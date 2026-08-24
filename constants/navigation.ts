@@ -1,4 +1,42 @@
 import { NavigationItem, Category } from "@/types";
+import { LucideIcon, Video, Globe, Share2, MessageSquare } from "lucide-react";
+
+export interface SocialLink {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+export const HEADER_NAV_LINKS: NavigationItem[] = [
+  { title: "Home", href: "/" },
+  { title: "Shop", href: "/shop" },
+  { title: "Deals", href: "/deals", badge: "HOT" },
+  { title: "Blog", href: "/blog" },
+  { title: "Contact", href: "/contact" },
+];
+
+export const SOCIAL_LINKS: SocialLink[] = [
+  {
+    title: "YouTube",
+    href: "https://youtube.com",
+    icon: Video,
+  },
+  {
+    title: "GitHub",
+    href: "https://github.com",
+    icon: Globe,
+  },
+  {
+    title: "LinkedIn",
+    href: "https://linkedin.com",
+    icon: Share2,
+  },
+  {
+    title: "Facebook",
+    href: "https://facebook.com",
+    icon: MessageSquare,
+  },
+];
 
 export const CATEGORIES: Category[] = [
   {
@@ -31,14 +69,6 @@ export const CATEGORIES: Category[] = [
     slug: "gaming-accessories",
     icon: "Gamepad2",
   },
-];
-
-export const MAIN_NAV_ITEMS: NavigationItem[] = [
-  { title: "Home", href: "/" },
-  { title: "Audio & Wireless", href: "/category/audio-headphones" },
-  { title: "Smartphones", href: "/category/smartphones-tablets" },
-  { title: "Laptops", href: "/category/laptops-workstations" },
-  { title: "Special Deals", href: "/deals", badge: "HOT" },
 ];
 
 export const CUSTOMER_CARE_LINKS: NavigationItem[] = [

@@ -1,5 +1,6 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { Container } from "@/components/layout/Container";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Product } from "@/types";
@@ -71,28 +72,30 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      <main className="flex-1 container mx-auto px-4 sm:px-6 py-8 space-y-12">
-        <HeroBanner />
+      <main className="flex-1 py-8">
+        <Container className="space-y-12">
+          <HeroBanner />
 
-        {/* Featured Products Section */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Featured Electronics
-              </h2>
-              <p className="text-sm text-slate-500">
-                Top rated gadgets selected for performance and quality.
-              </p>
+          {/* Featured Products Section */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  Featured Electronics
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Top rated gadgets selected for performance and quality.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {FEATURED_PRODUCTS.map((product) => (
-              <ProductCard key={product.id} {...product} />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {FEATURED_PRODUCTS.map((product) => (
+                <ProductCard key={product.id} {...product} />
+              ))}
+            </div>
+          </section>
+        </Container>
       </main>
 
       <Footer />

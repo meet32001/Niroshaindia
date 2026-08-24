@@ -1,25 +1,24 @@
 import Link from "next/link";
-import { Cpu, Mail, Phone, MapPin } from "lucide-react";
+import { Container } from "@/components/layout/Container";
+import { Logo } from "@/components/header/Logo";
+import { SocialMedia } from "@/components/shared/SocialMedia";
 import { CATEGORIES, CUSTOMER_CARE_LINKS, LEGAL_LINKS } from "@/constants/navigation";
+import { MapPin, Phone, Mail } from "lucide-react";
 
 export function Footer() {
   return (
     <footer className="border-t bg-slate-900 text-slate-200 mt-auto">
-      <div className="container mx-auto px-4 sm:px-6 py-12">
+      <Container className="py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand Col */}
+          {/* Brand & Social Col */}
           <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2 font-bold text-xl text-white">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-shop-orange text-white">
-                <Cpu className="h-4 w-4" />
-              </div>
-              <span>
-                nirosha<span className="text-shop-orange">.in</span>
-              </span>
-            </Link>
+            <Logo spanClassName="text-white" />
             <p className="text-xs text-slate-400 leading-relaxed">
               India&apos;s trusted platform for high-performance consumer electronics, smartphones, audio systems, and smart accessories.
             </p>
+            <div className="pt-2">
+              <SocialMedia iconClassName="border-slate-700 text-slate-300 hover:border-shop-orange" />
+            </div>
           </div>
 
           {/* Categories */}
@@ -80,7 +79,7 @@ export function Footer() {
             ))}
           </div>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }
