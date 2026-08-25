@@ -52,22 +52,26 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Build Sanity Product references array
-      const sanityProducts = lineItems.data.map((item) => {
-        const stripeProduct = item.price?.product as Stripe.Product | undefined;
-        const refId = stripeProduct?.metadata?.id || item.id;
+      // Build Sanity Product references array (filtering out non-existent mock IDs)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sanityProducts: any[] = [];
 
-        return {
-          _key: crypto.randomUUID(),
-          product: refId
-            ? {
-                _type: "reference",
-                _ref: refId,
-              }
-            : undefined,
-          quantity: item.quantity || 1,
-        };
-      });
+      for (const item of lineItems.data) {
+        const stripeProduct = item.price?.product as Stripe.Product | undefined;
+        const prodId = stripeProduct?.metadata?.id || "";
+        const isMock = !prodId || prodId.startsWith("mock-");
+
+        if (!isMock) {
+          sanityProducts.push({
+            _key: crypto.randomUUID(),
+            product: {
+              _type: "reference",
+              _ref: prodId,
+            },
+            quantity: item.quantity || 1,
+          });
+        }
+      }
 
       // Assemble Sanity Order document strictly matching orderType.ts schema
       const orderDoc = {
@@ -90,17 +94,17 @@ export async function POST(req: NextRequest) {
       const createdOrder = await backendClient.create(orderDoc as any);
       console.log("🎉 SUCCESS! Created Order Document ID:", createdOrder._id);
 
-      // Inventory Stock Decrement (isolated per product)
+      // Inventory Stock Decrement (isolated per product, skipping mock items)
       for (const item of lineItems.data) {
         const stripeProduct = item.price?.product as Stripe.Product | undefined;
-        const productId = stripeProduct?.metadata?.id;
-        const quantityPurchased = item.quantity || 1;
+        const productId = stripeProduct?.metadata?.id || "";
+        const isMock = !productId || productId.startsWith("mock-");
 
-        if (productId) {
+        if (!isMock) {
           try {
             const product = await backendClient.getDocument(productId);
             if (product && typeof product.stock === "number") {
-              const newStock = Math.max(0, product.stock - quantityPurchased);
+              const newStock = Math.max(0, product.stock - (item.quantity || 1));
               await backendClient
                 .patch(productId)
                 .set({ stock: newStock })
