@@ -1,32 +1,51 @@
 "use client";
 
-import { useState } from "react";
 import { Heart } from "lucide-react";
+import toast from "react-hot-toast";
+import { useStore } from "@/store";
 import { cn } from "@/lib/utils";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function AddToWishlistButton({ product }: { product?: any }) {
-  const [isWishlisted, setIsWishlisted] = useState(false);
+export interface AddToWishlistButtonProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  product: any;
+  className?: string;
+}
 
-  const toggleWishlist = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
-    if (product) {
-      console.log("Toggled wishlist for product:", product.name || product.title);
+export function AddToWishlistButton({
+  product,
+  className,
+}: AddToWishlistButtonProps) {
+  const { favoriteProduct, addToFavorite } = useStore();
+
+  const id = String(product?._id || product?.id || "");
+  const isFavorite = favoriteProduct.some(
+    (item) => String(item._id || item.id || "") === id
+  );
+
+  const handleToggleFavorite = () => {
+    addToFavorite(product);
+    if (isFavorite) {
+      toast.success("Removed from wishlist");
+    } else {
+      toast.success("Added to wishlist");
     }
   };
 
   return (
     <button
-      onClick={toggleWishlist}
-      aria-label="Add to Wishlist"
+      onClick={handleToggleFavorite}
       className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-full bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200/80 dark:border-slate-800 transition-all duration-300 hover:scale-110 hover:text-rose-500 cursor-pointer",
-        isWishlisted && "text-rose-500 fill-rose-500 bg-rose-50 border-rose-200"
+        "p-2 rounded-full border transition-all duration-300 shadow-xs cursor-pointer",
+        isFavorite
+          ? "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-600"
+          : "bg-white/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500 hover:border-rose-200",
+        className
       )}
+      aria-label="Add to Wishlist"
     >
-      <Heart className={cn("h-4 w-4", isWishlisted && "fill-rose-500")} />
+      <Heart
+        className={cn("h-4 w-4 transition-transform active:scale-125", isFavorite && "fill-rose-600 text-rose-600")}
+      />
     </button>
   );
 }
