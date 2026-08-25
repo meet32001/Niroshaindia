@@ -35,9 +35,9 @@ export async function HomeCategories() {
             <Link
               key={category._id || category.id || index}
               href={`/category/${slug}`}
-              className="bg-shop-light-pink/40 dark:bg-slate-900 p-4 rounded-xl flex items-center gap-4 hover:shadow-md border border-orange-100 dark:border-slate-800 transition-all duration-300 group"
+              className="bg-[#F8FAFC] dark:bg-slate-900 p-4 rounded-2xl flex items-center gap-4 hover:shadow-md border border-green-100 dark:border-slate-800 transition-all duration-300 group"
             >
-              <div className="w-20 h-20 overflow-hidden rounded-lg bg-white dark:bg-slate-800 p-1.5 border border-slate-200 dark:border-slate-700 shrink-0 relative flex items-center justify-center">
+              <div className="w-20 h-20 overflow-hidden rounded-xl bg-white dark:bg-slate-800 p-1.5 border border-slate-200/80 dark:border-slate-700 shrink-0 relative flex items-center justify-center">
                 <Image
                   src={imageUrl}
                   alt={category.title}
@@ -48,10 +48,10 @@ export async function HomeCategories() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-base font-semibold text-shop-dark dark:text-slate-100 group-hover:text-shop-orange transition-colors">
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 transition-colors">
                   {category.title}
                 </h3>
-                <p className="text-xs font-bold text-shop-orange">
+                <p className="text-xs font-bold text-emerald-600">
                   {count} {count === 1 ? "Item" : "Items"} Available
                 </p>
               </div>

@@ -17,6 +17,13 @@
   --font-sans: var(--font-poppins), sans-serif;
   --font-heading: var(--font-poppins), sans-serif;
 
+  --color-shop-dark-green: var(--shop-dark-green);
+  --color-shop-light-green: var(--shop-light-green);
+  --color-shop-btn-dark-green: var(--shop-btn-dark-green);
+  --color-shop-light-bg: var(--shop-light-bg);
+  --color-shop-banner-bg: var(--shop-banner-bg);
+  --color-shop-dark-text: var(--shop-dark-text);
+  --color-shop-light-text: var(--shop-light-text);
   --color-shop-light-pink: var(--shop-light-pink);
   --color-shop-orange: var(--shop-orange);
   --color-shop-dark: var(--shop-dark);
@@ -64,12 +71,19 @@
 }
 
 :root {
-  /* Brand color palette for Nirosha India */
-  --shop-light-pink: #FCF0E4;
-  --shop-orange: #FF6000;
-  --shop-dark: #0F172A;
-  --shop-slate: #1E293B;
-  --shop-light: #F8FAFC;
+  /* Brand color palette for shopcart - Emerald Green Design System */
+  --shop-dark-green: #15803d;
+  --shop-light-green: #22c55e;
+  --shop-btn-dark-green: #166534;
+  --shop-light-bg: #f8fafc;
+  --shop-banner-bg: #fbf6ee;
+  --shop-dark-text: #1e293b;
+  --shop-light-text: #64748b;
+  --shop-orange: #15803d; /* Aliased primary accent to Emerald Green */
+  --shop-light-pink: #fbf6ee;
+  --shop-dark: #0f172a;
+  --shop-slate: #1e293b;
+  --shop-light: #f8fafc;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -77,18 +91,18 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.22 35);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: #FCF0E4;
+  --primary: #15803d;
+  --primary-foreground: #ffffff;
+  --secondary: #fbf6ee;
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: #FCF0E4;
+  --accent: #fbf6ee;
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.65 0.22 35);
+  --ring: #15803d;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -106,11 +120,18 @@
 }
 
 .dark {
-  --shop-light-pink: #2D1F18;
-  --shop-orange: #FF7B25;
+  --shop-dark-green: #22c55e;
+  --shop-light-green: #4ade80;
+  --shop-btn-dark-green: #15803d;
+  --shop-light-bg: #0f172a;
+  --shop-banner-bg: #1e293b;
+  --shop-dark-text: #f8fafc;
+  --shop-light-text: #94a3b8;
+  --shop-orange: #22c55e;
+  --shop-light-pink: #1e293b;
   --shop-dark: #020617;
-  --shop-slate: #0F172A;
-  --shop-light: #1E293B;
+  --shop-slate: #0f172a;
+  --shop-light: #1e293b;
 
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -118,8 +139,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.22 35);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #22c55e;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -129,7 +150,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #22c55e;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

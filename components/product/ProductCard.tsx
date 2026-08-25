@@ -38,9 +38,9 @@ export function ProductCard(product: any) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-800 hover:shadow-md transition-shadow overflow-hidden group flex flex-col justify-between h-full">
-      {/* Top Image Container */}
-      <div className="relative bg-slate-50 dark:bg-slate-800/50 overflow-hidden aspect-square flex items-center justify-center p-4">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200/80 dark:border-slate-800 hover:shadow-md transition-shadow overflow-hidden group flex flex-col justify-between h-full">
+      {/* Top Image Container with Soft Background */}
+      <div className="relative bg-[#F8FAFC] dark:bg-slate-800/50 overflow-hidden aspect-square flex items-center justify-center p-4">
         {/* Image */}
         <Link href={`/product/${slug}`} className="w-full h-full relative flex items-center justify-center">
           <Image
@@ -55,7 +55,7 @@ export function ProductCard(product: any) {
         {/* Status Badge (Top Left) */}
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1">
           {status === "sale" && (
-            <span className="bg-shop-orange text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shadow-xs">
+            <span className="bg-emerald-600 text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shadow-xs">
               Sale!
             </span>
           )}
@@ -90,20 +90,20 @@ export function ProductCard(product: any) {
           <h3 className="line-clamp-1">
             <Link
               href={`/product/${slug}`}
-              className="text-xs md:text-sm font-semibold text-shop-dark dark:text-slate-100 hover:text-shop-orange line-clamp-1 transition-colors"
+              className="text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-100 hover:text-emerald-600 line-clamp-1 transition-colors"
             >
               {name}
             </Link>
           </h3>
 
-          {/* Ratings */}
+          {/* Green Star Ratings */}
           <div className="flex items-center gap-1 pt-0.5">
-            <div className="flex items-center text-amber-400">
+            <div className="flex items-center text-emerald-600">
               {[...Array(5)].map((_, i) => (
-                <Star key={i} className="h-3 w-3 fill-amber-400" />
+                <Star key={i} className="h-3 w-3 fill-emerald-600 text-emerald-600" />
               ))}
             </div>
-            <span className="text-xs text-slate-400 ml-1">
+            <span className="text-xs text-slate-400 ml-1 font-medium">
               ({product.reviewsCount || 42})
             </span>
           </div>

@@ -1,4 +1,3 @@
-import { currentUser } from "@clerk/nextjs/server";
 import { Container } from "@/components/layout/Container";
 import { Logo } from "@/components/header/Logo";
 import { HeaderMenu } from "@/components/header/HeaderMenu";
@@ -10,19 +9,8 @@ import { SignInButton } from "@/components/header/SignInButton";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 
 export async function Header() {
-  const user = await currentUser();
-
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      {/* Top Banner Announcement */}
-      <div className="bg-shop-orange text-white text-xs font-medium py-1.5 text-center tracking-wide shadow-sm">
-        {user ? (
-          <span>Welcome back, {user.firstName || user.emailAddresses[0]?.emailAddress}! Exclusive deals are active for you.</span>
-        ) : (
-          <span>Welcome to Nirosha India — India&apos;s Premier Destination for Premium Electronics & Gadgets</span>
-        )}
-      </div>
-
+    <header className="sticky top-0 z-50 w-full border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
       <Container>
         <div className="flex h-16 items-center justify-between gap-4 sm:gap-6">
           {/* Mobile Menu Trigger & Logo */}

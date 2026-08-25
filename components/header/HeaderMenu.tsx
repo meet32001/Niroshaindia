@@ -24,20 +24,20 @@ export function HeaderMenu() {
             className={cn(
               "relative py-1 transition-colors duration-200 flex items-center gap-1.5 font-medium",
               isActive
-                ? "text-shop-orange font-semibold"
-                : "text-slate-700 dark:text-slate-200 hover:text-shop-orange"
+                ? "text-emerald-600 font-semibold"
+                : "text-slate-700 dark:text-slate-200 hover:text-emerald-600"
             )}
           >
             <span>{item.title}</span>
             {item.badge && (
-              <Badge className="bg-shop-orange text-white text-[10px] px-1.5 py-0 h-4 hover:bg-shop-orange">
+              <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4 hover:bg-emerald-600">
                 {item.badge}
               </Badge>
             )}
             {/* Animated active indicator bar */}
             <span
               className={cn(
-                "absolute bottom-0 left-0 h-0.5 w-full bg-shop-orange rounded-full transition-transform duration-300 origin-left scale-x-0",
+                "absolute bottom-0 left-0 h-0.5 w-full bg-emerald-600 rounded-full transition-transform duration-300 origin-left scale-x-0",
                 isActive && "scale-x-100"
               )}
             />

@@ -24,7 +24,7 @@ export function FavoriteButton({ itemCount: propCount }: FavoriteButtonProps) {
     >
       <Heart className="h-5 w-5" />
       {totalCount > 0 && (
-        <Badge className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 flex items-center justify-center text-[10px] bg-shop-orange hover:bg-amber-600 text-white font-extrabold rounded-full">
+        <Badge className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 flex items-center justify-center text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-full">
           {totalCount}
         </Badge>
       )}

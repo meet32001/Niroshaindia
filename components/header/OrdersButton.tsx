@@ -35,12 +35,12 @@ export function OrdersButton() {
   return (
     <Link
       href="/orders"
-      className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-shop-orange transition-colors"
+      className="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 cursor-pointer"
       title="My Orders"
     >
       <Package className="h-5 w-5" />
       {orderCount > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-shop-orange px-1 text-[10px] font-bold text-white shadow-xs">
+        <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 flex items-center justify-center text-[10px] bg-emerald-600 text-white font-extrabold rounded-full">
           {orderCount}
         </span>
       )}
