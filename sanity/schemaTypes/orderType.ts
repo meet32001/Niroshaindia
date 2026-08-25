@@ -83,8 +83,15 @@ export const orderType = defineType({
     defineField({
       name: "address",
       title: "Shipping Address",
-      type: "reference",
-      to: [{ type: "address" }],
+      type: "object",
+      fields: [
+        defineField({ name: "name", title: "Name", type: "string" }),
+        defineField({ name: "addressLine1", title: "Address Line 1", type: "string" }),
+        defineField({ name: "city", title: "City", type: "string" }),
+        defineField({ name: "state", title: "State", type: "string" }),
+        defineField({ name: "pincode", title: "Pincode", type: "string" }),
+        defineField({ name: "phone", title: "Phone", type: "string" }),
+      ],
     }),
     defineField({
       name: "status",

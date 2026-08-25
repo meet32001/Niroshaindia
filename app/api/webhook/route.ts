@@ -69,27 +69,26 @@ export async function POST(req: NextRequest) {
         };
       });
 
-      // Assemble Sanity Order document
+      // Assemble Sanity Order document strictly matching orderType.ts schema
       const orderDoc = {
         _type: "order",
         orderNumber: session.metadata?.orderNumber || `ORD-${Date.now()}`,
         stripeCheckoutSessionId: session.id,
-        stripePaymentIntentId: (session.payment_intent as string) || "",
-        stripeCustomerId: (session.customer as string) || "",
-        clerkUserId: session.metadata?.clerkUserId || "",
+        stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : "",
+        clerkUserId: session.metadata?.clerkUserId || "guest_user",
         customerName: session.metadata?.customerName || session.customer_details?.name || "Customer",
-        email: session.customer_details?.email || session.metadata?.customerEmail || "",
-        currency: session.currency || "inr",
+        customerEmail: session.customer_details?.email || session.metadata?.customerEmail || "customer@example.com",
+        currency: (session.currency || "inr").toUpperCase(),
         totalPrice: (session.amount_total || 0) / 100,
         status: "paid",
-        orderDate: new Date().toISOString(),
         products: sanityProducts,
         address: parsedAddress,
       };
 
-      console.log(`Creating order in Sanity: ${orderDoc.orderNumber}`);
-      await backendClient.create(orderDoc);
-      console.log("✅ Order created successfully in Sanity!");
+      console.log("📝 Attempting to write order document to Sanity:", orderDoc.orderNumber);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const createdOrder = await backendClient.create(orderDoc as any);
+      console.log("🎉 SUCCESS! Created Order Document ID:", createdOrder._id);
 
       // Inventory Stock Decrement (isolated per product)
       for (const item of lineItems.data) {
@@ -113,8 +112,10 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-    } catch (orderErr) {
-      console.error("❌ Error during Sanity order creation:", orderErr);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (sanityErr: any) {
+      console.error("❌ Sanity Mutation Error:", sanityErr?.message || sanityErr);
+      console.error("Detailed Error Details:", JSON.stringify(sanityErr?.details || sanityErr, null, 2));
     }
   }
 
