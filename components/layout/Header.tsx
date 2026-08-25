@@ -12,7 +12,7 @@ export async function Header() {
   const user = await currentUser();
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       {/* Top Banner Announcement */}
       <div className="bg-shop-orange text-white text-xs font-medium py-1.5 text-center tracking-wide shadow-sm">
         {user ? (

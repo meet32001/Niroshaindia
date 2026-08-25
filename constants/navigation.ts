@@ -7,6 +7,13 @@ export interface SocialLink {
   icon: LucideIcon;
 }
 
+export const PRODUCT_TYPES = [
+  { title: "Gadget", value: "gadget" },
+  { title: "Appliances", value: "appliances" },
+  { title: "Refrigerators", value: "refrigerators" },
+  { title: "Others", value: "others" },
+];
+
 export const HEADER_NAV_LINKS: NavigationItem[] = [
   { title: "Home", href: "/" },
   { title: "Shop", href: "/shop" },
