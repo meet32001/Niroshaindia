@@ -14,17 +14,18 @@ export function SearchBar() {
       {/* Desktop Search Bar */}
       <div className="hidden md:flex flex-1 max-w-sm items-center relative">
         <Input
-          type="search"
+          type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search headphones, laptops, mobiles..."
-          className="w-full pl-9 pr-8 h-9 text-xs rounded-full bg-slate-100 dark:bg-slate-800 border-none focus-visible:ring-1 focus-visible:ring-shop-orange"
+          className="w-full pl-9 pr-8 h-9 text-xs rounded-full bg-slate-100 dark:bg-slate-800 border-none focus-visible:ring-1 focus-visible:ring-emerald-600 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
         />
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
         {query && (
           <button
+            type="button"
             onClick={() => setQuery("")}
-            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
