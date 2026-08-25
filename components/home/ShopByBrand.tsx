@@ -7,24 +7,26 @@ import { urlFor } from "@/sanity/lib/image";
 export async function ShopByBrand() {
   const brands = await getAllBrands();
 
-  // Filter only brands with a valid image asset and exclude 'Nirosha Pro'
+  // Explicitly allow only the 4 brands with valid assets (Apple, Sony, Dell, HP)
+  const allowedBrandNames = ["apple", "sony", "dell", "hp"];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const validBrands = brands.filter((brand: any) => {
-    const title = (brand.title || "").toLowerCase();
+  const featuredBrands = brands.filter((brand: any) => {
+    const name = (brand.title || "").toLowerCase().trim();
     const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
-    const slug = (rawSlug || "").toLowerCase();
+    const slug = (rawSlug || "").toLowerCase().trim();
     const hasImage = Boolean(
       brand.image &&
       (brand.image.asset || brand.image._ref || typeof brand.image === "string")
     );
 
-    return hasImage && title !== "nirosha pro" && slug !== "nirosha-pro";
+    return (allowedBrandNames.includes(name) || allowedBrandNames.includes(slug)) && hasImage;
   });
 
   return (
     <section className="bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 sm:p-8 lg:p-10 my-10 shadow-xs">
       {/* Top Header Row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
           Shop By Brands
         </h2>
@@ -36,10 +38,10 @@ export async function ShopByBrand() {
         </Link>
       </div>
 
-      {/* Brand Logo Cards Grid */}
+      {/* Exactly 4 Brand Logo Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6 sm:my-8">
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        {validBrands.map((brand: any, index: number) => {
+        {featuredBrands.map((brand: any, index: number) => {
           const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
           const slug = rawSlug || "brand";
 
