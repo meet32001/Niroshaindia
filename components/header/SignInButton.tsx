@@ -28,7 +28,7 @@ export function SignInButton() {
           href="/sign-in"
           className={cn(
             buttonVariants({ variant: "outline", size: "sm" }),
-            "hidden sm:inline-flex gap-2 rounded-full border-slate-300 dark:border-slate-700 hover:border-shop-orange hover:text-shop-orange transition-colors cursor-pointer text-xs font-semibold"
+            "hidden sm:inline-flex gap-2 rounded-full border-slate-300 dark:border-slate-700 hover:border-emerald-600 hover:text-emerald-600 transition-colors cursor-pointer text-xs font-semibold"
           )}
         >
           <User className="h-4 w-4" />

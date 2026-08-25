@@ -13,12 +13,12 @@ export function NoAccess() {
           <Logo />
         </div>
 
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-shop-orange/10 text-shop-orange mx-auto">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto">
           <Lock className="h-7 w-7" />
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-xl md:text-2xl font-bold text-shop-dark dark:text-slate-100">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
             Welcome Back!
           </h2>
           <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -29,7 +29,7 @@ export function NoAccess() {
         <div className="pt-2">
           <Link
             href="/sign-in"
-            className="block w-full bg-shop-orange hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl text-sm text-center transition-all duration-300 shadow-md cursor-pointer"
+            className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl text-sm text-center transition-all duration-300 shadow-md cursor-pointer"
           >
             Sign In / Register
           </Link>

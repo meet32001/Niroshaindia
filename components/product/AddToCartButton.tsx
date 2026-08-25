@@ -41,7 +41,7 @@ export function AddToCartButton({ product, className }: AddToCartButtonProps) {
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
             Subtotal
           </span>
-          <PriceFormatter amount={itemSubtotal} className="text-xs font-bold text-shop-orange" />
+          <PriceFormatter amount={itemSubtotal} className="text-xs font-bold text-emerald-600" />
         </div>
       </div>
     );
@@ -52,7 +52,7 @@ export function AddToCartButton({ product, className }: AddToCartButtonProps) {
       onClick={handleAddToCart}
       disabled={isOutOfStock}
       className={cn(
-        "w-full bg-shop-orange hover:bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed text-white font-semibold py-2 px-3 rounded-lg text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all duration-300 shadow-xs cursor-pointer",
+        "w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed text-white font-semibold py-2 px-3 rounded-lg text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all duration-300 shadow-xs cursor-pointer",
         className
       )}
     >

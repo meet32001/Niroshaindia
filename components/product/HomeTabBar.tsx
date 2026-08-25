@@ -24,10 +24,10 @@ export function HomeTabBar({ selectedTab, onTabSelect }: HomeTabBarProps) {
               key={item.value}
               onClick={() => onTabSelect(item.value)}
               className={cn(
-                "px-4 py-1.5 md:px-6 md:py-2 rounded-full text-sm font-semibold transition-all duration-300 cursor-pointer",
+                "px-5 py-2 rounded-full text-xs md:text-sm font-semibold transition-all duration-300 cursor-pointer border",
                 isActive
-                  ? "bg-shop-orange text-white border border-shop-orange shadow-md"
-                  : "border border-shop-orange/30 text-shop-dark dark:text-slate-200 hover:bg-shop-orange hover:text-white hover:border-shop-orange"
+                  ? "bg-[#16a34a] text-white border-[#16a34a] shadow-xs"
+                  : "border-green-200 text-slate-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-slate-800"
               )}
             >
               {item.title}
@@ -39,7 +39,7 @@ export function HomeTabBar({ selectedTab, onTabSelect }: HomeTabBarProps) {
       {/* Right Action Link */}
       <Link
         href="/shop"
-        className="border border-shop-orange/30 text-shop-dark dark:text-slate-200 hover:bg-shop-orange hover:text-white px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 shrink-0"
+        className="border border-green-200 text-slate-700 dark:text-slate-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 px-5 py-2 rounded-full text-xs md:text-sm font-semibold transition-all duration-300 shrink-0"
       >
         See all
       </Link>

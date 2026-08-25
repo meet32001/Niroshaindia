@@ -17,13 +17,13 @@ export function EmptyCart() {
         <motion.div
           animate={{ scale: [1, 1.05, 1] }}
           transition={{ repeat: Infinity, duration: 3 }}
-          className="flex h-20 w-20 items-center justify-center rounded-3xl bg-shop-orange/10 text-shop-orange mx-auto"
+          className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto"
         >
           <ShoppingBag className="h-10 w-10" />
         </motion.div>
 
         <div className="space-y-2">
-          <h2 className="text-xl md:text-2xl font-bold text-shop-dark dark:text-slate-100">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
             Your Cart is Feeling Lonely
           </h2>
           <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -34,7 +34,7 @@ export function EmptyCart() {
         <div className="pt-2">
           <Link
             href="/shop"
-            className="inline-flex items-center justify-center gap-2 bg-shop-orange hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl text-sm transition-all duration-300 shadow-md w-full"
+            className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl text-sm transition-all duration-300 shadow-md w-full cursor-pointer"
           >
             <span>Discover Products</span>
             <ArrowRight className="h-4 w-4" />

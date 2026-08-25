@@ -49,13 +49,13 @@ export function QuantityButtons({ product, className }: QuantityButtonsProps) {
         <Minus className="h-3.5 w-3.5" />
       </button>
 
-      <span className="text-xs font-extrabold text-shop-dark dark:text-slate-100 min-w-[20px] text-center">
+      <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 min-w-[20px] text-center">
         {itemCount}
       </span>
 
       <button
         onClick={handleIncrement}
-        className="h-7 w-7 rounded-md bg-shop-orange flex items-center justify-center text-white hover:bg-amber-600 transition-colors shadow-xs cursor-pointer"
+        className="h-7 w-7 rounded-md bg-emerald-600 flex items-center justify-center text-white hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
         aria-label="Increase quantity"
       >
         <Plus className="h-3.5 w-3.5" />

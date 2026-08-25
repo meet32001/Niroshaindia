@@ -47,9 +47,9 @@ export async function ShopByBrand() {
               <Link
                 key={brand._id || brand.id || index}
                 href={`/shop?brand=${slug}`}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 flex flex-col items-center justify-center h-20 hover:shadow-md hover:border-shop-orange transition-all duration-300 group text-center"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 flex flex-col items-center justify-center h-20 hover:shadow-md hover:border-emerald-500 transition-all duration-300 group text-center"
               >
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-shop-orange transition-colors">
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">
                   {brand.title}
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium">Official Partner</span>
@@ -66,13 +66,13 @@ export async function ShopByBrand() {
           return (
             <div
               key={index}
-              className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800 flex items-center gap-4 hover:border-shop-orange/40 transition-colors"
+              className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-300 transition-colors"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-shop-orange/10 text-shop-orange">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
                 <Icon className="h-6 w-6" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-shop-dark dark:text-slate-100">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   {item.title}
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">{item.subtitle}</p>
