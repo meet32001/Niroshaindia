@@ -59,13 +59,13 @@ export function SideMenu({ isOpen, onClose }: SideMenuProps) {
                   className={cn(
                     "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-shop-orange/10 text-shop-orange font-semibold"
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-slate-800 dark:text-emerald-400 font-semibold"
                       : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                   )}
                 >
                   <span>{item.title}</span>
                   {item.badge && (
-                    <Badge className="bg-shop-orange text-white text-[10px] px-1.5 py-0 h-4">
+                    <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4">
                       {item.badge}
                     </Badge>
                   )}
@@ -82,7 +82,7 @@ export function SideMenu({ isOpen, onClose }: SideMenuProps) {
             onClick={onClose}
             className={cn(
               buttonVariants({ variant: "default" }),
-              "w-full bg-shop-orange hover:bg-amber-600 text-white font-semibold gap-2 shadow-md flex items-center justify-center"
+              "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-2 shadow-md flex items-center justify-center"
             )}
           >
             <User className="h-4 w-4" />

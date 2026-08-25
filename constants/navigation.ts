@@ -17,7 +17,7 @@ export const PRODUCT_TYPES = [
 export const HEADER_NAV_LINKS: NavigationItem[] = [
   { title: "Home", href: "/" },
   { title: "Shop", href: "/shop" },
-  { title: "Deals", href: "/deal", badge: "HOT" },
+  { title: "Deals", href: "/deal" },
   { title: "Contact", href: "/contact" },
 ];
 
