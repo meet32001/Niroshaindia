@@ -8,40 +8,62 @@ export const brandType = defineType({
   icon: RocketIcon,
   fields: [
     defineField({
-      name: "title",
-      title: "Title",
+      name: "name",
+      title: "Brand Name",
       type: "string",
       validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "title",
+      title: "Title (Legacy Alias)",
+      type: "string",
     }),
     defineField({
       name: "slug",
       title: "Slug",
       type: "slug",
       options: {
-        source: "title",
+        source: (doc) => (doc.name as string) || (doc.title as string) || "brand",
         maxLength: 96,
       },
       validation: (Rule) => Rule.required(),
     }),
     defineField({
-      name: "description",
-      title: "Description",
-      type: "text",
-    }),
-    defineField({
-      name: "image",
+      name: "logo",
       title: "Brand Logo",
       type: "image",
       options: {
         hotspot: true,
       },
     }),
+    defineField({
+      name: "image",
+      title: "Brand Image (Legacy Alias)",
+      type: "image",
+      options: {
+        hotspot: true,
+      },
+    }),
+    defineField({
+      name: "description",
+      title: "Description",
+      type: "text",
+    }),
   ],
   preview: {
     select: {
+      name: "name",
       title: "title",
       subtitle: "description",
-      media: "image",
+      logo: "logo",
+      image: "image",
+    },
+    prepare({ name, title, subtitle, logo, image }) {
+      return {
+        title: name || title || "Brand",
+        subtitle,
+        media: logo || image,
+      };
     },
   },
 });

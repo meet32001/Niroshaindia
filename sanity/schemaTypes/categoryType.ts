@@ -8,20 +8,31 @@ export const categoryType = defineType({
   icon: TagIcon,
   fields: [
     defineField({
-      name: "title",
-      title: "Title",
+      name: "name",
+      title: "Category Name",
       type: "string",
       validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "title",
+      title: "Title (Legacy Alias)",
+      type: "string",
     }),
     defineField({
       name: "slug",
       title: "Slug",
       type: "slug",
       options: {
-        source: "title",
+        source: (doc) => (doc.name as string) || (doc.title as string) || "category",
         maxLength: 96,
       },
       validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "parent",
+      title: "Parent Category (Self-Referential Hierarchy)",
+      type: "reference",
+      to: [{ type: "category" }],
     }),
     defineField({
       name: "description",
@@ -50,9 +61,17 @@ export const categoryType = defineType({
   ],
   preview: {
     select: {
+      name: "name",
       title: "title",
       subtitle: "description",
       media: "image",
+    },
+    prepare({ name, title, subtitle, media }) {
+      return {
+        title: name || title || "Category",
+        subtitle,
+        media,
+      };
     },
   },
 });

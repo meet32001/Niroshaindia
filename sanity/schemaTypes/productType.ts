@@ -14,58 +14,79 @@ export const productType = defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: "title",
+      title: "Title (Legacy Alias)",
+      type: "string",
+    }),
+    defineField({
       name: "slug",
       title: "Slug",
       type: "slug",
       options: {
-        source: "name",
+        source: (doc) => (doc.name as string) || (doc.title as string) || "product",
         maxLength: 96,
       },
       validation: (Rule) => Rule.required(),
-    }),
-    defineField({
-      name: "images",
-      title: "Product Images",
-      type: "array",
-      of: [{ type: "image", options: { hotspot: true } }],
-    }),
-    defineField({
-      name: "description",
-      title: "Description",
-      type: "text",
-    }),
-    defineField({
-      name: "price",
-      title: "Price (INR ₹)",
-      type: "number",
-      validation: (Rule) => Rule.required().min(0),
-    }),
-    defineField({
-      name: "discount",
-      title: "Discount Price (INR ₹)",
-      type: "number",
-    }),
-    defineField({
-      name: "category",
-      title: "Category",
-      type: "reference",
-      to: [{ type: "category" }],
     }),
     defineField({
       name: "brand",
       title: "Brand",
       type: "reference",
       to: [{ type: "brand" }],
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "category",
+      title: "Category",
+      type: "reference",
+      to: [{ type: "category" }],
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: "description",
+      title: "Description",
+      type: "array",
+      of: [{ type: "block" }],
+    }),
+    defineField({
+      name: "is_active",
+      title: "Is Active",
+      type: "boolean",
+      initialValue: true,
+    }),
+    defineField({
+      name: "variants",
+      title: "Product Variants",
+      type: "array",
+      of: [{ type: "productVariant" }],
+      validation: (Rule) => Rule.min(1).error("At least 1 product variant is required."),
+    }),
+    // Legacy top-level fields for backwards compatibility with storefront cards & webhooks
+    defineField({
+      name: "images",
+      title: "Primary Images (Legacy)",
+      type: "array",
+      of: [{ type: "image", options: { hotspot: true } }],
+    }),
+    defineField({
+      name: "price",
+      title: "Selling Price INR ₹ (Legacy)",
+      type: "number",
+    }),
+    defineField({
+      name: "discount",
+      title: "Discount Price INR ₹ (Legacy)",
+      type: "number",
     }),
     defineField({
       name: "stock",
-      title: "Stock Count",
+      title: "Stock Count (Legacy)",
       type: "number",
       initialValue: 10,
     }),
     defineField({
       name: "status",
-      title: "Product Status Tag",
+      title: "Product Status Tag (Legacy)",
       type: "string",
       options: {
         list: [
@@ -77,16 +98,8 @@ export const productType = defineType({
     }),
     defineField({
       name: "productType",
-      title: "Product Type",
+      title: "Product Type Tag (Legacy)",
       type: "string",
-      options: {
-        list: [
-          { title: "Gadgets & Accessories", value: "gadget" },
-          { title: "Smart Appliances", value: "appliances" },
-          { title: "Refrigerators", value: "refrigerators" },
-          { title: "Other Electronics", value: "others" },
-        ],
-      },
       initialValue: "gadget",
     }),
     defineField({
@@ -98,15 +111,21 @@ export const productType = defineType({
   ],
   preview: {
     select: {
-      title: "name",
-      subtitle: "price",
-      media: "images.0",
+      name: "name",
+      title: "title",
+      brand: "brand.name",
+      price: "variants.0.price_cents",
+      legacyPrice: "price",
+      media: "variants.0.images.0",
+      legacyMedia: "images.0",
     },
-    prepare({ title, subtitle, media }) {
+    prepare({ name, title, brand, price, legacyPrice, media, legacyMedia }) {
+      const displayTitle = name || title || "Product";
+      const displayPrice = price ? `₹${(price / 100).toFixed(2)}` : legacyPrice ? `₹${legacyPrice}` : "";
       return {
-        title,
-        subtitle: subtitle ? `₹${subtitle}` : undefined,
-        media,
+        title: displayTitle,
+        subtitle: brand ? `${brand} ${displayPrice ? `• ${displayPrice}` : ""}` : displayPrice,
+        media: media || legacyMedia,
       };
     },
   },
