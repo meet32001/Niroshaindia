@@ -10,17 +10,24 @@ export async function POST(req: NextRequest) {
   const signature = headersList.get("stripe-signature");
 
   if (!signature) {
+    console.error("⚠️ Stripe Webhook Error: Missing stripe-signature header");
     return NextResponse.json({ error: "Missing stripe signature" }, { status: 400 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_placeholder";
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("⚠️ Stripe Webhook Error: STRIPE_WEBHOOK_SECRET is not configured");
+    return NextResponse.json({ error: "STRIPE_WEBHOOK_SECRET missing" }, { status: 500 });
+  }
+
   let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : "Webhook signature verification failed";
-    console.error(`Webhook Error: ${errorMsg}`);
+    const errorMsg = err instanceof Error ? err.message : "Unknown signature error";
+    console.error(`❌ Webhook Signature Verification Failed: ${errorMsg}`);
     return NextResponse.json({ error: `Webhook Error: ${errorMsg}` }, { status: 400 });
   }
 
@@ -28,50 +35,50 @@ export async function POST(req: NextRequest) {
     const session = event.data.object as Stripe.Checkout.Session;
 
     try {
-      const { orderNumber, customerName, customerEmail, clerkUserId, address } =
-        session.metadata || {};
+      console.log(`📦 Processing checkout.session.completed for session: ${session.id}`);
 
-      let parsedAddress = null;
-      if (address) {
-        try {
-          parsedAddress = JSON.parse(address);
-        } catch {
-          parsedAddress = address;
-        }
-      }
-
-      // Retrieve full line items from Stripe
+      // Retrieve full line items with product metadata expansion
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
         expand: ["data.price.product"],
       });
 
-      // Prepare Sanity Product references array
+      // Parse delivery address safely
+      let parsedAddress = null;
+      if (session.metadata?.address) {
+        try {
+          parsedAddress = JSON.parse(session.metadata.address);
+        } catch {
+          parsedAddress = session.metadata.address;
+        }
+      }
+
+      // Build Sanity Product references array
       const sanityProducts = lineItems.data.map((item) => {
         const stripeProduct = item.price?.product as Stripe.Product | undefined;
-        const productId = stripeProduct?.metadata?.id;
+        const refId = stripeProduct?.metadata?.id || item.id;
 
         return {
           _key: crypto.randomUUID(),
-          product: productId
+          product: refId
             ? {
                 _type: "reference",
-                _ref: productId,
+                _ref: refId,
               }
             : undefined,
           quantity: item.quantity || 1,
         };
       });
 
-      // Create Order Document in Sanity
+      // Assemble Sanity Order document
       const orderDoc = {
         _type: "order",
-        orderNumber: orderNumber || `ORD-${Date.now()}`,
+        orderNumber: session.metadata?.orderNumber || `ORD-${Date.now()}`,
         stripeCheckoutSessionId: session.id,
-        stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : "",
-        stripeCustomerId: typeof session.customer === "string" ? session.customer : "",
-        clerkUserId: clerkUserId || "",
-        customerName: customerName || session.customer_details?.name || "Customer",
-        email: customerEmail || session.customer_details?.email || "",
+        stripePaymentIntentId: (session.payment_intent as string) || "",
+        stripeCustomerId: (session.customer as string) || "",
+        clerkUserId: session.metadata?.clerkUserId || "",
+        customerName: session.metadata?.customerName || session.customer_details?.name || "Customer",
+        email: session.customer_details?.email || session.metadata?.customerEmail || "",
         currency: session.currency || "inr",
         totalPrice: (session.amount_total || 0) / 100,
         status: "paid",
@@ -80,9 +87,11 @@ export async function POST(req: NextRequest) {
         address: parsedAddress,
       };
 
+      console.log(`Creating order in Sanity: ${orderDoc.orderNumber}`);
       await backendClient.create(orderDoc);
+      console.log("✅ Order created successfully in Sanity!");
 
-      // Decrement Inventory Stock in Sanity
+      // Inventory Stock Decrement (isolated per product)
       for (const item of lineItems.data) {
         const stripeProduct = item.price?.product as Stripe.Product | undefined;
         const productId = stripeProduct?.metadata?.id;
@@ -90,7 +99,6 @@ export async function POST(req: NextRequest) {
 
         if (productId) {
           try {
-            // Fetch current product stock
             const product = await backendClient.getDocument(productId);
             if (product && typeof product.stock === "number") {
               const newStock = Math.max(0, product.stock - quantityPurchased);
@@ -98,17 +106,18 @@ export async function POST(req: NextRequest) {
                 .patch(productId)
                 .set({ stock: newStock })
                 .commit();
+              console.log(`📉 Decremented stock for ${productId}: ${product.stock} -> ${newStock}`);
             }
-          } catch (patchErr) {
-            console.error(`Failed to update stock for product ${productId}:`, patchErr);
+          } catch (stockErr) {
+            console.error(`⚠️ Stock update skipped for product ${productId}:`, stockErr);
           }
         }
       }
-    } catch (dbErr) {
-      console.error("Error creating Sanity order or updating stock:", dbErr);
-      return NextResponse.json({ error: "Failed to process order" }, { status: 500 });
+    } catch (orderErr) {
+      console.error("❌ Error during Sanity order creation:", orderErr);
     }
   }
 
+  // Always return 200 OK to Stripe
   return NextResponse.json({ received: true }, { status: 200 });
 }
