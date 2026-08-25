@@ -7,13 +7,18 @@ import { urlFor } from "@/sanity/lib/image";
 export async function ShopByBrand() {
   const brands = await getAllBrands();
 
-  // 1. Exclude 'Nirosha Pro'
+  // Filter only brands with a valid image asset and exclude 'Nirosha Pro'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filteredBrands = brands.filter((brand: any) => {
+  const validBrands = brands.filter((brand: any) => {
     const title = (brand.title || "").toLowerCase();
     const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
     const slug = (rawSlug || "").toLowerCase();
-    return title !== "nirosha pro" && slug !== "nirosha-pro";
+    const hasImage = Boolean(
+      brand.image &&
+      (brand.image.asset || brand.image._ref || typeof brand.image === "string")
+    );
+
+    return hasImage && title !== "nirosha pro" && slug !== "nirosha-pro";
   });
 
   return (
@@ -31,10 +36,10 @@ export async function ShopByBrand() {
         </Link>
       </div>
 
-      {/* Brand Logo Cards Grid (7-column layout without Nirosha Pro) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 my-6 sm:my-8">
+      {/* Brand Logo Cards Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6 sm:my-8">
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        {filteredBrands.map((brand: any, index: number) => {
+        {validBrands.map((brand: any, index: number) => {
           const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
           const slug = rawSlug || "brand";
 
@@ -49,25 +54,21 @@ export async function ShopByBrand() {
             }
           }
 
+          if (!imageUrl) return null;
+
           return (
             <Link
               key={brand._id || brand.id || index}
               href={`/shop?brand=${slug}`}
-              className="bg-white dark:bg-slate-900 rounded-xl p-3 sm:p-4 shadow-2xs border border-slate-200/80 dark:border-slate-800 flex items-center justify-center h-20 sm:h-24 hover:shadow-md hover:scale-105 transition-all duration-200 group cursor-pointer"
+              className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-2xs border border-slate-200/80 dark:border-slate-800 flex items-center justify-center h-20 sm:h-24 hover:shadow-md hover:scale-105 transition-all duration-200 group cursor-pointer"
             >
-              {imageUrl ? (
-                <Image
-                  src={imageUrl}
-                  alt={brand.title || "Brand"}
-                  width={120}
-                  height={60}
-                  className="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105"
-                />
-              ) : (
-                <span className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-emerald-600 transition-colors text-center tracking-tight">
-                  {brand.title}
-                </span>
-              )}
+              <Image
+                src={imageUrl}
+                alt={brand.title || "Brand Logo"}
+                width={140}
+                height={60}
+                className="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              />
             </Link>
           );
         })}
