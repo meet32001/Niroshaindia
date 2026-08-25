@@ -20,7 +20,27 @@ export interface Category {
   id: string;
   title: string;
   slug: string;
-  icon: string;
+  icon?: string;
+  productCount?: number;
+  image?: string;
+}
+
+export interface Brand {
+  id: string;
+  title: string;
+  slug: string;
+  image?: string;
+  description?: string;
+}
+
+export interface Blog {
+  id: string;
+  title: string;
+  slug: string;
+  publishedAt: string;
+  mainImage?: string;
+  isLatest?: boolean;
+  categories?: string[];
 }
 
 export interface NavigationItem {

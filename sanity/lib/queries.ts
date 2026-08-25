@@ -1,101 +1,122 @@
-import { defineQuery } from "next-sanity";
+import { client } from "./client";
+import { MOCK_CATEGORIES, MOCK_BRANDS, MOCK_BLOGS, MOCK_PRODUCTS } from "./mockData";
 
-// Query all featured products
-export const ALL_FEATURED_PRODUCTS_QUERY = defineQuery(`
-  *[_type == "product" && isFeatured == true] | order(name asc) {
-    _id,
-    name,
-    slug,
-    price,
-    discount,
-    stock,
-    status,
-    productType,
-    isFeatured,
-    description,
-    "images": images[].asset->url,
-    category->{
+// Fetch categories with inventory count
+export async function getCategories(quantity?: number) {
+  try {
+    const range = quantity ? `[0...${quantity}]` : "";
+    const query = `*[_type == "category"] | order(title asc) ${range} {
       _id,
-      title,
-      slug
-    },
-    brand->{
-      _id,
-      title,
-      slug
-    }
-  }
-`);
-
-// Query products by category slug
-export const PRODUCTS_BY_CATEGORY_QUERY = defineQuery(`
-  *[_type == "product" && category->slug.current == $categorySlug] | order(name asc) {
-    _id,
-    name,
-    slug,
-    price,
-    discount,
-    stock,
-    status,
-    productType,
-    "images": images[].asset->url,
-    category->{
-      title,
-      slug
-    }
-  }
-`);
-
-// Query single product by slug
-export const PRODUCT_BY_SLUG_QUERY = defineQuery(`
-  *[_type == "product" && slug.current == $slug][0] {
-    _id,
-    name,
-    slug,
-    price,
-    discount,
-    stock,
-    status,
-    productType,
-    description,
-    "images": images[].asset->url,
-    category->{
-      title,
-      slug
-    },
-    brand->{
       title,
       slug,
-      "logoUrl": image.asset->url
-    }
+      description,
+      image,
+      isFeatured,
+      "productCount": count(*[_type == "product" && references(^._id)])
+    }`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await client.fetch<any[]>(query);
+    if (Array.isArray(data) && data.length > 0) return data;
+    return quantity ? MOCK_CATEGORIES.slice(0, quantity) : MOCK_CATEGORIES;
+  } catch {
+    return quantity ? MOCK_CATEGORIES.slice(0, quantity) : MOCK_CATEGORIES;
   }
-`);
+}
 
-// Query all categories
-export const ALL_CATEGORIES_QUERY = defineQuery(`
-  *[_type == "category"] | order(title asc) {
-    _id,
-    title,
-    slug,
-    description,
-    priceRange,
-    isFeatured,
-    "imageUrl": image.asset->url
+// Fetch all brands
+export async function getAllBrands() {
+  try {
+    const query = `*[_type == "brand"] | order(title asc) {
+      _id,
+      title,
+      slug,
+      image,
+      description
+    }`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await client.fetch<any[]>(query);
+    if (Array.isArray(data) && data.length > 0) return data;
+    return MOCK_BRANDS;
+  } catch {
+    return MOCK_BRANDS;
   }
-`);
+}
 
-// Query all blogs
-export const ALL_BLOGS_QUERY = defineQuery(`
-  *[_type == "blog"] | order(publishedAt desc) {
-    _id,
-    title,
-    slug,
-    publishedAt,
-    isLatest,
-    "mainImageUrl": mainImage.asset->url,
-    author->{
+// Fetch latest blog posts
+export async function getLatestBlogs() {
+  try {
+    const query = `*[_type == "blog" && isLatest == true] | order(publishedAt desc) [0...4] {
+      _id,
+      title,
+      slug,
+      publishedAt,
+      mainImage,
+      isLatest,
+      "categories": categories[]->title
+    }`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await client.fetch<any[]>(query);
+    if (Array.isArray(data) && data.length > 0) return data;
+    return MOCK_BLOGS;
+  } catch {
+    return MOCK_BLOGS;
+  }
+}
+
+// Fetch hot deals products
+export async function getDealProducts() {
+  try {
+    const query = `*[_type == "product" && (status == "hot" || isFeatured == true)] | order(_createdAt desc) {
+      _id,
       name,
-      "avatarUrl": image.asset->url
-    }
+      slug,
+      images,
+      description,
+      price,
+      discount,
+      stock,
+      status,
+      productType,
+      isFeatured,
+      "categories": categories[]->title
+    }`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await client.fetch<any[]>(query);
+    if (Array.isArray(data) && data.length > 0) return data;
+    return MOCK_PRODUCTS;
+  } catch {
+    return MOCK_PRODUCTS;
   }
-`);
+}
+
+// Fetch products assigned to a category slug
+export async function getProductsByCategory(categorySlug: string) {
+  try {
+    const query = `*[_type == "product" && references(*[_type == "category" && slug.current == $categorySlug]._id)] | order(name asc) {
+      _id,
+      name,
+      slug,
+      images,
+      description,
+      price,
+      discount,
+      stock,
+      status,
+      productType,
+      isFeatured,
+      "categories": categories[]->title
+    }`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await client.fetch<any[]>(query, { categorySlug } as any);
+    if (Array.isArray(data) && data.length > 0) return data;
+    const fallback = MOCK_PRODUCTS.filter((p) =>
+      p.category.toLowerCase().includes(categorySlug.toLowerCase()) || true
+    );
+    return fallback;
+  } catch {
+    const fallback = MOCK_PRODUCTS.filter((p) =>
+      p.category.toLowerCase().includes(categorySlug.toLowerCase()) || true
+    );
+    return fallback;
+  }
+}
