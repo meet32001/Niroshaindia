@@ -7,6 +7,15 @@ import { urlFor } from "@/sanity/lib/image";
 export async function ShopByBrand() {
   const brands = await getAllBrands();
 
+  // 1. Exclude 'Nirosha Pro'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filteredBrands = brands.filter((brand: any) => {
+    const title = (brand.title || "").toLowerCase();
+    const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
+    const slug = (rawSlug || "").toLowerCase();
+    return title !== "nirosha pro" && slug !== "nirosha-pro";
+  });
+
   return (
     <section className="bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 sm:p-8 lg:p-10 my-10 shadow-xs">
       {/* Top Header Row */}
@@ -22,9 +31,10 @@ export async function ShopByBrand() {
         </Link>
       </div>
 
-      {/* Brand Logo Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 sm:gap-4 my-6 sm:my-8">
-        {brands.map((brand, index) => {
+      {/* Brand Logo Cards Grid (7-column layout without Nirosha Pro) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 my-6 sm:my-8">
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {filteredBrands.map((brand: any, index: number) => {
           const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
           const slug = rawSlug || "brand";
 
@@ -43,7 +53,7 @@ export async function ShopByBrand() {
             <Link
               key={brand._id || brand.id || index}
               href={`/shop?brand=${slug}`}
-              className="bg-white dark:bg-slate-900 rounded-xl p-3 sm:p-4 shadow-xs border border-slate-100 dark:border-slate-800 flex items-center justify-center h-20 sm:h-24 hover:shadow-md hover:scale-105 transition-all duration-200 group"
+              className="bg-white dark:bg-slate-900 rounded-xl p-3 sm:p-4 shadow-2xs border border-slate-200/80 dark:border-slate-800 flex items-center justify-center h-20 sm:h-24 hover:shadow-md hover:scale-105 transition-all duration-200 group cursor-pointer"
             >
               {imageUrl ? (
                 <Image
@@ -51,10 +61,10 @@ export async function ShopByBrand() {
                   alt={brand.title || "Brand"}
                   width={120}
                   height={60}
-                  className="max-h-12 w-auto object-contain transition-transform group-hover:scale-105"
+                  className="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105"
                 />
               ) : (
-                <span className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-emerald-600 transition-colors text-center">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-emerald-600 transition-colors text-center tracking-tight">
                   {brand.title}
                 </span>
               )}
@@ -69,7 +79,7 @@ export async function ShopByBrand() {
           <div className="flex items-center gap-3">
             <Truck className="w-8 h-8 text-slate-700 dark:text-slate-300 shrink-0" />
             <div>
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Free Delivery</h4>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Free Delivery</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Free shipping over ₹999</p>
             </div>
           </div>
@@ -77,7 +87,7 @@ export async function ShopByBrand() {
           <div className="flex items-center gap-3">
             <RefreshCw className="w-8 h-8 text-slate-700 dark:text-slate-300 shrink-0" />
             <div>
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Free Return</h4>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Free Return</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">7-day easy return policy</p>
             </div>
           </div>
@@ -85,7 +95,7 @@ export async function ShopByBrand() {
           <div className="flex items-center gap-3">
             <Headphones className="w-8 h-8 text-slate-700 dark:text-slate-300 shrink-0" />
             <div>
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Customer Support</h4>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Customer Support</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Friendly 24/7 customer support</p>
             </div>
           </div>
@@ -93,7 +103,7 @@ export async function ShopByBrand() {
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-8 h-8 text-slate-700 dark:text-slate-300 shrink-0" />
             <div>
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Money Back Guarantee</h4>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Money Back Guarantee</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Quality checked by our team</p>
             </div>
           </div>

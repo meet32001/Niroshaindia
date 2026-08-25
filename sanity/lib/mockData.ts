@@ -36,14 +36,13 @@ export const MOCK_CATEGORIES: Category[] = [
 ];
 
 export const MOCK_BRANDS: Brand[] = [
-  { id: "b-1", title: "Apple", slug: "apple" },
-  { id: "b-2", title: "Sony", slug: "sony" },
-  { id: "b-3", title: "Samsung", slug: "samsung" },
-  { id: "b-4", title: "LG", slug: "lg" },
-  { id: "b-5", title: "Bose", slug: "bose" },
-  { id: "b-6", title: "Dell", slug: "dell" },
-  { id: "b-7", title: "HP", slug: "hp" },
-  { id: "b-8", title: "Nirosha Pro", slug: "nirosha-pro" },
+  { id: "b-1", title: "Apple", slug: "apple", image: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
+  { id: "b-2", title: "Sony", slug: "sony", image: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg" },
+  { id: "b-3", title: "Samsung", slug: "samsung", image: "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg" },
+  { id: "b-4", title: "LG", slug: "lg", image: "https://upload.wikimedia.org/wikipedia/commons/b/bf/LG_logo_%282015%29.svg" },
+  { id: "b-5", title: "Bose", slug: "bose", image: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Bose_logo.svg" },
+  { id: "b-6", title: "Dell", slug: "dell", image: "https://upload.wikimedia.org/wikipedia/commons/1/18/Dell_logo_2016.svg" },
+  { id: "b-7", title: "HP", slug: "hp", image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/HP_logo_2012.svg" },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
