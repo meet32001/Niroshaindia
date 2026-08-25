@@ -8,7 +8,7 @@ export async function ShopByBrand() {
   const brands = await getAllBrands();
 
   return (
-    <section className="bg-[#fbf6ee]/80 dark:bg-slate-900/80 border border-amber-100/60 dark:border-slate-800 rounded-2xl p-6 sm:p-8 lg:p-10 my-10 shadow-xs">
+    <section className="bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 sm:p-8 lg:p-10 my-10 shadow-xs">
       {/* Top Header Row */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
