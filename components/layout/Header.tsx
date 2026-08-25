@@ -5,6 +5,7 @@ import { HeaderMenu } from "@/components/header/HeaderMenu";
 import { SearchBar } from "@/components/header/SearchBar";
 import { FavoriteButton } from "@/components/header/FavoriteButton";
 import { CartIcon } from "@/components/header/CartIcon";
+import { OrdersButton } from "@/components/header/OrdersButton";
 import { SignInButton } from "@/components/header/SignInButton";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 
@@ -36,6 +37,7 @@ export async function Header() {
           {/* Search Bar & Action Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
             <SearchBar />
+            <OrdersButton />
             <FavoriteButton itemCount={0} />
             <CartIcon itemCount={0} />
             <SignInButton />
