@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint-typecheck-build:
+  build:
     name: Lint, Typecheck & Build
     runs-on: ubuntu-latest
 
@@ -18,17 +18,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
-      - name: Run ESLint
+      - name: Run Linting
         run: npm run lint
 
-      - name: Run TypeScript type-check
+      - name: TypeScript Check
         run: npx tsc --noEmit
 
-      - name: Build Next.js project
+      - name: Build Next.js App
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_PUBLIC_SANITY_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_SANITY_PROJECT_ID || 'ertg492t' }}
+          NEXT_PUBLIC_SANITY_DATASET: ${{ secrets.NEXT_PUBLIC_SANITY_DATASET || 'production' }}
+          SANITY_API_READ_TOKEN: ${{ secrets.SANITY_API_READ_TOKEN || 'placeholder_token' }}
         run: npm run build
