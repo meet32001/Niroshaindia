@@ -12,8 +12,11 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Nirosha India | Online Electronics Store",
-  description: "Premier electronics and gadgets e-commerce platform in India.",
+  title: {
+    default: "Nirosha India | Online Electronics Store",
+    template: "%s | Nirosha India",
+  },
+  description: "Upgrade your lifestyle with premium electronics, gadgets, and accessories from Nirosha India.",
 };
 
 export default function RootLayout({

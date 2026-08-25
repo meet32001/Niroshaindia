@@ -38,7 +38,7 @@ export function Footer() {
   ];
 
   return (
-    <footer className="border-t bg-slate-900 text-slate-200 mt-auto">
+    <footer className="border-t border-slate-800 bg-slate-900 text-slate-200 mt-auto">
       <Container>
         {/* Tier 1: Top Contact Touchpoints */}
         <FooterTop />
@@ -52,7 +52,7 @@ export function Footer() {
               Nirosha India is your premier destination for high-performance consumer electronics, noise-cancelling audio, smart appliances, and fast charging gear.
             </p>
             <div className="pt-2">
-              <SocialMedia iconClassName="border-slate-700 text-slate-300 hover:border-shop-orange" />
+              <SocialMedia iconClassName="border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-400" />
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export function Footer() {
             <ul className="space-y-2.5 text-xs text-slate-400">
               {QUICK_LINKS.map((link) => (
                 <li key={link.title}>
-                  <Link href={link.href} className="hover:text-shop-orange transition-colors">
+                  <Link href={link.href} className="hover:text-emerald-400 transition-colors">
                     {link.title}
                   </Link>
                 </li>
@@ -80,7 +80,7 @@ export function Footer() {
             <ul className="space-y-2.5 text-xs text-slate-400">
               {CATEGORY_LINKS.map((cat) => (
                 <li key={cat.title}>
-                  <Link href={cat.href} className="hover:text-shop-orange transition-colors">
+                  <Link href={cat.href} className="hover:text-emerald-400 transition-colors">
                     {cat.title}
                   </Link>
                 </li>
@@ -110,11 +110,11 @@ export function Footer() {
                   placeholder="Enter your email address..."
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 h-9 text-xs focus-visible:ring-shop-orange"
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 h-9 text-xs focus-visible:ring-emerald-500"
                 />
                 <Button
                   type="submit"
-                  className="w-full bg-shop-orange hover:bg-amber-600 text-white font-semibold h-9 text-xs shadow-md"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-9 text-xs shadow-md cursor-pointer"
                 >
                   Subscribe
                 </Button>
