@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable}`}>
       <body className="font-poppins antialiased bg-background text-foreground min-h-screen">
-        <TooltipProvider>{children}</TooltipProvider>
+        <ClerkProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </ClerkProvider>
       </body>
     </html>
   );
