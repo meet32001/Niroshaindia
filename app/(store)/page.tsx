@@ -3,7 +3,6 @@ import { HomeBanner } from "@/components/layout/HomeBanner";
 import { HomeTabContainer } from "@/components/product/HomeTabContainer";
 import { HomeCategories } from "@/components/home/HomeCategories";
 import { ShopByBrand } from "@/components/home/ShopByBrand";
-import { LatestBlog } from "@/components/home/LatestBlog";
 
 export default function StoreHomePage() {
   return (
@@ -20,9 +19,6 @@ export default function StoreHomePage() {
 
         {/* 4. Shop by Brand & Trust Guarantee Strip */}
         <ShopByBrand />
-
-        {/* 5. Latest Tech Articles & News */}
-        <LatestBlog />
       </Container>
     </div>
   );

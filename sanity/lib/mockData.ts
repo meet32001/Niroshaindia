@@ -1,4 +1,4 @@
-import { Product, Category, Brand, Blog } from "@/types";
+import { Product, Category, Brand } from "@/types";
 
 export const MOCK_CATEGORIES: Category[] = [
   {
@@ -44,45 +44,6 @@ export const MOCK_BRANDS: Brand[] = [
   { id: "b-6", title: "Dell", slug: "dell" },
   { id: "b-7", title: "HP", slug: "hp" },
   { id: "b-8", title: "Nirosha Pro", slug: "nirosha-pro" },
-];
-
-export const MOCK_BLOGS: Blog[] = [
-  {
-    id: "blog-1",
-    title: "The Ultimate Guide to Active Noise Cancelling Headphones in 2026",
-    slug: "ultimate-guide-anc-headphones-2026",
-    publishedAt: "2026-08-20T10:00:00Z",
-    isLatest: true,
-    categories: ["Audio", "Gadgets"],
-    mainImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "blog-2",
-    title: "How Smart Inverter Refrigerators Save Up to 40% Energy",
-    slug: "smart-inverter-refrigerators-energy-saving",
-    publishedAt: "2026-08-18T14:30:00Z",
-    isLatest: true,
-    categories: ["Home Appliances"],
-    mainImage: "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=800&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "blog-3",
-    title: "Understanding GaN Fast Chargers & USB-C Power Delivery",
-    slug: "understanding-gan-fast-chargers-pd",
-    publishedAt: "2026-08-15T09:15:00Z",
-    isLatest: true,
-    categories: ["Tech Trends"],
-    mainImage: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "blog-4",
-    title: "Top 5 Flagship Laptops for Creators & Developers",
-    slug: "top-5-flagship-laptops-creators-2026",
-    publishedAt: "2026-08-10T16:00:00Z",
-    isLatest: true,
-    categories: ["Laptops"],
-    mainImage: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
-  },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [

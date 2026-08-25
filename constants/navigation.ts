@@ -18,7 +18,6 @@ export const HEADER_NAV_LINKS: NavigationItem[] = [
   { title: "Home", href: "/" },
   { title: "Shop", href: "/shop" },
   { title: "Deals", href: "/deal", badge: "HOT" },
-  { title: "Blog", href: "/blog" },
   { title: "Contact", href: "/contact" },
 ];
 
@@ -79,7 +78,7 @@ export const CATEGORIES: Category[] = [
 ];
 
 export const CUSTOMER_CARE_LINKS: NavigationItem[] = [
-  { title: "Order Tracking", href: "/account/orders" },
+  { title: "Order Tracking", href: "/orders" },
   { title: "Warranty Policy", href: "/warranty" },
   { title: "Returns & Refunds", href: "/returns" },
   { title: "Shipping & Delivery", href: "/shipping" },
