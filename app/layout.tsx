@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${poppins.variable}`}>
-      <body className="font-poppins antialiased bg-background text-foreground min-h-screen flex flex-col">
+      <body className="font-poppins antialiased bg-background text-foreground min-h-screen">
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

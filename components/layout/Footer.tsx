@@ -1,46 +1,69 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Container } from "@/components/layout/Container";
 import { Logo } from "@/components/header/Logo";
 import { SocialMedia } from "@/components/shared/SocialMedia";
-import { CATEGORIES, CUSTOMER_CARE_LINKS, LEGAL_LINKS } from "@/constants/navigation";
-import { MapPin, Phone, Mail } from "lucide-react";
+import { FooterTop } from "@/components/layout/FooterTop";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2 } from "lucide-react";
 
 export function Footer() {
+  const [email, setEmail] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      setSubscribed(true);
+      setEmail("");
+    }
+  };
+
+  const QUICK_LINKS = [
+    { title: "About Us", href: "/about" },
+    { title: "Contact Us", href: "/contact" },
+    { title: "Terms & Conditions", href: "/terms" },
+    { title: "Privacy Policy", href: "/privacy" },
+    { title: "FAQs", href: "/faqs" },
+  ];
+
+  const CATEGORY_LINKS = [
+    { title: "Gadgets & Accessories", href: "/category/gadgets" },
+    { title: "Smart Appliances", href: "/category/appliances" },
+    { title: "Refrigerators", href: "/category/refrigerators" },
+    { title: "Other Electronics", href: "/category/others" },
+  ];
+
   return (
     <footer className="border-t bg-slate-900 text-slate-200 mt-auto">
-      <Container className="py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand & Social Col */}
+      <Container>
+        {/* Tier 1: Top Contact Touchpoints */}
+        <FooterTop />
+
+        {/* Tier 2: Main 4-Column Footer */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-12">
+          {/* Col 1: Brand & Social */}
           <div className="space-y-4">
             <Logo spanClassName="text-white" />
             <p className="text-xs text-slate-400 leading-relaxed">
-              India&apos;s trusted platform for high-performance consumer electronics, smartphones, audio systems, and smart accessories.
+              Nirosha India is your premier destination for high-performance consumer electronics, noise-cancelling audio, smart appliances, and fast charging gear.
             </p>
             <div className="pt-2">
               <SocialMedia iconClassName="border-slate-700 text-slate-300 hover:border-shop-orange" />
             </div>
           </div>
 
-          {/* Categories */}
+          {/* Col 2: Quick Links */}
           <div>
-            <h4 className="font-semibold text-sm text-white mb-3">Categories</h4>
-            <ul className="space-y-2 text-xs text-slate-400">
-              {CATEGORIES.map((cat) => (
-                <li key={cat.id}>
-                  <Link href={`/category/${cat.slug}`} className="hover:text-shop-orange transition-colors">
-                    {cat.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Customer Service */}
-          <div>
-            <h4 className="font-semibold text-sm text-white mb-3">Customer Care</h4>
-            <ul className="space-y-2 text-xs text-slate-400">
-              {CUSTOMER_CARE_LINKS.map((link) => (
-                <li key={link.href}>
+            <h4 className="font-semibold text-sm text-white mb-4 tracking-wide">
+              Quick Links
+            </h4>
+            <ul className="space-y-2.5 text-xs text-slate-400">
+              {QUICK_LINKS.map((link) => (
+                <li key={link.title}>
                   <Link href={link.href} className="hover:text-shop-orange transition-colors">
                     {link.title}
                   </Link>
@@ -49,35 +72,60 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Contact Info */}
+          {/* Col 3: Category Links */}
           <div>
-            <h4 className="font-semibold text-sm text-white mb-3">Get in Touch</h4>
-            <ul className="space-y-2 text-xs text-slate-400">
-              <li className="flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-shop-orange shrink-0" />
-                <span>Mumbai, Maharashtra, India</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="h-3.5 w-3.5 text-shop-orange shrink-0" />
-                <span>+91 1800-NIROSHA</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="h-3.5 w-3.5 text-shop-orange shrink-0" />
-                <span>support@nirosha.in</span>
-              </li>
+            <h4 className="font-semibold text-sm text-white mb-4 tracking-wide">
+              Categories
+            </h4>
+            <ul className="space-y-2.5 text-xs text-slate-400">
+              {CATEGORY_LINKS.map((cat) => (
+                <li key={cat.title}>
+                  <Link href={cat.href} className="hover:text-shop-orange transition-colors">
+                    {cat.title}
+                  </Link>
+                </li>
+              ))}
             </ul>
+          </div>
+
+          {/* Col 4: Newsletter */}
+          <div className="space-y-4">
+            <h4 className="font-semibold text-sm text-white tracking-wide">
+              Newsletter
+            </h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Subscribe to get exclusive festival deals, new product launches, and special promo codes.
+            </p>
+
+            {subscribed ? (
+              <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 p-3 rounded-lg border border-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>Thank you for subscribing to Nirosha India!</span>
+              </div>
+            ) : (
+              <form onSubmit={handleSubscribe} className="space-y-2">
+                <Input
+                  type="email"
+                  required
+                  placeholder="Enter your email address..."
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 h-9 text-xs focus-visible:ring-shop-orange"
+                />
+                <Button
+                  type="submit"
+                  className="w-full bg-shop-orange hover:bg-amber-600 text-white font-semibold h-9 text-xs shadow-md"
+                >
+                  Subscribe
+                </Button>
+              </form>
+            )}
           </div>
         </div>
 
-        <div className="border-t border-slate-800 mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+        {/* Bottom Legal Copyright Row */}
+        <div className="border-t border-slate-800 py-6 text-center text-xs text-slate-400">
           <p>© {new Date().getFullYear()} Nirosha India. All rights reserved.</p>
-          <div className="flex gap-4">
-            {LEGAL_LINKS.map((legal) => (
-              <Link key={legal.href} href={legal.href} className="hover:text-white transition-colors">
-                {legal.title}
-              </Link>
-            ))}
-          </div>
         </div>
       </Container>
     </footer>
