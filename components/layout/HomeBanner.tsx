@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Truck, ShieldCheck, Zap, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Zap, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BANNER_SLIDES = [
@@ -93,7 +93,7 @@ export function HomeBanner() {
       </button>
 
       {/* Main Grid Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[360px] px-4 md:px-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[320px] px-4 md:px-8">
         {/* Left Text & CTA */}
         <div className="lg:col-span-7 space-y-5 animate-in fade-in duration-500">
           <Badge className="bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 px-3 py-1 text-xs font-extrabold tracking-wide">
@@ -121,22 +121,6 @@ export function HomeBanner() {
                 View Deals
               </Button>
             </Link>
-          </div>
-
-          {/* Value Badges */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-6 border-t border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 font-medium">
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Free Express Shipping</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>100% Genuine Warranty</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Hassle-Free Returns</span>
-            </div>
           </div>
         </div>
 
