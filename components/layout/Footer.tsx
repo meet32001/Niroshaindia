@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Container } from "@/components/layout/Container";
 import { Logo } from "@/components/header/Logo";
 import { SocialMedia } from "@/components/shared/SocialMedia";
-import { FooterTop } from "@/components/layout/FooterTop";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
@@ -40,10 +39,7 @@ export function Footer() {
   return (
     <footer className="border-t border-slate-800 bg-slate-900 text-slate-200 mt-auto">
       <Container>
-        {/* Tier 1: Top Contact Touchpoints */}
-        <FooterTop />
-
-        {/* Tier 2: Main 4-Column Footer */}
+        {/* Main 4-Column Footer */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-12">
           {/* Col 1: Brand & Social */}
           <div className="space-y-4">
