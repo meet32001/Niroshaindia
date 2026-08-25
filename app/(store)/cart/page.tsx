@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
@@ -10,17 +11,19 @@ import { Title } from "@/components/ui/text";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { QuantityButtons } from "@/components/product/QuantityButtons";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
-import { DeliveryAddress } from "@/components/cart/DeliveryAddress";
+import { DeliveryAddress, MOCK_ADDRESSES } from "@/components/cart/DeliveryAddress";
 import { NoAccess } from "@/components/cart/NoAccess";
 import { EmptyCart } from "@/components/cart/EmptyCart";
 import { useStore } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { urlFor } from "@/sanity/lib/image";
+import { createCheckoutSession } from "@/actions/createCheckoutSession";
 
 export default function CartPage() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const { items, deleteCartProduct, resetCart, getTotalPrice, getSubtotalPrice } = useStore();
   const isMounted = useIsMounted();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   if (!isLoaded || !isMounted) {
     return (
@@ -53,6 +56,32 @@ export default function CartPage() {
   const handleDeleteItem = (productId: string, name: string) => {
     deleteCartProduct(productId);
     toast.success(`${name.slice(0, 18)}... removed from cart`);
+  };
+
+  const handleCheckout = async () => {
+    try {
+      setIsCheckingOut(true);
+      const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+      const metadata = {
+        orderNumber,
+        customerName: user?.fullName || "Customer",
+        customerEmail: user?.primaryEmailAddress?.emailAddress || "customer@example.com",
+        clerkUserId: user?.id || "",
+        address: MOCK_ADDRESSES[0],
+      };
+
+      const checkoutUrl = await createCheckoutSession(items, metadata);
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        toast.error("Failed to initialize Stripe checkout session");
+        setIsCheckingOut(false);
+      }
+    } catch (err) {
+      console.error("Checkout error:", err);
+      toast.error("An error occurred during checkout setup");
+      setIsCheckingOut(false);
+    }
   };
 
   const getImageUrl = (img: unknown) => {
@@ -231,11 +260,21 @@ export default function CartPage() {
 
               {/* Checkout CTA */}
               <button
-                onClick={() => alert("Stripe Checkout Integration coming up in Phase 10!")}
-                className="w-full bg-shop-orange hover:bg-amber-600 text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-md cursor-pointer"
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+                className="w-full bg-shop-orange hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-md cursor-pointer"
               >
-                <span>Proceed to Checkout</span>
-                <ArrowRight className="h-4 w-4" />
+                {isCheckingOut ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Preparing Checkout...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Proceed to Checkout</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
 
               {/* Trust Features */}
@@ -260,11 +299,21 @@ export default function CartPage() {
         </div>
 
         <button
-          onClick={() => alert("Stripe Checkout Integration coming up in Phase 10!")}
-          className="bg-shop-orange hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+          onClick={handleCheckout}
+          disabled={isCheckingOut}
+          className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
         >
-          <span>Checkout</span>
-          <ArrowRight className="h-3.5 w-3.5" />
+          {isCheckingOut ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Preparing...</span>
+            </>
+          ) : (
+            <>
+              <span>Checkout</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </>
+          )}
         </button>
       </div>
     </div>
