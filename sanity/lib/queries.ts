@@ -89,6 +89,37 @@ export async function getDealProducts() {
   }
 }
 
+// Fetch single product by slug
+export async function getProductBySlug(slug: string) {
+  try {
+    const query = `*[_type == "product" && slug.current == $slug][0] {
+      _id,
+      name,
+      slug,
+      images,
+      description,
+      price,
+      discount,
+      stock,
+      status,
+      productType,
+      isFeatured,
+      "brand": brand->title,
+      "categories": categories[]->title
+    }`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await client.fetch<any>(query, { slug } as any);
+    if (data && data.name) return data;
+    
+    // Local fallback matching requested slug or first mock item
+    const match = MOCK_PRODUCTS.find((p) => p.slug === slug);
+    return match || MOCK_PRODUCTS[0];
+  } catch {
+    const match = MOCK_PRODUCTS.find((p) => p.slug === slug);
+    return match || MOCK_PRODUCTS[0];
+  }
+}
+
 // Fetch products assigned to a category slug
 export async function getProductsByCategory(categorySlug: string) {
   try {
