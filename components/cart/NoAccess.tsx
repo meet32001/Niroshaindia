@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton } from "@clerk/nextjs";
+import Link from "next/link";
 import { Lock } from "lucide-react";
 import { Container } from "@/components/layout/Container";
 import { Logo } from "@/components/header/Logo";
@@ -27,11 +27,12 @@ export function NoAccess() {
         </div>
 
         <div className="pt-2">
-          <SignInButton mode="modal">
-            <button className="w-full bg-shop-orange hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl text-sm transition-all duration-300 shadow-md cursor-pointer">
-              Sign In to Access Cart
-            </button>
-          </SignInButton>
+          <Link
+            href="/sign-in"
+            className="block w-full bg-shop-orange hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl text-sm text-center transition-all duration-300 shadow-md cursor-pointer"
+          >
+            Sign In / Register
+          </Link>
         </div>
       </div>
     </Container>

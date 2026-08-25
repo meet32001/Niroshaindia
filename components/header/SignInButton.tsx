@@ -1,8 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import {
   ClerkLoaded,
-  SignInButton as ClerkSignInButton,
   UserButton,
   useUser,
 } from "@clerk/nextjs";
@@ -24,17 +24,16 @@ export function SignInButton() {
       {isSignedIn ? (
         <UserButton />
       ) : (
-        <ClerkSignInButton mode="modal">
-          <button
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "hidden sm:inline-flex gap-2 rounded-full border-slate-300 dark:border-slate-700 hover:border-shop-orange hover:text-shop-orange transition-colors cursor-pointer text-xs font-semibold"
-            )}
-          >
-            <User className="h-4 w-4" />
-            <span>Login</span>
-          </button>
-        </ClerkSignInButton>
+        <Link
+          href="/sign-in"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "hidden sm:inline-flex gap-2 rounded-full border-slate-300 dark:border-slate-700 hover:border-shop-orange hover:text-shop-orange transition-colors cursor-pointer text-xs font-semibold"
+          )}
+        >
+          <User className="h-4 w-4" />
+          <span>Login</span>
+        </Link>
       )}
     </ClerkLoaded>
   );
