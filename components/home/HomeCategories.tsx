@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCategories } from "@/lib/db/products";
-import { urlFor } from "@/lib/image";
 
 export async function HomeCategories() {
   const categories = await getCategories(6);
@@ -18,19 +17,18 @@ export async function HomeCategories() {
       {/* 3x2 Category Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {categories.map((category, index) => {
-          const rawSlug = typeof category.slug === "string" ? category.slug : category.slug?.current;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawSlug = typeof category.slug === "string" ? category.slug : (category.slug as any)?.current;
           const slug = rawSlug || "gadgets";
           const count = category.productCount ?? 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const catName = category.name || category.title || (category as any).name || "Category";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawImg = (category as any).image_url || category.image;
 
           let imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-          if (typeof category.image === "string") {
-            imageUrl = category.image;
-          } else if (category.image) {
-            try {
-              imageUrl = urlFor(category.image).url();
-            } catch {
-              imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-            }
+          if (typeof rawImg === "string" && rawImg.startsWith("http")) {
+            imageUrl = rawImg;
           }
 
           return (
@@ -44,7 +42,7 @@ export async function HomeCategories() {
                 {imageUrl ? (
                   <Image
                     src={imageUrl}
-                    alt={category.title || "Category"}
+                    alt={catName}
                     width={80}
                     height={80}
                     className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
@@ -57,7 +55,7 @@ export async function HomeCategories() {
               {/* Right Category Details */}
               <div className="flex flex-col">
                 <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 capitalize group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
-                  {category.title}
+                  {catName}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 font-medium">
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">({count})</span> items Available

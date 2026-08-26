@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Truck, RefreshCw, Headphones, ShieldCheck } from "lucide-react";
 import { getAllBrands } from "@/lib/db/products";
-import { urlFor } from "@/lib/image";
 
 export async function ShopByBrand() {
   const brands = await getAllBrands();
@@ -12,10 +11,10 @@ export async function ShopByBrand() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const featuredBrands = brands.filter((brand: any) => {
-    const name = (brand.title || brand.name || "").toLowerCase().trim();
+    const name = (brand.name || brand.title || "").toLowerCase().trim();
     const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
     const slug = (rawSlug || "").toLowerCase().trim();
-    const hasImage = Boolean(brand.image || brand.logo);
+    const hasImage = Boolean(brand.logo_url || brand.image || brand.logo);
 
     return (allowedBrandNames.includes(name) || allowedBrandNames.includes(slug)) && hasImage;
   });
@@ -42,17 +41,7 @@ export async function ShopByBrand() {
           const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
           const slug = rawSlug || "brand";
 
-          const rawImg = brand.image || brand.logo;
-          let imageUrl = "";
-          if (typeof rawImg === "string") {
-            imageUrl = rawImg;
-          } else if (rawImg) {
-            try {
-              imageUrl = urlFor(rawImg).url();
-            } catch {
-              imageUrl = "";
-            }
-          }
+          const imageUrl = brand.logo_url || brand.image || brand.logo || "";
 
           if (!imageUrl) return null;
 
@@ -64,7 +53,7 @@ export async function ShopByBrand() {
             >
               <Image
                 src={imageUrl}
-                alt={brand.title || brand.name || "Brand Logo"}
+                alt={brand.name || brand.title || "Brand Logo"}
                 width={140}
                 height={60}
                 className="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105"

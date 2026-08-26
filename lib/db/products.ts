@@ -5,6 +5,7 @@ export const MOCK_CATEGORIES: Category[] = [
   {
     id: "cat-1",
     title: "Gadgets & Accessories",
+    name: "Gadgets & Accessories",
     slug: "gadgets",
     icon: "Headphones",
     productCount: 12,
@@ -13,6 +14,7 @@ export const MOCK_CATEGORIES: Category[] = [
   {
     id: "cat-2",
     title: "Smart Appliances",
+    name: "Smart Appliances",
     slug: "appliances",
     icon: "Tv",
     productCount: 8,
@@ -21,6 +23,7 @@ export const MOCK_CATEGORIES: Category[] = [
   {
     id: "cat-3",
     title: "Refrigerators",
+    name: "Refrigerators",
     slug: "refrigerators",
     icon: "Refrigerator",
     productCount: 6,
@@ -29,6 +32,7 @@ export const MOCK_CATEGORIES: Category[] = [
   {
     id: "cat-4",
     title: "Other Electronics",
+    name: "Other Electronics",
     slug: "others",
     icon: "Cpu",
     productCount: 15,
@@ -37,10 +41,10 @@ export const MOCK_CATEGORIES: Category[] = [
 ];
 
 export const MOCK_BRANDS: Brand[] = [
-  { id: "b-1", title: "Apple", slug: "apple", image: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
-  { id: "b-2", title: "Sony", slug: "sony", image: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg" },
-  { id: "b-3", title: "Dell", slug: "dell", image: "https://upload.wikimedia.org/wikipedia/commons/1/18/Dell_logo_2016.svg" },
-  { id: "b-4", title: "HP", slug: "hp", image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/HP_logo_2012.svg" },
+  { id: "b-1", title: "Apple", name: "Apple", slug: "apple", image: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
+  { id: "b-2", title: "Sony", name: "Sony", slug: "sony", image: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg" },
+  { id: "b-3", title: "Dell", name: "Dell", slug: "dell", image: "https://upload.wikimedia.org/wikipedia/commons/1/18/Dell_logo_2016.svg" },
+  { id: "b-4", title: "HP", name: "HP", slug: "hp", image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/HP_logo_2012.svg" },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -110,82 +114,167 @@ export const MOCK_PRODUCTS: Product[] = [
   },
 ];
 
-// Fetch all active products
+// Helper to normalize Supabase PostgreSQL rows into standard UI format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeProduct(item: any) {
+  if (!item) return null;
+
+  const defaultFallbackImg =
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
+
+  const brandObj = item.brands || item.brand;
+  const brandName = typeof brandObj === "string" ? brandObj : brandObj?.name || brandObj?.title || "Brand";
+
+  const catObj = item.categories || item.category;
+  const categoryName = typeof catObj === "string" ? catObj : catObj?.name || catObj?.title || "Electronics";
+
+  const variants = item.product_variants || item.variants || [];
+  const primaryVariant = variants[0] || {};
+
+  const priceCents = primaryVariant.price_cents ?? item.price_cents ?? (item.price ? item.price * 100 : 0);
+  const comparePriceCents = primaryVariant.compare_at_price_cents ?? item.compare_at_price_cents ?? (item.discountPrice ? item.discountPrice * 100 : 0);
+
+  const price = priceCents ? priceCents / 100 : item.price || 0;
+  const discountPrice = comparePriceCents ? comparePriceCents / 100 : item.discountPrice || item.discount || 0;
+
+  let images: string[] = [];
+  if (primaryVariant.product_images && Array.isArray(primaryVariant.product_images)) {
+    images = primaryVariant.product_images
+      .map((img: { image_url?: string; url?: string }) => img.image_url || img.url)
+      .filter(Boolean);
+  } else if (item.product_images && Array.isArray(item.product_images)) {
+    images = item.product_images
+      .map((img: { image_url?: string; url?: string }) => img.image_url || img.url)
+      .filter(Boolean);
+  } else if (Array.isArray(item.images)) {
+    images = item.images;
+  }
+
+  if (images.length === 0) {
+    images = [defaultFallbackImg];
+  }
+
+  const specs =
+    primaryVariant.product_specifications?.specs ||
+    (Array.isArray(primaryVariant.product_specifications)
+      ? primaryVariant.product_specifications[0]?.specs
+      : item.specs) ||
+    {};
+
+  return {
+    ...item,
+    id: item.id || item._id,
+    title: item.name || item.title || "Electronics Product",
+    name: item.name || item.title || "Electronics Product",
+    slug: typeof item.slug === "string" ? item.slug : item.slug?.current || "product",
+    brand: brandName,
+    brands: typeof brandObj === "object" ? brandObj : { name: brandName },
+    category: categoryName,
+    categories: typeof catObj === "object" ? catObj : { name: categoryName },
+    price,
+    discountPrice,
+    images,
+    product_variants: variants,
+    specs,
+  };
+}
+
+// Fetch all active products matching PostgREST relational schema
 export async function getAllProducts() {
   try {
     const { data, error } = await supabase
       .from("products")
       .select(`
-        *,
-        categories (title, slug),
-        brands (name, title, slug),
-        variants (*),
-        product_images (url)
+        id,
+        name,
+        slug,
+        description,
+        is_active,
+        brands:brand_id ( id, name, slug, logo_url ),
+        categories:category_id ( id, name, slug, description ),
+        product_variants (
+          id,
+          sku,
+          name,
+          price_cents,
+          compare_at_price_cents,
+          is_serialized,
+          weight_grams,
+          product_images ( id, image_url, sort_order, is_featured ),
+          product_specifications ( specs )
+        )
       `)
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.map((item: any) => ({
-        ...item,
-        name: item.name || item.title,
-        title: item.title || item.name,
-        price: item.price_cents ? item.price_cents / 100 : item.price || 0,
-        discount: item.compare_at_price_cents ? item.compare_at_price_cents / 100 : item.discount || 0,
-        images: item.product_images?.map((i: { url: string }) => i.url) || item.images || [],
-      }));
+      return data.map(normalizeProduct);
     }
-    return MOCK_PRODUCTS;
+    return MOCK_PRODUCTS.map(normalizeProduct);
   } catch {
-    return MOCK_PRODUCTS;
+    return MOCK_PRODUCTS.map(normalizeProduct);
   }
 }
 
-// Fetch single detailed product by slug
+// Fetch single detailed product by slug matching PostgREST schema
 export async function getProductBySlug(slug: string) {
   try {
     const { data, error } = await supabase
       .from("products")
       .select(`
-        *,
-        categories (title, slug),
-        brands (name, title, slug),
-        variants (*),
-        product_images (url)
+        id,
+        name,
+        slug,
+        description,
+        is_active,
+        brands:brand_id ( id, name, slug, logo_url ),
+        categories:category_id ( id, name, slug, description ),
+        product_variants (
+          id,
+          sku,
+          name,
+          price_cents,
+          compare_at_price_cents,
+          is_serialized,
+          weight_grams,
+          product_images ( id, image_url, sort_order, is_featured ),
+          product_specifications ( specs )
+        )
       `)
       .eq("slug", slug)
       .single();
 
     if (!error && data) {
-      return {
-        ...data,
-        name: data.name || data.title,
-        title: data.title || data.name,
-        price: data.price_cents ? data.price_cents / 100 : data.price || 0,
-        discount: data.compare_at_price_cents ? data.compare_at_price_cents / 100 : data.discount || 0,
-        images: data.product_images?.map((i: { url: string }) => i.url) || data.images || [],
-      };
+      return normalizeProduct(data);
     }
 
     const match = MOCK_PRODUCTS.find((p) => p.slug === slug);
-    return match || MOCK_PRODUCTS[0];
+    return normalizeProduct(match || MOCK_PRODUCTS[0]);
   } catch {
     const match = MOCK_PRODUCTS.find((p) => p.slug === slug);
-    return match || MOCK_PRODUCTS[0];
+    return normalizeProduct(match || MOCK_PRODUCTS[0]);
   }
 }
 
-// Fetch categories
+// Fetch categories matching PostgREST schema
 export async function getCategories(quantity?: number) {
   try {
-    const query = supabase.from("categories").select("*").order("title", { ascending: true });
+    const query = supabase
+      .from("categories")
+      .select("id, name, slug, description, image_url")
+      .order("name", { ascending: true });
+
     if (quantity) {
       query.limit(quantity);
     }
     const { data, error } = await query;
     if (!error && Array.isArray(data) && data.length > 0) {
-      return data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return data.map((cat: any) => ({
+        ...cat,
+        title: cat.name || cat.title,
+        image: cat.image_url || cat.image,
+      }));
     }
     return quantity ? MOCK_CATEGORIES.slice(0, quantity) : MOCK_CATEGORIES;
   } catch {
@@ -193,12 +282,21 @@ export async function getCategories(quantity?: number) {
   }
 }
 
-// Fetch brands
+// Fetch brands matching PostgREST schema
 export async function getBrands() {
   try {
-    const { data, error } = await supabase.from("brands").select("*").order("name", { ascending: true });
+    const { data, error } = await supabase
+      .from("brands")
+      .select("id, name, slug, logo_url")
+      .order("name", { ascending: true });
+
     if (!error && Array.isArray(data) && data.length > 0) {
-      return data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return data.map((b: any) => ({
+        ...b,
+        title: b.name || b.title,
+        image: b.logo_url || b.image,
+      }));
     }
     return MOCK_BRANDS;
   } catch {
@@ -206,55 +304,94 @@ export async function getBrands() {
   }
 }
 
-// Alias for getBrands matching components import
 export const getAllBrands = getBrands;
 
 // Fetch hot deals products
 export async function getDealProducts() {
-  try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .or("status.eq.hot,is_featured.eq.true");
-
-    if (!error && Array.isArray(data) && data.length > 0) {
-      return data;
-    }
-    return MOCK_PRODUCTS;
-  } catch {
-    return MOCK_PRODUCTS;
-  }
+  return getAllProducts();
 }
 
-// Fetch products by category
+// Fetch products by category slug
 export async function getProductsByCategory(categorySlug: string) {
   try {
     const { data, error } = await supabase
       .from("products")
-      .select("*, categories!inner(slug)")
-      .eq("categories.slug", categorySlug);
+      .select(`
+        id,
+        name,
+        slug,
+        description,
+        is_active,
+        brands:brand_id ( id, name, slug, logo_url ),
+        categories:category_id!inner ( id, name, slug, description ),
+        product_variants (
+          id,
+          sku,
+          name,
+          price_cents,
+          compare_at_price_cents,
+          is_serialized,
+          weight_grams,
+          product_images ( id, image_url, sort_order, is_featured ),
+          product_specifications ( specs )
+        )
+      `)
+      .eq("categories.slug", categorySlug)
+      .eq("is_active", true);
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      return data;
+      return data.map(normalizeProduct);
     }
-    return MOCK_PRODUCTS.filter((p) =>
-      p.category.toLowerCase().includes(categorySlug.toLowerCase())
+    const all = await getAllProducts();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return all.filter((p: any) =>
+      (p.category || "").toLowerCase().includes(categorySlug.toLowerCase())
     );
   } catch {
-    return MOCK_PRODUCTS.filter((p) =>
-      p.category.toLowerCase().includes(categorySlug.toLowerCase())
+    const all = await getAllProducts();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return all.filter((p: any) =>
+      (p.category || "").toLowerCase().includes(categorySlug.toLowerCase())
     );
   }
 }
 
-// Fetch user orders by Clerk UserId
+// Fetch user orders by Clerk UserId via customers table join
 export async function getMyOrders(userId: string) {
   try {
     if (!userId) return [];
+
+    const { data: customer, error: custErr } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    if (custErr || !customer) {
+      // Fallback query directly on orders table if customer record is pending
+      const { data: directOrders } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("clerk_user_id", userId)
+        .order("created_at", { ascending: false });
+
+      return directOrders || [];
+    }
+
     const { data, error } = await supabase
       .from("orders")
-      .select("*")
-      .eq("clerk_user_id", userId)
+      .select(`
+        *,
+        order_items (
+          *,
+          product_variants (
+            name,
+            sku,
+            product_images ( image_url )
+          )
+        )
+      `)
+      .eq("customer_id", customer.id)
       .order("created_at", { ascending: false });
 
     if (!error && Array.isArray(data)) {

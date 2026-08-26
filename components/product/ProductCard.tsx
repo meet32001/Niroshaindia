@@ -4,37 +4,40 @@ import { Star, Flame } from "lucide-react";
 import { PriceView } from "@/components/product/PriceView";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
-import { urlFor } from "@/lib/image";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ProductCard(product: any) {
-  // Extract fields with Sanity document schema or mock object fallback
   const name = product.name || product.title || "Electronics Product";
   const rawSlug = typeof product.slug === "string" ? product.slug : product.slug?.current;
   const slug = rawSlug || "product-details";
-  
-  const categoryName = typeof product.category === "string" 
-    ? product.category 
-    : product.category?.title || product.productType || "Electronics";
 
-  const price = product.price || 0;
-  const discount = product.discount || 0;
+  const categoryName =
+    product.categories?.name ||
+    product.categories?.title ||
+    (typeof product.category === "string" ? product.category : product.category?.title) ||
+    "Electronics";
+
+  const primaryVariant = product.product_variants?.[0] || product.variants?.[0];
+  const price = primaryVariant?.price_cents
+    ? primaryVariant.price_cents / 100
+    : product.price || 0;
+
+  const discount = primaryVariant?.compare_at_price_cents
+    ? primaryVariant.compare_at_price_cents / 100
+    : product.discountPrice || product.discount || 0;
+
   const stock = product.stock !== undefined ? product.stock : 10;
   const status = product.status || product.tag?.toLowerCase();
 
-  // Resolve image source
   let imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-  if (product.images && product.images.length > 0) {
-    const firstImg = product.images[0];
-    if (typeof firstImg === "string") {
-      imageUrl = firstImg;
-    } else if (firstImg?.asset) {
-      try {
-        imageUrl = urlFor(firstImg).url();
-      } catch {
-        imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-      }
-    }
+
+  const variantImg = primaryVariant?.product_images?.[0]?.image_url || primaryVariant?.images?.[0];
+  const directImg = product.product_images?.[0]?.image_url || (Array.isArray(product.images) ? product.images[0] : product.image);
+
+  if (variantImg && typeof variantImg === "string") {
+    imageUrl = variantImg;
+  } else if (directImg && typeof directImg === "string") {
+    imageUrl = directImg;
   }
 
   return (
