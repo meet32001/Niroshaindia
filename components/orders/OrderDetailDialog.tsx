@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
-import { urlFor } from "@/sanity/lib/image";
+import { urlFor } from "@/lib/image";
 
 export interface OrderDetailDialogProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

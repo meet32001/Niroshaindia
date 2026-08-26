@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { Package, PackageX, ShoppingBag, ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/Container";
 import { Title } from "@/components/ui/text";
-import { getMyOrders } from "@/sanity/lib/queries";
+import { getMyOrders } from "@/lib/db/products";
 import { OrdersComponent } from "@/components/orders/OrdersComponent";
 
 export default async function OrdersPage() {
@@ -22,7 +22,7 @@ export default async function OrdersPage() {
         <div className="space-y-6">
           {/* Header Title Bar */}
           <div className="flex items-center gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-shop-orange/10 text-shop-orange">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
               <Package className="h-6 w-6" />
             </div>
             <div>
@@ -41,7 +41,7 @@ export default async function OrdersPage() {
               </div>
 
               <div className="space-y-1">
-                <h2 className="text-lg font-bold text-shop-dark dark:text-slate-100">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                   No orders found
                 </h2>
                 <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
@@ -51,7 +51,7 @@ export default async function OrdersPage() {
 
               <Link
                 href="/shop"
-                className="inline-flex items-center justify-center gap-2 bg-shop-orange hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all duration-300 shadow-md cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all duration-300 shadow-md cursor-pointer"
               >
                 <ShoppingBag className="h-4 w-4" />
                 <span>Explore Store</span>

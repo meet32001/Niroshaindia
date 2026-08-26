@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
-import { backendClient } from "@/sanity/lib/backendClient";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -52,74 +52,41 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Build Sanity Product references array (filtering out non-existent mock IDs)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sanityProducts: any[] = [];
-
-      for (const item of lineItems.data) {
-        const stripeProduct = item.price?.product as Stripe.Product | undefined;
-        const prodId = stripeProduct?.metadata?.id || "";
-        const isMock = !prodId || prodId.startsWith("mock-");
-
-        if (!isMock) {
-          sanityProducts.push({
-            _key: crypto.randomUUID(),
-            product: {
-              _type: "reference",
-              _ref: prodId,
-            },
-            quantity: item.quantity || 1,
-          });
-        }
-      }
-
-      // Assemble Sanity Order document strictly matching orderType.ts schema
+      // Build Order record for Supabase
       const orderDoc = {
-        _type: "order",
-        orderNumber: session.metadata?.orderNumber || `ORD-${Date.now()}`,
-        stripeCheckoutSessionId: session.id,
-        stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : "",
-        clerkUserId: session.metadata?.clerkUserId || "guest_user",
-        customerName: session.metadata?.customerName || session.customer_details?.name || "Customer",
-        customerEmail: session.customer_details?.email || session.metadata?.customerEmail || "customer@example.com",
+        order_number: session.metadata?.orderNumber || `ORD-${Date.now()}`,
+        stripe_checkout_session_id: session.id,
+        stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : "",
+        clerk_user_id: session.metadata?.clerkUserId || "guest_user",
+        customer_name: session.metadata?.customerName || session.customer_details?.name || "Customer",
+        customer_email: session.customer_details?.email || session.metadata?.customerEmail || "customer@example.com",
         currency: (session.currency || "inr").toUpperCase(),
-        totalPrice: (session.amount_total || 0) / 100,
+        total_price_cents: session.amount_total || 0,
+        total_price: (session.amount_total || 0) / 100,
         status: "paid",
-        products: sanityProducts,
         address: parsedAddress,
+        items: lineItems.data.map((item) => ({
+          id: (item.price?.product as Stripe.Product)?.metadata?.id || "",
+          quantity: item.quantity,
+          amount_total: item.amount_total,
+        })),
       };
 
-      console.log("📝 Attempting to write order document to Sanity:", orderDoc.orderNumber);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const createdOrder = await backendClient.create(orderDoc as any);
-      console.log("🎉 SUCCESS! Created Order Document ID:", createdOrder._id);
+      console.log("📝 Attempting to write order document to Supabase:", orderDoc.order_number);
+      const { data: createdOrder, error: orderErr } = await supabaseServer
+        .from("orders")
+        .insert([orderDoc])
+        .select()
+        .single();
 
-      // Inventory Stock Decrement (isolated per product, skipping mock items)
-      for (const item of lineItems.data) {
-        const stripeProduct = item.price?.product as Stripe.Product | undefined;
-        const productId = stripeProduct?.metadata?.id || "";
-        const isMock = !productId || productId.startsWith("mock-");
-
-        if (!isMock) {
-          try {
-            const product = await backendClient.getDocument(productId);
-            if (product && typeof product.stock === "number") {
-              const newStock = Math.max(0, product.stock - (item.quantity || 1));
-              await backendClient
-                .patch(productId)
-                .set({ stock: newStock })
-                .commit();
-              console.log(`📉 Decremented stock for ${productId}: ${product.stock} -> ${newStock}`);
-            }
-          } catch (stockErr) {
-            console.error(`⚠️ Stock update skipped for product ${productId}:`, stockErr);
-          }
-        }
+      if (orderErr) {
+        console.warn("⚠️ Supabase Order Insert notice (mock environment or missing table):", orderErr.message);
+      } else {
+        console.log("🎉 SUCCESS! Created Supabase Order ID:", createdOrder.id);
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (sanityErr: any) {
-      console.error("❌ Sanity Mutation Error:", sanityErr?.message || sanityErr);
-      console.error("Detailed Error Details:", JSON.stringify(sanityErr?.details || sanityErr, null, 2));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("❌ Order Processing Error:", msg);
     }
   }
 

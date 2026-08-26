@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2 } from "lucide-react";
 import { Category } from "@/types";
-import { getProductsByCategory } from "@/sanity/lib/queries";
+import { getProductsByCategory } from "@/lib/db/products";
 import { ProductCard } from "@/components/product/ProductCard";
 import { NoProductAvailable } from "@/components/product/NoProductAvailable";
 import { cn } from "@/lib/utils";

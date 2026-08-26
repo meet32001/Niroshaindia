@@ -12,7 +12,7 @@ import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 import { useStore } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
-import { urlFor } from "@/sanity/lib/image";
+import { urlFor } from "@/lib/image";
 
 export default function WishlistPage() {
   const { favoriteProduct, addToFavorite, resetFavorite } = useStore();

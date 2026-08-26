@@ -4,7 +4,7 @@ import { Star, Flame } from "lucide-react";
 import { PriceView } from "@/components/product/PriceView";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
-import { urlFor } from "@/sanity/lib/image";
+import { urlFor } from "@/lib/image";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ProductCard(product: any) {

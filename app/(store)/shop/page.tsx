@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { Container } from "@/components/layout/Container";
 import { Shop } from "@/components/shop/Shop";
-import { getCategories, getAllBrands } from "@/sanity/lib/queries";
+import { getCategories, getAllBrands } from "@/lib/db/products";
 
 export default async function ShopPage() {
   const categories = await getCategories();

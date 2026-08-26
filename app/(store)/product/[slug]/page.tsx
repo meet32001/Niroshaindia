@@ -6,7 +6,7 @@ import { PriceView } from "@/components/product/PriceView";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
 import { ProductCharacteristics } from "@/components/product/ProductCharacteristics";
-import { getProductBySlug } from "@/sanity/lib/queries";
+import { getProductBySlug } from "@/lib/db/products";
 
 export interface SingleProductPageProps {
   params: Promise<{

@@ -1,7 +1,7 @@
 import { Container } from "@/components/layout/Container";
 import { Title, SubText } from "@/components/ui/text";
 import { CategoryProducts } from "@/components/category/CategoryProducts";
-import { getCategories } from "@/sanity/lib/queries";
+import { getCategories } from "@/lib/db/products";
 
 export interface CategoryPageProps {
   params: Promise<{

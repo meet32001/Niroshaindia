@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Truck, RefreshCw, Headphones, ShieldCheck } from "lucide-react";
-import { getAllBrands } from "@/sanity/lib/queries";
-import { urlFor } from "@/sanity/lib/image";
+import { getAllBrands } from "@/lib/db/products";
+import { urlFor } from "@/lib/image";
 
 export async function ShopByBrand() {
   const brands = await getAllBrands();
@@ -12,13 +12,10 @@ export async function ShopByBrand() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const featuredBrands = brands.filter((brand: any) => {
-    const name = (brand.title || "").toLowerCase().trim();
+    const name = (brand.title || brand.name || "").toLowerCase().trim();
     const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
     const slug = (rawSlug || "").toLowerCase().trim();
-    const hasImage = Boolean(
-      brand.image &&
-      (brand.image.asset || brand.image._ref || typeof brand.image === "string")
-    );
+    const hasImage = Boolean(brand.image || brand.logo);
 
     return (allowedBrandNames.includes(name) || allowedBrandNames.includes(slug)) && hasImage;
   });
@@ -45,12 +42,13 @@ export async function ShopByBrand() {
           const rawSlug = typeof brand.slug === "string" ? brand.slug : brand.slug?.current;
           const slug = rawSlug || "brand";
 
+          const rawImg = brand.image || brand.logo;
           let imageUrl = "";
-          if (typeof brand.image === "string") {
-            imageUrl = brand.image;
-          } else if (brand.image?.asset) {
+          if (typeof rawImg === "string") {
+            imageUrl = rawImg;
+          } else if (rawImg) {
             try {
-              imageUrl = urlFor(brand.image).url();
+              imageUrl = urlFor(rawImg).url();
             } catch {
               imageUrl = "";
             }
@@ -66,7 +64,7 @@ export async function ShopByBrand() {
             >
               <Image
                 src={imageUrl}
-                alt={brand.title || "Brand Logo"}
+                alt={brand.title || brand.name || "Brand Logo"}
                 width={140}
                 height={60}
                 className="max-h-10 sm:max-h-12 w-auto object-contain transition-transform group-hover:scale-105"

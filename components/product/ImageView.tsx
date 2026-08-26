@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
-import { urlFor } from "@/sanity/lib/image";
+import { urlFor } from "@/lib/image";
 import { cn } from "@/lib/utils";
 
 export interface ImageViewProps {

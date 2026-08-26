@@ -2,7 +2,7 @@
 
 import { stripe } from "@/lib/stripe";
 import { CartItem } from "@/store";
-import { urlFor } from "@/sanity/lib/image";
+import { urlFor } from "@/lib/image";
 
 export interface CheckoutMetadata {
   orderNumber: string;
@@ -44,7 +44,7 @@ export async function createCheckoutSession(
       let imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
       if (typeof mainImg === "string") {
         imageUrl = mainImg;
-      } else if (mainImg?.asset) {
+      } else if (mainImg) {
         try {
           imageUrl = urlFor(mainImg).url();
         } catch {
@@ -58,7 +58,7 @@ export async function createCheckoutSession(
           unit_amount: Math.round(price * 100),
           product_data: {
             name,
-            description: description.slice(0, 200),
+            description: String(description).slice(0, 200),
             images: [imageUrl],
             metadata: {
               id,

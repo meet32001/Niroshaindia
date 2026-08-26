@@ -16,7 +16,7 @@ import { NoAccess } from "@/components/cart/NoAccess";
 import { EmptyCart } from "@/components/cart/EmptyCart";
 import { useStore } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
-import { urlFor } from "@/sanity/lib/image";
+import { urlFor } from "@/lib/image";
 import { createCheckoutSession } from "@/actions/createCheckoutSession";
 
 export default function CartPage() {
