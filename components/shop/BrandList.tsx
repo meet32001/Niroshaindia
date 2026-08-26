@@ -36,8 +36,9 @@ export function BrandList({
         {brands.map((brand, idx) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const rawSlug = typeof brand.slug === "string" ? brand.slug : (brand.slug as any)?.current;
-          const slug = rawSlug || brand.title?.toLowerCase() || "brand";
+          const slug = rawSlug || brand.title?.toLowerCase() || brand.name?.toLowerCase() || "brand";
           const isActive = selectedBrand?.toLowerCase() === slug.toLowerCase();
+          const brandName = brand.name || brand.title || "Brand";
 
           return (
             <button
@@ -57,8 +58,13 @@ export function BrandList({
                   onChange={() => {}}
                   className="accent-emerald-600 cursor-pointer"
                 />
-                <span className="line-clamp-1">{brand.title}</span>
+                <span className="line-clamp-1">{brandName}</span>
               </div>
+              {brand.productCount !== undefined && (
+                <span className="text-[10px] font-bold text-slate-400">
+                  ({brand.productCount})
+                </span>
+              )}
             </button>
           );
         })}

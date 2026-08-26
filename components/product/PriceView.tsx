@@ -8,7 +8,14 @@ export interface PriceViewProps {
 }
 
 export function PriceView({ price = 0, discount = 0, className }: PriceViewProps) {
-  const originalPrice = discount > 0 ? price + (price * (discount / 100)) : 0;
+  // If discount is greater than price, it is an absolute compare-at / strikethrough price (e.g. 89900)
+  // Otherwise if discount is between 0 and 100, treat it as a percentage discount
+  const strikethroughPrice =
+    discount > price
+      ? discount
+      : discount > 0 && discount < 100
+      ? price + price * (discount / 100)
+      : 0;
 
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
@@ -16,9 +23,9 @@ export function PriceView({ price = 0, discount = 0, className }: PriceViewProps
         amount={price}
         className="text-shop-dark dark:text-white font-bold text-sm md:text-base"
       />
-      {discount > 0 && (
+      {strikethroughPrice > price && (
         <PriceFormatter
-          amount={originalPrice}
+          amount={strikethroughPrice}
           className="line-through text-xs text-slate-400 font-normal ml-1"
         />
       )}

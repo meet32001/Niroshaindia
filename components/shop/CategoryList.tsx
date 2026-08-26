@@ -38,6 +38,7 @@ export function CategoryList({
           const rawSlug = typeof cat.slug === "string" ? cat.slug : (cat.slug as any)?.current;
           const slug = rawSlug || "category";
           const isActive = selectedCategory?.toLowerCase() === slug.toLowerCase();
+          const catName = cat.name || cat.title || "Category";
 
           return (
             <button
@@ -50,7 +51,7 @@ export function CategoryList({
                   : "border-green-200 text-slate-700 dark:text-slate-300 hover:bg-green-50 dark:hover:bg-slate-800"
               )}
             >
-              <span>{cat.title}</span>
+              <span>{catName}</span>
               {cat.productCount !== undefined && (
                 <span className={cn("text-[10px] font-bold ml-2", isActive ? "text-white/90" : "text-slate-400")}>
                   ({cat.productCount})
