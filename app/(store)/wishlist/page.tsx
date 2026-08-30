@@ -4,24 +4,28 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Container } from "@/components/layout/Container";
 import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { useStore } from "@/store";
-import { getWishlistItems, toggleWishlistItem } from "@/actions/wishlist";
-import { Heart, ShoppingBag, Trash2, Loader2 } from "lucide-react";
+import { getWishlistItems, removeFromWishlist, moveToCart } from "@/actions/wishlist";
+import { Heart, ShoppingBag, Trash2, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 
 export default function WishlistPage() {
   const { favoriteProduct, addToFavorite, addItem } = useStore();
   const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [dbItems, setDbItems] = useState<any[]>([]);
 
   useEffect(() => {
     let isMounted = true;
     getWishlistItems().then((res) => {
       if (!isMounted) return;
       if (res.success && res.items.length > 0) {
-        // Sync server wishlist items into Zustand store if local is empty
+        setDbItems(res.items);
+        // Hydrate local Zustand store with saved server items
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         res.items.forEach((item: any) => {
           const variant = item.product_variants || {};
@@ -29,8 +33,11 @@ export default function WishlistPage() {
           const formatted = {
             id: product.id || variant.id || item.id,
             _id: product.id || variant.id || item.id,
-            name: variant.name || product.name || "Product",
+            variant_id: variant.id || item.variant_id,
+            wishlist_item_id: item.id,
+            name: variant.name || product.name || "Saved Product",
             price: (variant.price_cents || 0) / 100,
+            stock: variant.stock ?? 10,
             image: variant.product_images?.[0]?.image_url || "/images/product-placeholder.png",
             slug: product.slug,
           };
@@ -52,22 +59,35 @@ export default function WishlistPage() {
   }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleRemove = async (product: any) => {
+  const handleRemove = async (product: any, wishlistItemId?: string) => {
     addToFavorite(product);
     toast.success("Removed from wishlist");
-    const id = String(product._id || product.id || "");
-    const variantId = String(product.product_variants?.[0]?.id || product.variant_id || "");
-    try {
-      await toggleWishlistItem(variantId || null, id || null);
-    } catch (err) {
-      console.warn("[WISHLIST REMOVE NOTICE]:", err);
+
+    if (wishlistItemId) {
+      await removeFromWishlist(wishlistItemId);
     }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMoveToCart = (product: any) => {
+  const handleMoveToCart = async (product: any) => {
+    const stock = product.stock ?? 10;
+    if (stock <= 0) {
+      toast.error("This item is currently out of stock");
+      return;
+    }
+
+    // 1. Add to local Zustand cart
     addItem(product);
+
+    // 2. Remove from local Zustand favorites
+    addToFavorite(product);
+
     toast.success("Moved to cart!");
+
+    // 3. Server action: Move from DB wishlist to DB cart
+    const variantId = product.variant_id || product.id || product._id;
+    const productId = product.id || product._id;
+    await moveToCart(variantId, productId, 1);
   };
 
   return (
@@ -78,28 +98,39 @@ export default function WishlistPage() {
           <span>My Wishlist</span>
         </h1>
         <p className="text-sm text-slate-500">
-          Save your favorite products to buy later or move them to cart.
+          Curate your desired products, view stock availability, or move them directly to your cart.
         </p>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((n) => (
+            <Card key={n} className="overflow-hidden border border-slate-200 dark:border-slate-800 animate-pulse">
+              <div className="aspect-square bg-slate-100 dark:bg-slate-800" />
+              <div className="p-4 space-y-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+              </div>
+            </Card>
+          ))}
         </div>
       ) : favoriteProduct.length === 0 ? (
         <Card className="p-12 text-center border-dashed space-y-4">
           <div className="w-16 h-16 rounded-full bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center mx-auto text-rose-500">
             <Heart className="w-8 h-8" />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold">Your wishlist is empty</h3>
-            <p className="text-sm text-slate-500">
-              Explore products and click the heart icon to save items here.
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Your Wishlist is Empty
+            </h3>
+            <p className="text-sm text-slate-500 max-w-sm mx-auto">
+              You haven&apos;t saved any items yet. Explore our storefront and click the heart icon on any product to save it for later.
             </p>
           </div>
           <Link href="/shop">
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
-              Discover Products
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-2 rounded-xl">
+              <span>Explore Products</span>
+              <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
         </Card>
@@ -114,6 +145,13 @@ export default function WishlistPage() {
               product.product_variants?.[0]?.product_images?.[0]?.image_url ||
               "/images/product-placeholder.png";
             const price = product.price || (product.price_cents || 0) / 100;
+            const stock = product.stock ?? 10;
+            const inStock = stock > 0;
+
+            // Match DB item ID if present
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const dbMatch = dbItems.find((d: any) => d.product_variants?.id === product.variant_id || d.id === product.wishlist_item_id);
+            const wishlistItemId = dbMatch?.id || product.wishlist_item_id;
 
             return (
               <Card
@@ -129,12 +167,19 @@ export default function WishlistPage() {
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <button
-                      onClick={() => handleRemove(product)}
+                      onClick={() => handleRemove(product, wishlistItemId)}
                       className="absolute top-3 right-3 p-2 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-600 transition-colors shadow-xs cursor-pointer"
                       aria-label="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                    <div className="absolute bottom-3 left-3">
+                      {inStock ? (
+                        <Badge className="bg-emerald-600 text-white text-[10px]">In Stock</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-[10px]">Out of Stock</Badge>
+                      )}
+                    </div>
                   </div>
 
                   <CardHeader className="p-4 pb-2">
@@ -155,10 +200,11 @@ export default function WishlistPage() {
                 <CardFooter className="p-4 pt-2">
                   <Button
                     onClick={() => handleMoveToCart(product)}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-2 rounded-xl"
+                    disabled={!inStock}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold gap-2 rounded-xl"
                   >
                     <ShoppingBag className="w-4 h-4" />
-                    <span>Move to Cart</span>
+                    <span>{inStock ? "Move to Cart" : "Out of Stock"}</span>
                   </Button>
                 </CardFooter>
               </Card>
