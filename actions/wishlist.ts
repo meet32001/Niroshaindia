@@ -118,60 +118,83 @@ export async function toggleWishlistItem(variantId?: string | number | null) {
   }
 }
 
-export async function removeFromWishlist(variantIdOrItemId: string | number) {
-  try {
-    const { userId } = await auth();
-    if (!userId) return { success: false, error: 'Unauthorized' };
+export async function removeFromWishlist(rawTargetId: unknown) {
+  console.log('====================================================');
+  console.log('[DEBUG WISHLIST DELETE] 1. Action Invoked');
+  console.log('[DEBUG WISHLIST DELETE] Passed rawTargetId:', rawTargetId, 'Type:', typeof rawTargetId);
 
-    const targetId = Number(variantIdOrItemId);
-    if (isNaN(targetId)) return { success: false, error: 'Invalid ID' };
-
-    const supabase = getSupabaseAdmin();
-
-    // 1. Resolve Customer ID
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('clerk_user_id', userId)
-      .single();
-
-    if (!customer) return { success: false, error: 'Customer not found' };
-
-    // 2. Resolve Customer Wishlist
-    const { data: wishlist } = await supabase
-      .from('wishlists')
-      .select('id')
-      .eq('customer_id', customer.id)
-      .maybeSingle();
-
-    if (!wishlist) return { success: false, error: 'Wishlist not found' };
-
-    console.log('[WISHLIST REMOVE] Target ID:', targetId, 'from wishlist:', wishlist.id);
-
-    // 3. Delete matching row (by variant_id or primary key id)
-    const { data, error } = await supabase
-      .from('wishlist_items')
-      .delete()
-      .eq('wishlist_id', wishlist.id)
-      .or(`variant_id.eq.${targetId},id.eq.${targetId}`)
-      .select();
-
-    if (error) {
-      console.error('[WISHLIST REMOVE ERROR]:', error);
-      return { success: false, error: error.message };
-    }
-
-    console.log('[WISHLIST REMOVE SUCCESS]: Removed row(s):', data);
-    return { success: true, count: data?.length || 0 };
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to remove from wishlist';
-    console.error('[WISHLIST REMOVE UNCAUGHT EXCEPTION]:', err);
-    return { success: false, error: errorMessage };
+  const { userId } = await auth();
+  console.log('[DEBUG WISHLIST DELETE] 2. Clerk Session userId:', userId);
+  if (!userId) {
+    console.error('[DEBUG WISHLIST DELETE] FAILED: User not authenticated');
+    return { success: false, error: 'Unauthorized' };
   }
+
+  const supabase = getSupabaseAdmin();
+
+  // 1. Resolve Customer Record
+  const { data: customer, error: custErr } = await supabase
+    .from('customers')
+    .select('id, clerk_user_id, email')
+    .eq('clerk_user_id', userId)
+    .single();
+
+  console.log('[DEBUG WISHLIST DELETE] 3. Customer query result:', customer, 'Error:', custErr);
+  if (custErr || !customer) {
+    console.error('[DEBUG WISHLIST DELETE] FAILED: No matching customer found in DB');
+    return { success: false, error: 'Customer not found' };
+  }
+
+  // 2. Resolve Customer Wishlist
+  const { data: wishlist, error: wishErr } = await supabase
+    .from('wishlists')
+    .select('id, customer_id')
+    .eq('customer_id', customer.id)
+    .maybeSingle();
+
+  console.log('[DEBUG WISHLIST DELETE] 4. Wishlist query result:', wishlist, 'Error:', wishErr);
+  if (wishErr || !wishlist) {
+    console.error('[DEBUG WISHLIST DELETE] FAILED: Customer has no active wishlist');
+    return { success: false, error: 'Wishlist not found' };
+  }
+
+  // 3. Inspect Existing Items in Wishlist
+  const { data: currentItems, error: listErr } = await supabase
+    .from('wishlist_items')
+    .select('*')
+    .eq('wishlist_id', wishlist.id);
+
+  console.log('[DEBUG WISHLIST DELETE] 5. Current rows in wishlist_items for wishlist_id =', wishlist.id, ':', currentItems, 'Error:', listErr);
+
+  const parsedId = Number(rawTargetId);
+  console.log('[DEBUG WISHLIST DELETE] 6. Target ID parsed as Number:', parsedId);
+
+  // 4. Execute Targeted Deletion with SELECT confirmation
+  const { data: deletedRows, error: deleteErr } = await supabase
+    .from('wishlist_items')
+    .delete()
+    .eq('wishlist_id', wishlist.id)
+    .or(`id.eq.${parsedId},variant_id.eq.${parsedId}`)
+    .select();
+
+  console.log('[DEBUG WISHLIST DELETE] 7. Delete Query Output -> Deleted Rows:', deletedRows, 'Error:', deleteErr);
+  console.log('====================================================');
+
+  if (deleteErr) {
+    return { success: false, error: deleteErr.message };
+  }
+
+  if (!deletedRows || deletedRows.length === 0) {
+    console.warn('[DEBUG WISHLIST DELETE] WARNING: Query executed but 0 rows matched. Check if target ID exists in currentItems array logged in step 5.');
+  }
+
+  return { success: true, count: deletedRows?.length || 0, deletedRows };
 }
 
 export async function moveToCart(variantId: string | number, quantity: number = 1) {
   try {
+    console.log('====================================================');
+    console.log('[DEBUG MOVE TO CART] 1. Action Invoked for variantId:', variantId);
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthorized' };
 
@@ -249,14 +272,18 @@ export async function moveToCart(variantId: string | number, quantity: number = 
       .maybeSingle();
 
     if (wishlist) {
-      await supabase
+      const { data: deletedRows } = await supabase
         .from('wishlist_items')
         .delete()
         .eq('wishlist_id', wishlist.id)
-        .or(`variant_id.eq.${numericVariantId},id.eq.${numericVariantId}`);
+        .or(`variant_id.eq.${numericVariantId},id.eq.${numericVariantId}`)
+        .select();
+
+      console.log('[MOVE TO CART DELETE WISHLIST]: Removed row(s):', deletedRows);
     }
 
     console.log('[MOVE TO CART SUCCESS]: Variant', numericVariantId, 'transferred to cart', cart.id);
+    console.log('====================================================');
     return { success: true, cartId: cart.id };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to move to cart';

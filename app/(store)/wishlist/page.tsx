@@ -60,34 +60,40 @@ export default function WishlistPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleRemove = async (product: any, wishlistItemId?: string) => {
-    console.log('[CLIENT] Wishlist Delete Clicked for product:', product, 'wishlistItemId:', wishlistItemId);
+    console.log('[CLIENT DEBUG] Delete button clicked for item object:', product);
     const targetId = wishlistItemId || product.variant_id || product.id || product._id;
-    console.log('[CLIENT] Derived targetId:', targetId);
+    console.log('[CLIENT DEBUG] Resolved targetId to pass to action:', targetId);
 
     if (!targetId) {
-      console.error('[CLIENT] Target ID is missing or invalid!');
+      console.error('[CLIENT DEBUG] Target ID is missing or invalid!');
       return;
     }
 
     try {
       const res = await removeFromWishlist(targetId);
-      console.log('[CLIENT] removeFromWishlist response:', res);
+      console.log('[CLIENT DEBUG] removeFromWishlist response received:', res);
 
       if (res.success) {
+        if ((res.count || 0) > 0) {
+          console.log('[CLIENT DEBUG] Database confirmed deletion of', res.count, 'rows.');
+        } else {
+          console.warn('[CLIENT DEBUG] Action succeeded but 0 rows were deleted from database.');
+        }
         addToFavorite(product);
         toast.success("Removed from wishlist");
         setDbItems((prev) => prev.filter((item) => String(item.id) !== String(targetId) && String(item.variant_id) !== String(targetId)));
       } else {
-        console.error("[WISHLIST DELETE ERROR]:", res.error);
+        console.error('[CLIENT DEBUG] Deletion returned failure:', res.error);
         toast.error(res.error || "Failed to remove from wishlist");
       }
     } catch (err) {
-      console.error('[CLIENT] Delete failed with exception:', err);
+      console.error('[CLIENT DEBUG] Delete failed with exception:', err);
     }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleMoveToCart = async (product: any) => {
+    console.log('[CLIENT DEBUG] Move to Cart button clicked for item object:', product);
     const stock = product.stock ?? 10;
     if (stock <= 0) {
       toast.error("This item is currently out of stock");
@@ -95,16 +101,16 @@ export default function WishlistPage() {
     }
 
     const variantId = product.variant_id || product.id || product._id;
-    console.log('[CLIENT] Move to Cart Clicked for variantId:', variantId);
+    console.log('[CLIENT DEBUG] Resolved variantId for move to cart:', variantId);
 
     if (!variantId) {
-      console.error('[CLIENT] Variant ID is missing or invalid!');
+      console.error('[CLIENT DEBUG] Variant ID is missing!');
       return;
     }
 
     try {
       const res = await moveToCart(variantId, 1);
-      console.log('[CLIENT] moveToCart response:', res);
+      console.log('[CLIENT DEBUG] moveToCart response received:', res);
 
       if (res.success) {
         addItem(product);
@@ -112,11 +118,11 @@ export default function WishlistPage() {
         toast.success("Moved to cart!");
         setDbItems((prev) => prev.filter((item) => String(item.variant_id) !== String(variantId)));
       } else {
-        console.error("[MOVE TO CART ERROR]:", res.error);
+        console.error('[CLIENT DEBUG] Move to cart returned failure:', res.error);
         toast.error(res.error || "Failed to move item to cart");
       }
     } catch (err) {
-      console.error('[CLIENT] Move to cart failed with exception:', err);
+      console.error('[CLIENT DEBUG] Move to cart failed with exception:', err);
     }
   };
 
