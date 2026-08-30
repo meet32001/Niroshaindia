@@ -88,7 +88,7 @@ export async function toggleWishlistItem(variantId?: string | number | null) {
     if (!wishlist) {
       const { data: newWishlist } = await supabase
         .from('wishlists')
-        .insert({ customer_id: customer.id })
+        .insert({ customer_id: customer.id, name: 'My Wishlist' })
         .select('id')
         .single();
       wishlist = newWishlist;
@@ -100,13 +100,11 @@ export async function toggleWishlistItem(variantId?: string | number | null) {
       return { success: false, error: 'Missing variantId', isInWishlist: false };
     }
 
-    const targetVariantId = String(variantId);
-
     const { data: existingItem } = await supabase
       .from('wishlist_items')
       .select('id')
       .eq('wishlist_id', wishlist.id)
-      .eq('variant_id', targetVariantId)
+      .eq('variant_id', variantId)
       .maybeSingle();
 
     if (existingItem) {
@@ -115,7 +113,7 @@ export async function toggleWishlistItem(variantId?: string | number | null) {
     } else {
       await supabase.from('wishlist_items').insert({
         wishlist_id: wishlist.id,
-        variant_id: targetVariantId,
+        variant_id: variantId,
       });
       return { success: true, isInWishlist: true };
     }
@@ -152,8 +150,9 @@ export async function removeFromWishlist(variantId: string | number) {
 
     console.log('[WISHLIST DELETE] Removing variant/item:', variantId, 'from wishlist:', wishlist.id);
 
-    // 3. Delete row (match on wishlist_id and variant_id or id)
     const targetId = String(variantId);
+
+    // 3. Delete row (match on wishlist_id and either primary key id or variant_id)
     const { data, error } = await supabase
       .from('wishlist_items')
       .delete()
@@ -201,7 +200,7 @@ export async function moveToCart(variantId: string | number, quantity: number = 
     if (!cart) {
       const { data: newCart, error: cartCreateError } = await supabase
         .from('carts')
-        .insert({ customer_id: customer.id })
+        .insert({ customer_id: customer.id, session_token: `customer_${customer.id}` })
         .select('id')
         .single();
 
@@ -243,7 +242,7 @@ export async function moveToCart(variantId: string | number, quantity: number = 
       }
     }
 
-    // 4. Delete from wishlist_items (match on wishlist_id and variant_id or id)
+    // 4. Delete from wishlist_items
     const { data: wishlist } = await supabase
       .from('wishlists')
       .select('id')
@@ -255,7 +254,7 @@ export async function moveToCart(variantId: string | number, quantity: number = 
         .from('wishlist_items')
         .delete()
         .eq('wishlist_id', wishlist.id)
-        .or(`id.eq.${targetVariantId},variant_id.eq.${targetVariantId}`);
+        .or(`variant_id.eq.${targetVariantId},id.eq.${targetVariantId}`);
     }
 
     console.log('[MOVE TO CART SUCCESS] Moved variant:', variantId, 'to cart:', cart.id);

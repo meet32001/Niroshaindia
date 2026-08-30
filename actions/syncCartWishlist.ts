@@ -114,7 +114,6 @@ export async function syncCartAndWishlistOnLogin(guestSessionToken: string | nul
       id,
       wishlist_items (
         id,
-        product_id,
         variant_id
       )
     `)
