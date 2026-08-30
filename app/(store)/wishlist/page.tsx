@@ -60,24 +60,15 @@ export default function WishlistPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleRemove = async (product: any, wishlistItemId?: string) => {
-    // 1. Optimistic removal in local store
-    addToFavorite(product);
-    toast.success("Removed from wishlist");
+    const targetId = wishlistItemId || product.variant_id || product.id || product._id;
 
-    // 2. Server Action deletion
-    const variantId = product.variant_id || product.id || product._id;
-    const productId = product.id || product._id;
+    const res = await removeFromWishlist(targetId);
 
-    const res = await removeFromWishlist({
-      wishlistItemId: wishlistItemId || product.wishlist_item_id || null,
-      variantId: variantId || null,
-      productId: productId || null,
-    });
-
-    if (!res.success) {
-      console.warn("[WISHLIST REMOVE NOTICE]:", res.error);
-      // Revert optimistic removal if server fails
+    if (res.success) {
       addToFavorite(product);
+      toast.success("Removed from wishlist");
+    } else {
+      console.error("[WISHLIST DELETE ERROR]:", res.error);
       toast.error(res.error || "Failed to remove from wishlist");
     }
   };
@@ -91,20 +82,16 @@ export default function WishlistPage() {
     }
 
     const variantId = product.variant_id || product.id || product._id;
-    const productId = product.id || product._id;
 
-    // 1. Add to local Zustand cart
-    addItem(product);
+    const res = await moveToCart(variantId, 1);
 
-    // 2. Remove from local Zustand favorites
-    addToFavorite(product);
-
-    toast.success("Moved to cart!");
-
-    // 3. Server action: Move from DB wishlist to DB cart
-    const res = await moveToCart(variantId, productId, 1);
-    if (!res.success) {
-      console.warn("[MOVE TO CART NOTICE]:", res.error);
+    if (res.success) {
+      addItem(product);
+      addToFavorite(product);
+      toast.success("Moved to cart!");
+    } else {
+      console.error("[MOVE TO CART ERROR]:", res.error);
+      toast.error(res.error || "Failed to move item to cart");
     }
   };
 

@@ -1,17 +1,40 @@
 'use server';
 
-import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
+import { auth } from '@clerk/nextjs/server';
+import { createClient } from '@supabase/supabase-js';
+
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase credentials');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 export async function getWishlistItems() {
   try {
-    const authData = await getAuthenticatedCustomer();
-    if (!authData) {
-      return { success: false, error: 'Unauthenticated', items: [] };
-    }
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: 'Unauthorized', items: [] };
 
-    const { customer, supabaseAdmin } = authData;
+    const supabase = getSupabaseAdmin();
 
-    const { data: wishlist } = await supabaseAdmin
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('clerk_user_id', userId)
+      .single();
+
+    if (!customer) return { success: false, error: 'Customer not found', items: [] };
+
+    const { data: wishlist } = await supabase
       .from('wishlists')
       .select(`
         id,
@@ -42,24 +65,29 @@ export async function getWishlistItems() {
   }
 }
 
-export async function toggleWishlistItem(variantId?: string | null, productId?: string | null) {
+export async function toggleWishlistItem(variantId?: string | number | null, productId?: string | number | null) {
   try {
-    const authData = await getAuthenticatedCustomer();
-    if (!authData) {
-      return { success: false, error: 'Unauthenticated', isInWishlist: false };
-    }
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: 'Unauthorized', isInWishlist: false };
 
-    const { customer, supabaseAdmin } = authData;
+    const supabase = getSupabaseAdmin();
 
-    // 1. Get or create customer wishlist
-    let { data: wishlist } = await supabaseAdmin
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('clerk_user_id', userId)
+      .single();
+
+    if (!customer) return { success: false, error: 'Customer not found', isInWishlist: false };
+
+    let { data: wishlist } = await supabase
       .from('wishlists')
       .select('id')
       .eq('customer_id', customer.id)
       .maybeSingle();
 
     if (!wishlist) {
-      const { data: newWishlist } = await supabaseAdmin
+      const { data: newWishlist } = await supabase
         .from('wishlists')
         .insert({ customer_id: customer.id })
         .select('id')
@@ -67,12 +95,9 @@ export async function toggleWishlistItem(variantId?: string | null, productId?: 
       wishlist = newWishlist;
     }
 
-    if (!wishlist) {
-      return { success: false, error: 'Failed to access wishlist', isInWishlist: false };
-    }
+    if (!wishlist) return { success: false, error: 'Wishlist not found', isInWishlist: false };
 
-    // 2. Check if item exists in wishlist_items
-    let query = supabaseAdmin
+    let query = supabase
       .from('wishlist_items')
       .select('id')
       .eq('wishlist_id', wishlist.id);
@@ -88,12 +113,10 @@ export async function toggleWishlistItem(variantId?: string | null, productId?: 
     const { data: existingItem } = await query.maybeSingle();
 
     if (existingItem) {
-      // Remove from wishlist
-      await supabaseAdmin.from('wishlist_items').delete().eq('id', existingItem.id);
+      await supabase.from('wishlist_items').delete().eq('id', existingItem.id);
       return { success: true, isInWishlist: false };
     } else {
-      // Insert into wishlist
-      await supabaseAdmin.from('wishlist_items').insert({
+      await supabase.from('wishlist_items').insert({
         wishlist_id: wishlist.id,
         variant_id: variantId || null,
         product_id: productId || null,
@@ -106,142 +129,144 @@ export async function toggleWishlistItem(variantId?: string | null, productId?: 
   }
 }
 
-export async function removeFromWishlist(identifier: {
-  wishlistItemId?: string | null;
-  variantId?: string | null;
-  productId?: string | null;
-} | string) {
+export async function removeFromWishlist(variantId: string | number) {
   try {
-    const authData = await getAuthenticatedCustomer();
-    if (!authData) {
-      return { success: false, error: 'Unauthenticated' };
-    }
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
-    const { customer, supabaseAdmin } = authData;
+    const supabase = getSupabaseAdmin();
 
-    // Resolve customer wishlist ID
-    const { data: wishlist } = await supabaseAdmin
+    // 1. Get customer
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('clerk_user_id', userId)
+      .single();
+
+    if (!customer) return { success: false, error: 'Customer not found' };
+
+    // 2. Get customer's wishlist
+    const { data: wishlist } = await supabase
       .from('wishlists')
       .select('id')
       .eq('customer_id', customer.id)
-      .maybeSingle();
+      .single();
 
-    if (!wishlist) {
-      return { success: false, error: 'Wishlist not found' };
-    }
+    if (!wishlist) return { success: false, error: 'Wishlist not found' };
 
-    let deleteQuery = supabaseAdmin
+    console.log('[WISHLIST DELETE] Removing variant/item:', variantId, 'from wishlist:', wishlist.id);
+
+    // 3. Delete row (match on wishlist_id and variant_id / product_id / id)
+    const targetId = String(variantId);
+    const { data, error } = await supabase
       .from('wishlist_items')
       .delete()
-      .eq('wishlist_id', wishlist.id);
-
-    if (typeof identifier === 'string') {
-      deleteQuery = deleteQuery.or(`id.eq.${identifier},variant_id.eq.${identifier},product_id.eq.${identifier}`);
-    } else if (identifier?.wishlistItemId) {
-      deleteQuery = deleteQuery.eq('id', identifier.wishlistItemId);
-    } else if (identifier?.variantId) {
-      deleteQuery = deleteQuery.eq('variant_id', identifier.variantId);
-    } else if (identifier?.productId) {
-      deleteQuery = deleteQuery.eq('product_id', identifier.productId);
-    } else {
-      return { success: false, error: 'No identifier provided' };
-    }
-
-    const { error } = await deleteQuery;
+      .eq('wishlist_id', wishlist.id)
+      .or(`id.eq.${targetId},variant_id.eq.${targetId},product_id.eq.${targetId}`)
+      .select();
 
     if (error) {
-      console.error('[REMOVE FROM WISHLIST ERROR]:', error);
+      console.error('[WISHLIST DELETE ERROR]:', error);
       return { success: false, error: error.message };
     }
 
-    return { success: true };
+    console.log('[WISHLIST DELETE SUCCESS]: Removed row count:', data?.length || 0);
+    return { success: true, removed: data };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to remove from wishlist';
+    console.error('[WISHLIST DELETE UNCAUGHT EXCEPTION]:', err);
     return { success: false, error: errorMessage };
   }
 }
 
-export async function moveToCart(variantId?: string | null, productId?: string | null, quantity: number = 1) {
+export async function moveToCart(variantId: string | number, quantity: number = 1) {
   try {
-    const authData = await getAuthenticatedCustomer();
-    if (!authData) {
-      return { success: false, error: 'Unauthenticated' };
-    }
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
-    const { customer, supabaseAdmin } = authData;
+    const supabase = getSupabaseAdmin();
 
-    // 1. Get customer wishlist
-    const { data: wishlist } = await supabaseAdmin
-      .from('wishlists')
+    // 1. Get customer
+    const { data: customer } = await supabase
+      .from('customers')
       .select('id')
-      .eq('customer_id', customer.id)
-      .maybeSingle();
+      .eq('clerk_user_id', userId)
+      .single();
 
-    // 2. Get or create active customer cart
-    let { data: cart } = await supabaseAdmin
+    if (!customer) return { success: false, error: 'Customer not found' };
+
+    // 2. Get or create active cart
+    let { data: cart } = await supabase
       .from('carts')
       .select('id')
       .eq('customer_id', customer.id)
       .maybeSingle();
 
     if (!cart) {
-      const { data: newCart } = await supabaseAdmin
+      const { data: newCart, error: cartCreateError } = await supabase
         .from('carts')
         .insert({ customer_id: customer.id })
         .select('id')
         .single();
+
+      if (cartCreateError) {
+        console.error('[MOVE TO CART] Failed creating cart:', cartCreateError);
+        return { success: false, error: cartCreateError.message };
+      }
       cart = newCart;
     }
 
-    if (!cart) {
-      return { success: false, error: 'Failed to access cart' };
-    }
+    console.log('[MOVE TO CART] Target cart ID:', cart.id, 'for variant:', variantId);
 
-    // 3. Upsert into cart_items
-    if (variantId) {
-      const { data: existingCartItem } = await supabaseAdmin
+    // 3. Insert or update cart_items
+    const targetVariantId = String(variantId);
+    const { data: existingCartItem } = await supabase
+      .from('cart_items')
+      .select('id, quantity')
+      .eq('cart_id', cart.id)
+      .eq('variant_id', targetVariantId)
+      .maybeSingle();
+
+    if (existingCartItem) {
+      await supabase
         .from('cart_items')
-        .select('id, quantity')
-        .eq('cart_id', cart.id)
-        .eq('variant_id', variantId)
-        .maybeSingle();
-
-      if (existingCartItem) {
-        await supabaseAdmin
-          .from('cart_items')
-          .update({ quantity: existingCartItem.quantity + quantity })
-          .eq('id', existingCartItem.id);
-      } else {
-        await supabaseAdmin.from('cart_items').insert({
+        .update({ quantity: existingCartItem.quantity + quantity })
+        .eq('id', existingCartItem.id);
+    } else {
+      const { error: insertCartError } = await supabase
+        .from('cart_items')
+        .insert({
           cart_id: cart.id,
-          variant_id: variantId,
-          quantity,
+          variant_id: targetVariantId,
+          quantity: quantity,
         });
+
+      if (insertCartError) {
+        console.error('[MOVE TO CART] Failed inserting into cart_items:', insertCartError);
+        return { success: false, error: insertCartError.message };
       }
     }
 
-    // 4. Remove from wishlist_items
+    // 4. Delete from wishlist_items
+    const { data: wishlist } = await supabase
+      .from('wishlists')
+      .select('id')
+      .eq('customer_id', customer.id)
+      .maybeSingle();
+
     if (wishlist) {
-      let removeQuery = supabaseAdmin
+      await supabase
         .from('wishlist_items')
         .delete()
-        .eq('wishlist_id', wishlist.id);
-
-      if (variantId) {
-        removeQuery = removeQuery.eq('variant_id', variantId);
-      } else if (productId) {
-        removeQuery = removeQuery.eq('product_id', productId);
-      }
-
-      const { error: removeError } = await removeQuery;
-      if (removeError) {
-        console.error('[MOVE TO CART WISHLIST DELETE ERROR]:', removeError);
-      }
+        .eq('wishlist_id', wishlist.id)
+        .or(`variant_id.eq.${targetVariantId},product_id.eq.${targetVariantId},id.eq.${targetVariantId}`);
     }
 
+    console.log('[MOVE TO CART SUCCESS] Moved variant:', variantId, 'to cart:', cart.id);
     return { success: true, cartId: cart.id };
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to move item to cart';
+    const errorMessage = err instanceof Error ? err.message : 'Failed to move to cart';
+    console.error('[MOVE TO CART UNCAUGHT EXCEPTION]:', err);
     return { success: false, error: errorMessage };
   }
 }
