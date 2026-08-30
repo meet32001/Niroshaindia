@@ -1,15 +1,14 @@
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
-import { useStore } from "@/store";
-import { syncCurrentCustomer } from "@/actions/syncCustomer";
-import { syncUserCartAction } from "@/actions/syncCart";
+import { useEffect, useRef } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import { syncCartAndWishlistOnLogin } from '@/actions/syncCartWishlist';
+import { useStore } from '@/store';
 
-const GUEST_TOKEN_KEY = "nirosha_guest_cart_token";
+const GUEST_TOKEN_KEY = 'nirosha_guest_cart_token';
 
 export function getOrCreateGuestToken(): string {
-  if (typeof window === "undefined") return "";
+  if (typeof window === 'undefined') return '';
   let token = localStorage.getItem(GUEST_TOKEN_KEY);
   if (!token) {
     token = `guest_${Math.random().toString(36).substring(2)}_${Date.now()}`;
@@ -19,57 +18,47 @@ export function getOrCreateGuestToken(): string {
 }
 
 export function useCartSync() {
-  const { isSignedIn, isLoaded, user } = useUser();
-  const prevIsSignedInRef = useRef<boolean | null>(null);
+  const { isSignedIn, userId } = useAuth();
+  const syncedRef = useRef<string | null>(null);
+  const prevIsSignedInRef = useRef<boolean | undefined>(undefined);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (isSignedIn && userId && syncedRef.current !== userId) {
+      syncedRef.current = userId;
 
-    const syncUserCartAndProfile = async () => {
-      try {
-        // 1. Perform JIT Customer Sync via Server Action (bypasses RLS & works on localhost)
-        const syncResult = await syncCurrentCustomer();
+      const guestToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem(GUEST_TOKEN_KEY)
+          : null;
 
-        if (!syncResult.success) {
-          console.warn("JIT Customer Sync notice:", syncResult.reason || syncResult.error);
-        }
-
-        // 2. Perform Cart Sync via Server Action (bypasses client RLS limits)
-        const guestToken = getOrCreateGuestToken();
-        const localItems = useStore.getState().items;
-        const formattedItems = localItems.map((item) => ({
-          productId: String(item.product._id || item.product.id || ""),
-          variantId: String(
-            item.product.product_variants?.[0]?.id ||
-            item.product.variant_id ||
-            item.product._id ||
-            item.product.id ||
-            ""
-          ),
-          quantity: item.quantity,
-        }));
-
-        await syncUserCartAction(guestToken, formattedItems);
-      } catch (err) {
-        console.error("Cart & Wishlist sync notice:", err);
-      }
-    };
-
-    // Transition from unauthenticated to authenticated
-    if (isSignedIn && user?.id) {
-      syncUserCartAndProfile();
+      syncCartAndWishlistOnLogin(guestToken)
+        .then((res) => {
+          if (res.success) {
+            console.log('[CART/WISHLIST SYNC SUCCESS]:', res);
+            if (guestToken) {
+              localStorage.removeItem(GUEST_TOKEN_KEY);
+            }
+          } else {
+            console.warn('[CART/WISHLIST SYNC NOTICE]:', res.error);
+          }
+        })
+        .catch((err: unknown) => {
+          const errorMessage = err instanceof Error ? err.message : 'Unknown sync error';
+          console.error('[CART/WISHLIST SYNC ERROR]:', errorMessage);
+        });
     }
 
-    // Transition from authenticated to signed-out
+    // Handle sign-out cleanup
     if (prevIsSignedInRef.current === true && !isSignedIn) {
+      syncedRef.current = null;
       useStore.getState().resetCart();
       useStore.getState().resetFavorite();
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         const freshToken = `guest_${Math.random().toString(36).substring(2)}_${Date.now()}`;
         localStorage.setItem(GUEST_TOKEN_KEY, freshToken);
       }
     }
 
     prevIsSignedInRef.current = isSignedIn;
-  }, [isSignedIn, isLoaded, user]);
+  }, [isSignedIn, userId]);
 }
