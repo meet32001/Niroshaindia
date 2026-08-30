@@ -60,11 +60,25 @@ export default function WishlistPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleRemove = async (product: any, wishlistItemId?: string) => {
+    // 1. Optimistic removal in local store
     addToFavorite(product);
     toast.success("Removed from wishlist");
 
-    if (wishlistItemId) {
-      await removeFromWishlist(wishlistItemId);
+    // 2. Server Action deletion
+    const variantId = product.variant_id || product.id || product._id;
+    const productId = product.id || product._id;
+
+    const res = await removeFromWishlist({
+      wishlistItemId: wishlistItemId || product.wishlist_item_id || null,
+      variantId: variantId || null,
+      productId: productId || null,
+    });
+
+    if (!res.success) {
+      console.warn("[WISHLIST REMOVE NOTICE]:", res.error);
+      // Revert optimistic removal if server fails
+      addToFavorite(product);
+      toast.error(res.error || "Failed to remove from wishlist");
     }
   };
 
@@ -76,6 +90,9 @@ export default function WishlistPage() {
       return;
     }
 
+    const variantId = product.variant_id || product.id || product._id;
+    const productId = product.id || product._id;
+
     // 1. Add to local Zustand cart
     addItem(product);
 
@@ -85,9 +102,10 @@ export default function WishlistPage() {
     toast.success("Moved to cart!");
 
     // 3. Server action: Move from DB wishlist to DB cart
-    const variantId = product.variant_id || product.id || product._id;
-    const productId = product.id || product._id;
-    await moveToCart(variantId, productId, 1);
+    const res = await moveToCart(variantId, productId, 1);
+    if (!res.success) {
+      console.warn("[MOVE TO CART NOTICE]:", res.error);
+    }
   };
 
   return (

@@ -106,7 +106,11 @@ export async function toggleWishlistItem(variantId?: string | null, productId?: 
   }
 }
 
-export async function removeFromWishlist(itemId: string) {
+export async function removeFromWishlist(identifier: {
+  wishlistItemId?: string | null;
+  variantId?: string | null;
+  productId?: string | null;
+} | string) {
   try {
     const authData = await getAuthenticatedCustomer();
     if (!authData) {
@@ -126,11 +130,24 @@ export async function removeFromWishlist(itemId: string) {
       return { success: false, error: 'Wishlist not found' };
     }
 
-    const { error } = await supabaseAdmin
+    let deleteQuery = supabaseAdmin
       .from('wishlist_items')
       .delete()
-      .eq('id', itemId)
       .eq('wishlist_id', wishlist.id);
+
+    if (typeof identifier === 'string') {
+      deleteQuery = deleteQuery.or(`id.eq.${identifier},variant_id.eq.${identifier},product_id.eq.${identifier}`);
+    } else if (identifier?.wishlistItemId) {
+      deleteQuery = deleteQuery.eq('id', identifier.wishlistItemId);
+    } else if (identifier?.variantId) {
+      deleteQuery = deleteQuery.eq('variant_id', identifier.variantId);
+    } else if (identifier?.productId) {
+      deleteQuery = deleteQuery.eq('product_id', identifier.productId);
+    } else {
+      return { success: false, error: 'No identifier provided' };
+    }
+
+    const { error } = await deleteQuery;
 
     if (error) {
       console.error('[REMOVE FROM WISHLIST ERROR]:', error);
@@ -216,7 +233,10 @@ export async function moveToCart(variantId?: string | null, productId?: string |
         removeQuery = removeQuery.eq('product_id', productId);
       }
 
-      await removeQuery;
+      const { error: removeError } = await removeQuery;
+      if (removeError) {
+        console.error('[MOVE TO CART WISHLIST DELETE ERROR]:', removeError);
+      }
     }
 
     return { success: true, cartId: cart.id };
