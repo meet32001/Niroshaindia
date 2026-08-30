@@ -2,6 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
 
 function getSupabaseAdmin() {
   return createClient(
@@ -104,12 +105,16 @@ export async function toggleWishlistItem(variantId?: string | number | null) {
 
     if (existingItem) {
       await supabase.from('wishlist_items').delete().eq('id', existingItem.id);
+      revalidatePath('/wishlist');
+      revalidatePath('/shop');
       return { success: true, isInWishlist: false };
     } else {
       await supabase.from('wishlist_items').insert({
         wishlist_id: wishlist.id,
         variant_id: numericVariantId,
       });
+      revalidatePath('/wishlist');
+      revalidatePath('/shop');
       return { success: true, isInWishlist: true };
     }
   } catch (err: unknown) {
@@ -186,6 +191,9 @@ export async function removeFromWishlist(rawTargetId: unknown) {
 
   if (!deletedRows || deletedRows.length === 0) {
     console.warn('[DEBUG WISHLIST DELETE] WARNING: Query executed but 0 rows matched. Check if target ID exists in currentItems array logged in step 5.');
+  } else {
+    revalidatePath('/wishlist');
+    revalidatePath('/shop');
   }
 
   return { success: true, count: deletedRows?.length || 0, deletedRows };
@@ -281,6 +289,9 @@ export async function moveToCart(variantId: string | number, quantity: number = 
 
       console.log('[MOVE TO CART DELETE WISHLIST]: Removed row(s):', deletedRows);
     }
+
+    revalidatePath('/wishlist');
+    revalidatePath('/shop');
 
     console.log('[MOVE TO CART SUCCESS]: Variant', numericVariantId, 'transferred to cart', cart.id);
     console.log('====================================================');

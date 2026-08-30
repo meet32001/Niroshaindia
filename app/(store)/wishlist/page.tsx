@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Container } from "@/components/layout/Container";
 import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 
 export default function WishlistPage() {
+  const router = useRouter();
   const { favoriteProduct, addToFavorite, addItem } = useStore();
   const [loading, setLoading] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,6 +84,7 @@ export default function WishlistPage() {
         addToFavorite(product);
         toast.success("Removed from wishlist");
         setDbItems((prev) => prev.filter((item) => String(item.id) !== String(targetId) && String(item.variant_id) !== String(targetId)));
+        router.refresh();
       } else {
         console.error('[CLIENT DEBUG] Deletion returned failure:', res.error);
         toast.error(res.error || "Failed to remove from wishlist");
@@ -104,7 +107,7 @@ export default function WishlistPage() {
     console.log('[CLIENT DEBUG] Resolved variantId for move to cart:', variantId);
 
     if (!variantId) {
-      console.error('[CLIENT DEBUG] Variant ID is missing!');
+      console.error('[CLIENT DEBUG] Variant ID is missing or invalid!');
       return;
     }
 
@@ -117,6 +120,7 @@ export default function WishlistPage() {
         addToFavorite(product);
         toast.success("Moved to cart!");
         setDbItems((prev) => prev.filter((item) => String(item.variant_id) !== String(variantId)));
+        router.refresh();
       } else {
         console.error('[CLIENT DEBUG] Move to cart returned failure:', res.error);
         toast.error(res.error || "Failed to move item to cart");
