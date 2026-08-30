@@ -3,6 +3,7 @@
 import { Heart } from "lucide-react";
 import toast from "react-hot-toast";
 import { useStore } from "@/store";
+import { toggleWishlistItem } from "@/actions/wishlist";
 import { cn } from "@/lib/utils";
 
 export interface AddToWishlistButtonProps {
@@ -18,16 +19,33 @@ export function AddToWishlistButton({
   const { favoriteProduct, addToFavorite } = useStore();
 
   const id = String(product?._id || product?.id || "");
-  const isFavorite = favoriteProduct.some(
-    (item) => String(item._id || item.id || "") === id
+  const variantId = String(
+    product?.product_variants?.[0]?.id || product?.variant_id || ""
   );
 
-  const handleToggleFavorite = () => {
+  const isFavorite = favoriteProduct.some(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (item: any) => String(item._id || item.id || "") === id
+  );
+
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Optimistic UI update in local Zustand store
     addToFavorite(product);
+
     if (isFavorite) {
       toast.success("Removed from wishlist");
     } else {
       toast.success("Added to wishlist");
+    }
+
+    // Server-side persistent sync
+    try {
+      await toggleWishlistItem(variantId || null, id || null);
+    } catch (err) {
+      console.warn("[WISHLIST SYNC NOTICE]:", err);
     }
   };
 

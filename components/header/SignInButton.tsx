@@ -7,7 +7,7 @@ import {
   UserButton,
   useUser,
 } from "@clerk/nextjs";
-import { LogIn, UserPlus, Package } from "lucide-react";
+import { LogIn, UserPlus, Package, User, MapPin, Heart } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -27,9 +27,24 @@ export function SignInButton() {
           <UserButton>
             <UserButton.MenuItems>
               <UserButton.Link
+                label="Account Settings"
+                href="/account"
+                labelIcon={<User className="w-4 h-4 text-emerald-600" />}
+              />
+              <UserButton.Link
+                label="Saved Addresses"
+                href="/account/addresses"
+                labelIcon={<MapPin className="w-4 h-4 text-emerald-600" />}
+              />
+              <UserButton.Link
                 label="My Orders"
                 href="/orders"
                 labelIcon={<Package className="w-4 h-4 text-emerald-600" />}
+              />
+              <UserButton.Link
+                label="Wishlist"
+                href="/wishlist"
+                labelIcon={<Heart className="w-4 h-4 text-rose-600" />}
               />
             </UserButton.MenuItems>
           </UserButton>

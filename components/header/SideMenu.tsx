@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
-import { X, LogIn, UserPlus, Package } from "lucide-react";
+import { X, LogIn, UserPlus, Package, User, MapPin, Heart } from "lucide-react";
 import { HEADER_NAV_LINKS } from "@/constants/navigation";
 import { Logo } from "@/components/header/Logo";
 import { SocialMedia } from "@/components/shared/SocialMedia";
@@ -75,18 +75,48 @@ export function SideMenu({ isOpen, onClose }: SideMenuProps) {
             })}
 
             <Show when="signed-in">
-              <Link
-                href="/orders"
-                onClick={onClose}
-                className={cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-emerald-600" />
-                  <span>My Orders</span>
-                </div>
-              </Link>
+              <div className="pt-2 border-t space-y-1">
+                <Link
+                  href="/account"
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-emerald-600" />
+                    <span>Account Hub</span>
+                  </div>
+                </Link>
+                <Link
+                  href="/account/addresses"
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-emerald-600" />
+                    <span>Saved Addresses</span>
+                  </div>
+                </Link>
+                <Link
+                  href="/orders"
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-emerald-600" />
+                    <span>My Orders</span>
+                  </div>
+                </Link>
+                <Link
+                  href="/wishlist"
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-center gap-2">
+                    <Heart className="h-4 w-4 text-rose-600" />
+                    <span>My Wishlist</span>
+                  </div>
+                </Link>
+              </div>
             </Show>
           </nav>
         </div>
