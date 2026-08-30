@@ -60,16 +60,29 @@ export default function WishlistPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleRemove = async (product: any, wishlistItemId?: string) => {
+    console.log('[CLIENT] Wishlist Delete Clicked for product:', product, 'wishlistItemId:', wishlistItemId);
     const targetId = wishlistItemId || product.variant_id || product.id || product._id;
+    console.log('[CLIENT] Derived targetId:', targetId);
 
-    const res = await removeFromWishlist(targetId);
+    if (!targetId) {
+      console.error('[CLIENT] Target ID is missing or invalid!');
+      return;
+    }
 
-    if (res.success) {
-      addToFavorite(product);
-      toast.success("Removed from wishlist");
-    } else {
-      console.error("[WISHLIST DELETE ERROR]:", res.error);
-      toast.error(res.error || "Failed to remove from wishlist");
+    try {
+      const res = await removeFromWishlist(targetId);
+      console.log('[CLIENT] removeFromWishlist response:', res);
+
+      if (res.success) {
+        addToFavorite(product);
+        toast.success("Removed from wishlist");
+        setDbItems((prev) => prev.filter((item) => String(item.id) !== String(targetId) && String(item.variant_id) !== String(targetId)));
+      } else {
+        console.error("[WISHLIST DELETE ERROR]:", res.error);
+        toast.error(res.error || "Failed to remove from wishlist");
+      }
+    } catch (err) {
+      console.error('[CLIENT] Delete failed with exception:', err);
     }
   };
 
@@ -82,16 +95,28 @@ export default function WishlistPage() {
     }
 
     const variantId = product.variant_id || product.id || product._id;
+    console.log('[CLIENT] Move to Cart Clicked for variantId:', variantId);
 
-    const res = await moveToCart(variantId, 1);
+    if (!variantId) {
+      console.error('[CLIENT] Variant ID is missing or invalid!');
+      return;
+    }
 
-    if (res.success) {
-      addItem(product);
-      addToFavorite(product);
-      toast.success("Moved to cart!");
-    } else {
-      console.error("[MOVE TO CART ERROR]:", res.error);
-      toast.error(res.error || "Failed to move item to cart");
+    try {
+      const res = await moveToCart(variantId, 1);
+      console.log('[CLIENT] moveToCart response:', res);
+
+      if (res.success) {
+        addItem(product);
+        addToFavorite(product);
+        toast.success("Moved to cart!");
+        setDbItems((prev) => prev.filter((item) => String(item.variant_id) !== String(variantId)));
+      } else {
+        console.error("[MOVE TO CART ERROR]:", res.error);
+        toast.error(res.error || "Failed to move item to cart");
+      }
+    } catch (err) {
+      console.error('[CLIENT] Move to cart failed with exception:', err);
     }
   };
 
@@ -172,7 +197,12 @@ export default function WishlistPage() {
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <button
-                      onClick={() => handleRemove(product, wishlistItemId)}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleRemove(product, wishlistItemId);
+                      }}
                       className="absolute top-3 right-3 p-2 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-600 transition-colors shadow-xs cursor-pointer"
                       aria-label="Remove item"
                     >
@@ -204,7 +234,12 @@ export default function WishlistPage() {
 
                 <CardFooter className="p-4 pt-2">
                   <Button
-                    onClick={() => handleMoveToCart(product)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMoveToCart(product);
+                    }}
                     disabled={!inStock}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold gap-2 rounded-xl"
                   >
