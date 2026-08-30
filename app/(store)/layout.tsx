@@ -1,7 +1,7 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "react-hot-toast";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { CartSyncProvider } from "@/components/shared/CartSyncProvider";
 
 export default function StoreLayout({
   children,
@@ -9,7 +9,7 @@ export default function StoreLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <CartSyncProvider>
       <div className="flex flex-col min-h-screen">
         <Header />
         <main className="flex-1 min-h-[calc(100vh-140px)]">{children}</main>
@@ -26,6 +26,6 @@ export default function StoreLayout({
           }}
         />
       </div>
-    </ClerkProvider>
+    </CartSyncProvider>
   );
 }

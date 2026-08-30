@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, User } from "lucide-react";
+import { Show, UserButton } from "@clerk/nextjs";
+import { X, LogIn, UserPlus, Package } from "lucide-react";
 import { HEADER_NAV_LINKS } from "@/constants/navigation";
 import { Logo } from "@/components/header/Logo";
 import { SocialMedia } from "@/components/shared/SocialMedia";
@@ -72,22 +73,66 @@ export function SideMenu({ isOpen, onClose }: SideMenuProps) {
                 </Link>
               );
             })}
+
+            <Show when="signed-in">
+              <Link
+                href="/orders"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-emerald-600" />
+                  <span>My Orders</span>
+                </div>
+              </Link>
+            </Show>
           </nav>
         </div>
 
         {/* Bottom Section */}
         <div className="space-y-6 pt-6 border-t border-border">
-          <Link
-            href="/sign-in"
-            onClick={onClose}
-            className={cn(
-              buttonVariants({ variant: "default" }),
-              "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-2 shadow-md flex items-center justify-center"
-            )}
-          >
-            <User className="h-4 w-4" />
-            <span>Sign In / Register</span>
-          </Link>
+          <Show when="signed-in">
+            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+              <UserButton />
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  My Account
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Logged in via Clerk
+                </span>
+              </div>
+            </div>
+          </Show>
+
+          <Show when="signed-out">
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/sign-in"
+                onClick={onClose}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "w-full rounded-xl border-slate-300 dark:border-slate-700 font-semibold gap-2 flex items-center justify-center"
+                )}
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Sign In</span>
+              </Link>
+              <Link
+                href="/sign-up"
+                onClick={onClose}
+                className={cn(
+                  buttonVariants({ variant: "default" }),
+                  "w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold gap-2 shadow-md flex items-center justify-center"
+                )}
+              >
+                <UserPlus className="h-4 w-4" />
+                <span>Register</span>
+              </Link>
+            </div>
+          </Show>
 
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">

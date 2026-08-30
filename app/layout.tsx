@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthSync } from "@/components/auth/AuthSync";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="en" className={`${poppins.variable}`}>
       <body className="font-poppins antialiased bg-background text-foreground min-h-screen">
         <ClerkProvider>
+          <AuthSync />
           <TooltipProvider>{children}</TooltipProvider>
         </ClerkProvider>
       </body>

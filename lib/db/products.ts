@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { supabaseServer } from "@/lib/supabase/server";
 import { Product, Category, Brand } from "@/types";
 
 export const MOCK_CATEGORIES: Category[] = [
@@ -361,15 +362,15 @@ export async function getMyOrders(userId: string) {
   try {
     if (!userId) return [];
 
-    const { data: customer, error: custErr } = await supabase
+    const { data: customer, error: custErr } = await supabaseServer
       .from("customers")
       .select("id")
       .eq("clerk_user_id", userId)
-      .single();
+      .maybeSingle();
 
     if (custErr || !customer) {
       // Fallback query directly on orders table if customer record is pending
-      const { data: directOrders } = await supabase
+      const { data: directOrders } = await supabaseServer
         .from("orders")
         .select("*")
         .eq("clerk_user_id", userId)
@@ -378,7 +379,7 @@ export async function getMyOrders(userId: string) {
       return directOrders || [];
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseServer
       .from("orders")
       .select(`
         *,

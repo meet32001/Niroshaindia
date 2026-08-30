@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Package } from "lucide-react";
-import { getMyOrders } from "@/lib/db/products";
+import { fetchMyOrdersAction } from "@/actions/getOrders";
 import { useIsMounted } from "@/hooks/useIsMounted";
 
 export function OrdersButton() {
@@ -16,7 +16,7 @@ export function OrdersButton() {
     async function fetchOrders() {
       if (isSignedIn && user?.id) {
         try {
-          const orders = await getMyOrders(user.id);
+          const orders = await fetchMyOrdersAction();
           setOrderCount(orders.length);
         } catch {
           setOrderCount(0);
