@@ -40,7 +40,6 @@ export async function getWishlistItems() {
         id,
         wishlist_items (
           id,
-          product_id,
           variant_id,
           created_at,
           product_variants (
@@ -65,7 +64,7 @@ export async function getWishlistItems() {
   }
 }
 
-export async function toggleWishlistItem(variantId?: string | number | null, productId?: string | number | null) {
+export async function toggleWishlistItem(variantId?: string | number | null) {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthorized', isInWishlist: false };
@@ -97,20 +96,18 @@ export async function toggleWishlistItem(variantId?: string | number | null, pro
 
     if (!wishlist) return { success: false, error: 'Wishlist not found', isInWishlist: false };
 
-    let query = supabase
-      .from('wishlist_items')
-      .select('id')
-      .eq('wishlist_id', wishlist.id);
-
-    if (variantId) {
-      query = query.eq('variant_id', variantId);
-    } else if (productId) {
-      query = query.eq('product_id', productId);
-    } else {
-      return { success: false, error: 'Missing variantId or productId', isInWishlist: false };
+    if (!variantId) {
+      return { success: false, error: 'Missing variantId', isInWishlist: false };
     }
 
-    const { data: existingItem } = await query.maybeSingle();
+    const targetVariantId = String(variantId);
+
+    const { data: existingItem } = await supabase
+      .from('wishlist_items')
+      .select('id')
+      .eq('wishlist_id', wishlist.id)
+      .eq('variant_id', targetVariantId)
+      .maybeSingle();
 
     if (existingItem) {
       await supabase.from('wishlist_items').delete().eq('id', existingItem.id);
@@ -118,8 +115,7 @@ export async function toggleWishlistItem(variantId?: string | number | null, pro
     } else {
       await supabase.from('wishlist_items').insert({
         wishlist_id: wishlist.id,
-        variant_id: variantId || null,
-        product_id: productId || null,
+        variant_id: targetVariantId,
       });
       return { success: true, isInWishlist: true };
     }
@@ -156,13 +152,13 @@ export async function removeFromWishlist(variantId: string | number) {
 
     console.log('[WISHLIST DELETE] Removing variant/item:', variantId, 'from wishlist:', wishlist.id);
 
-    // 3. Delete row (match on wishlist_id and variant_id / product_id / id)
+    // 3. Delete row (match on wishlist_id and variant_id or id)
     const targetId = String(variantId);
     const { data, error } = await supabase
       .from('wishlist_items')
       .delete()
       .eq('wishlist_id', wishlist.id)
-      .or(`id.eq.${targetId},variant_id.eq.${targetId},product_id.eq.${targetId}`)
+      .or(`id.eq.${targetId},variant_id.eq.${targetId}`)
       .select();
 
     if (error) {
@@ -247,7 +243,7 @@ export async function moveToCart(variantId: string | number, quantity: number = 
       }
     }
 
-    // 4. Delete from wishlist_items
+    // 4. Delete from wishlist_items (match on wishlist_id and variant_id or id)
     const { data: wishlist } = await supabase
       .from('wishlists')
       .select('id')
@@ -259,7 +255,7 @@ export async function moveToCart(variantId: string | number, quantity: number = 
         .from('wishlist_items')
         .delete()
         .eq('wishlist_id', wishlist.id)
-        .or(`variant_id.eq.${targetVariantId},product_id.eq.${targetVariantId},id.eq.${targetVariantId}`);
+        .or(`id.eq.${targetVariantId},variant_id.eq.${targetVariantId}`);
     }
 
     console.log('[MOVE TO CART SUCCESS] Moved variant:', variantId, 'to cart:', cart.id);

@@ -43,7 +43,7 @@ export function AddToWishlistButton({
 
     // Server-side persistent sync
     try {
-      await toggleWishlistItem(variantId || null, id || null);
+      await toggleWishlistItem(variantId || id || null);
     } catch (err) {
       console.warn("[WISHLIST SYNC NOTICE]:", err);
     }
