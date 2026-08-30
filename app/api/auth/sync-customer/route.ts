@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
 
     console.log('[API SYNC SUCCESS]: Customer saved:', data);
     return NextResponse.json({ success: true, customer: data }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Sync failed';
     console.error('[API SYNC FATAL]:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -92,8 +92,9 @@ export async function syncUserCartAction(
     }
 
     return { success: true, cartId };
-  } catch (err: any) {
-    console.error('Cart sync error:', err?.message || err);
-    return { success: false, error: err?.message || 'Sync failed' };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Sync failed';
+    console.error('Cart sync error:', errorMessage);
+    return { success: false, error: errorMessage };
   }
 }

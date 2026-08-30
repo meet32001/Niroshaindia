@@ -33,8 +33,9 @@ export async function syncCurrentCustomer() {
     });
 
     return { success: true, customer };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Sync failed';
     console.error('[SYNC ERROR]:', err);
-    return { success: false, error: err?.message || 'Sync failed' };
+    return { success: false, error: errorMessage };
   }
 }

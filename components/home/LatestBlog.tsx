@@ -23,7 +23,9 @@ export async function LatestBlog() {
             <CardHeader className="p-4 pb-2">
               <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>{new Date(blog.publishedAt || Date.now()).toLocaleDateString()}</span>
+                {blog.publishedAt ? (
+                  <span>{new Date(blog.publishedAt).toLocaleDateString()}</span>
+                ) : null}
               </div>
               <CardTitle className="text-lg font-semibold line-clamp-2">
                 <Link href={`/blog/${blog.slug?.current || blog._id}`} className="hover:text-emerald-600 transition-colors">
