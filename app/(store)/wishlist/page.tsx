@@ -62,25 +62,16 @@ export default function WishlistPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleRemove = async (product: any, wishlistItemId?: string) => {
-    console.log('[CLIENT DEBUG] Delete button clicked for item object:', product);
     const targetWishlistItemId = wishlistItemId || product.wishlist_item_id;
     const targetVariantId = product.variant_id || product.id || product._id;
-
-    console.log('[CLIENT DEBUG] Deleting with wishlistItemId:', targetWishlistItemId, 'variantId:', targetVariantId);
 
     try {
       const res = await removeFromWishlist({
         wishlistItemId: targetWishlistItemId || null,
         variantId: targetVariantId || null,
       });
-      console.log('[CLIENT DEBUG] removeFromWishlist response received:', res);
 
       if (res.success) {
-        if ((res.count || 0) > 0) {
-          console.log('[CLIENT DEBUG] Database confirmed deletion of', res.count, 'rows.');
-        } else {
-          console.warn('[CLIENT DEBUG] Action succeeded but 0 rows were deleted from database.');
-        }
         addToFavorite(product);
         toast.success("Removed from wishlist");
         setDbItems((prev) =>
@@ -92,17 +83,16 @@ export default function WishlistPage() {
         );
         router.refresh();
       } else {
-        console.error('[CLIENT DEBUG] Deletion returned failure:', res.error);
         toast.error(res.error || "Failed to remove from wishlist");
       }
-    } catch (err) {
-      console.error('[CLIENT DEBUG] Delete failed with exception:', err);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to remove from wishlist";
+      toast.error(errorMessage);
     }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleMoveToCart = async (product: any, wishlistItemId?: string) => {
-    console.log('[CLIENT DEBUG] Move to Cart button clicked for item object:', product);
     const stock = product.stock ?? 10;
     if (stock <= 0) {
       toast.error("This item is currently out of stock");
@@ -111,10 +101,9 @@ export default function WishlistPage() {
 
     const targetWishlistItemId = wishlistItemId || product.wishlist_item_id;
     const variantId = product.variant_id || product.id || product._id;
-    console.log('[CLIENT DEBUG] Resolved variantId:', variantId, 'wishlistItemId:', targetWishlistItemId);
 
     if (!variantId) {
-      console.error('[CLIENT DEBUG] Variant ID is missing or invalid!');
+      toast.error("Variant ID is missing");
       return;
     }
 
@@ -124,7 +113,6 @@ export default function WishlistPage() {
         wishlistItemId: targetWishlistItemId || null,
         quantity: 1,
       });
-      console.log('[CLIENT DEBUG] moveToCart response received:', res);
 
       if (res.success) {
         addItem(product);
@@ -139,11 +127,11 @@ export default function WishlistPage() {
         );
         router.refresh();
       } else {
-        console.error('[CLIENT DEBUG] Move to cart returned failure:', res.error);
         toast.error(res.error || "Failed to move item to cart");
       }
-    } catch (err) {
-      console.error('[CLIENT DEBUG] Move to cart failed with exception:', err);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to move item to cart";
+      toast.error(errorMessage);
     }
   };
 

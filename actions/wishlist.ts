@@ -187,7 +187,6 @@ export async function removeFromWishlist(params: {
     revalidatePath('/wishlist');
     revalidatePath('/shop');
 
-    console.log('[WISHLIST REMOVE SUCCESS]: Removed row(s):', deletedRows);
     return { success: true, count: deletedRows?.length || 0, deletedRows };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to remove from wishlist';
@@ -301,14 +300,12 @@ export async function moveToCart(params: {
         removeQuery = removeQuery.eq('variant_id', numericVariantId);
       }
 
-      const { data: deletedRows } = await removeQuery.select();
-      console.log('[MOVE TO CART DELETE WISHLIST]: Removed row(s):', deletedRows);
+      await removeQuery.select();
     }
 
     revalidatePath('/wishlist');
     revalidatePath('/shop');
 
-    console.log('[MOVE TO CART SUCCESS]: Variant', numericVariantId, 'transferred to cart', cart.id);
     return { success: true, cartId: cart.id };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to move to cart';
