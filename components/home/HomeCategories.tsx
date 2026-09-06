@@ -23,7 +23,7 @@ export const POPULAR_CATEGORIES: VisualCategory[] = [
     title: 'Air Conditioners',
     slug: 'ac',
     itemCountLabel: 'Inverter Split & Window ACs',
-    imageUrl: 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=600&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1631545729918-46c9d1e37456?w=600&auto=format&fit=crop&q=80',
     badge: 'Seasonal',
   },
   {
@@ -42,7 +42,7 @@ export const POPULAR_CATEGORIES: VisualCategory[] = [
     title: 'Home & Kitchen Appliances',
     slug: 'kitchen-appliances',
     itemCountLabel: 'Air Fryers, Water Purifiers & More',
-    imageUrl: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=600&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1695653422715-991ec3a0db7a?w=600&auto=format&fit=crop&q=80',
   },
   {
     title: 'Headphones & Speakers',
