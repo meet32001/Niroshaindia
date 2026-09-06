@@ -452,7 +452,7 @@ export default function CheckoutPage() {
                         {pinVerified && !pinLoading && (
                           <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
                             <CheckCircle2 className="w-3 h-3" />
-                            <span>Verified via Postal Registry</span>
+                            <span>Verified</span>
                           </Badge>
                         )}
                       </div>
