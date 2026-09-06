@@ -32,11 +32,24 @@ import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { useStore } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { getUserAddresses, saveAddress } from "@/actions/address";
+import { getActiveDeliveryRegions } from "@/actions/deliveryRegions";
 import { createCheckoutSession } from "@/actions/createCheckoutSession";
 import { addressSchema, AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
 import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
 import { urlFor } from "@/lib/image";
+
+interface DeliveryStateItem {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+interface DeliveryCityItem {
+  id: string;
+  state_id: string;
+  name: string;
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -52,6 +65,10 @@ export default function CheckoutPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Dynamic Database Delivery Regions State
+  const [dbStates, setDbStates] = useState<DeliveryStateItem[]>([]);
+  const [dbCities, setDbCities] = useState<DeliveryCityItem[]>([]);
 
   // PIN Code Verification State
   const [pinLoading, setPinLoading] = useState(false);
@@ -74,8 +91,36 @@ export default function CheckoutPage() {
     is_default: false,
   });
 
-  // Available cities based on selected state
-  const baseCities = getAvailableCities(formAddress.state);
+  // Fetch active delivery regions from database on mount
+  useEffect(() => {
+    let isSubscribed = true;
+    getActiveDeliveryRegions().then((res) => {
+      if (!isSubscribed) return;
+      if (res.success && res.states.length > 0) {
+        setDbStates(res.states);
+        setDbCities(res.cities);
+      }
+    });
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
+  // Compute available states and cities dynamically
+  const stateOptions = dbStates.length > 0 ? dbStates.map((s) => s.name) : INDIAN_STATES;
+
+  const getDbCitiesForState = (stateName: string) => {
+    if (!stateName) return [];
+    if (dbStates.length > 0) {
+      const stateObj = dbStates.find((s) => s.name.toLowerCase() === stateName.toLowerCase());
+      if (stateObj) {
+        return dbCities.filter((c) => c.state_id === stateObj.id).map((c) => c.name);
+      }
+    }
+    return getAvailableCities(stateName);
+  };
+
+  const baseCities = getDbCitiesForState(formAddress.state);
   const availableCities = Array.from(new Set([...baseCities, ...customCities]));
 
   // Restore guest draft from sessionStorage on mount
@@ -140,14 +185,14 @@ export default function CheckoutPage() {
       setPinLoading(false);
 
       if (res.isValid && res.city && res.state) {
-        // Match or find closest State in INDIAN_STATES
-        const matchedState = INDIAN_STATES.find(
+        // Match or find closest State in stateOptions
+        const matchedState = stateOptions.find(
           (s) => s.toLowerCase() === res.state!.toLowerCase()
         ) || res.state!;
 
-        // Add custom city if missing from master list
-        const stateCities = getAvailableCities(matchedState);
-        if (res.city && !stateCities.includes(res.city)) {
+        // Add custom city if missing from active database / master list
+        const stateCities = getDbCitiesForState(matchedState);
+        if (res.city && !stateCities.some((c) => c.toLowerCase() === res.city!.toLowerCase())) {
           setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
         }
 
@@ -523,7 +568,7 @@ export default function CheckoutPage() {
                           className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shop-orange"
                         >
                           <option value="">Select State</option>
-                          {INDIAN_STATES.map((stateName) => (
+                          {stateOptions.map((stateName) => (
                             <option key={stateName} value={stateName}>
                               {stateName}
                             </option>

@@ -7,6 +7,7 @@ import {
   saveAddress,
   deleteAddress,
 } from "@/actions/address";
+import { getActiveDeliveryRegions } from "@/actions/deliveryRegions";
 import { AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
 import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
@@ -27,6 +28,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, MapPin, Edit, Trash2, ArrowLeft, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
+interface DeliveryStateItem {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+interface DeliveryCityItem {
+  id: string;
+  state_id: string;
+  name: string;
+}
+
 export default function AddressBookPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -34,6 +47,10 @@ export default function AddressBookPage() {
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<AddressInput | null>(null);
+
+  // Dynamic Database Delivery Regions State
+  const [dbStates, setDbStates] = useState<DeliveryStateItem[]>([]);
+  const [dbCities, setDbCities] = useState<DeliveryCityItem[]>([]);
 
   // PIN Code Verification State
   const [pinLoading, setPinLoading] = useState(false);
@@ -55,7 +72,36 @@ export default function AddressBookPage() {
     is_default: false,
   });
 
-  const baseCities = getAvailableCities(formData.state);
+  // Fetch active delivery regions from database on mount
+  useEffect(() => {
+    let isSubscribed = true;
+    getActiveDeliveryRegions().then((res) => {
+      if (!isSubscribed) return;
+      if (res.success && res.states.length > 0) {
+        setDbStates(res.states);
+        setDbCities(res.cities);
+      }
+    });
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
+  // Compute available states and cities dynamically
+  const stateOptions = dbStates.length > 0 ? dbStates.map((s) => s.name) : INDIAN_STATES;
+
+  const getDbCitiesForState = (stateName: string) => {
+    if (!stateName) return [];
+    if (dbStates.length > 0) {
+      const stateObj = dbStates.find((s) => s.name.toLowerCase() === stateName.toLowerCase());
+      if (stateObj) {
+        return dbCities.filter((c) => c.state_id === stateObj.id).map((c) => c.name);
+      }
+    }
+    return getAvailableCities(stateName);
+  };
+
+  const baseCities = getDbCitiesForState(formData.state);
   const availableCities = Array.from(new Set([...baseCities, ...customCities]));
 
   const fetchAddresses = async () => {
@@ -103,12 +149,12 @@ export default function AddressBookPage() {
       setPinLoading(false);
 
       if (res.isValid && res.city && res.state) {
-        const matchedState = INDIAN_STATES.find(
+        const matchedState = stateOptions.find(
           (s) => s.toLowerCase() === res.state!.toLowerCase()
         ) || res.state!;
 
-        const stateCities = getAvailableCities(matchedState);
-        if (res.city && !stateCities.includes(res.city)) {
+        const stateCities = getDbCitiesForState(matchedState);
+        if (res.city && !stateCities.some((c) => c.toLowerCase() === res.city!.toLowerCase())) {
           setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
         }
 
@@ -339,7 +385,7 @@ export default function AddressBookPage() {
                     className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   >
                     <option value="">Select State</option>
-                    {INDIAN_STATES.map((stateName) => (
+                    {stateOptions.map((stateName) => (
                       <option key={stateName} value={stateName}>
                         {stateName}
                       </option>
