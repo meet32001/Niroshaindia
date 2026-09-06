@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
 import { addressSchema, AddressInput } from '@/lib/validations/address';
+import { verifyIndianPincode } from '@/lib/services/pincode';
 
 export async function getUserAddresses() {
   try {
@@ -43,6 +44,19 @@ export async function saveAddress(rawPayload: AddressInput) {
 
     const validated = addressSchema.parse(rawPayload);
 
+    // Verify PIN code against official India Post Registry
+    const pinCheck = await verifyIndianPincode(validated.postal_code);
+    if (!pinCheck.isValid) {
+      return {
+        success: false,
+        error: pinCheck.error || 'The provided PIN code does not exist in India.',
+      };
+    }
+
+    // Override city and state with official postal registry values to prevent geographic tampering
+    const verifiedCity = pinCheck.city || validated.city;
+    const verifiedState = pinCheck.state || validated.state;
+
     // If setting as default, unset previous default for this customer
     if (validated.is_default) {
       await supabaseAdmin
@@ -56,8 +70,8 @@ export async function saveAddress(rawPayload: AddressInput) {
       recipient_name: validated.recipient_name,
       address_line1: validated.address_line1,
       address_line2: validated.address_line2 || '',
-      city: validated.city,
-      state: validated.state,
+      city: verifiedCity,
+      state: verifiedState,
       postal_code: validated.postal_code,
       country: validated.country || 'India',
       phone: validated.phone,

@@ -8,6 +8,7 @@ import {
   deleteAddress,
 } from "@/actions/address";
 import { AddressInput } from "@/lib/validations/address";
+import { verifyIndianPincode } from "@/lib/services/pincode";
 import { Container } from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, MapPin, Edit, Trash2, ArrowLeft, Loader2 } from "lucide-react";
+import { Plus, MapPin, Edit, Trash2, ArrowLeft, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function AddressBookPage() {
@@ -32,6 +33,11 @@ export default function AddressBookPage() {
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<AddressInput | null>(null);
+
+  // PIN Code Verification State
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<AddressInput>({
     recipient_name: "",
@@ -72,8 +78,47 @@ export default function AddressBookPage() {
     };
   }, []);
 
+  // Handle PIN Code Verification & Auto-Fill
+  const handlePincodeChange = async (newPin: string) => {
+    setFormData((prev) => ({ ...prev, postal_code: newPin }));
+    const cleanPin = newPin.trim();
+
+    if (cleanPin.length === 6) {
+      if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
+        setPinError("Please enter a valid 6-digit Indian PIN code.");
+        setPinVerified(false);
+        return;
+      }
+
+      setPinLoading(true);
+      setPinError(null);
+      const res = await verifyIndianPincode(cleanPin);
+      setPinLoading(false);
+
+      if (res.isValid && res.city && res.state) {
+        setFormData((prev) => ({
+          ...prev,
+          city: res.city!,
+          state: res.state!,
+        }));
+        setPinVerified(true);
+        setPinError(null);
+        toast.success(`PIN verified: ${res.city}, ${res.state}`);
+      } else {
+        setPinVerified(false);
+        setPinError(res.error || "Invalid PIN code. No postal office found in India.");
+        toast.error("Invalid PIN code. Please enter a valid Indian PIN code.");
+      }
+    } else {
+      setPinVerified(false);
+      setPinError(null);
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingAddress(null);
+    setPinVerified(false);
+    setPinError(null);
     setFormData({
       recipient_name: "",
       address_line1: "",
@@ -91,6 +136,8 @@ export default function AddressBookPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleOpenEdit = (addr: any) => {
     setEditingAddress(addr);
+    setPinVerified(true);
+    setPinError(null);
     setFormData({
       id: addr.id,
       recipient_name: addr.recipient_name || addr.full_name || "",
@@ -108,6 +155,11 @@ export default function AddressBookPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pinError) {
+      toast.error(pinError);
+      return;
+    }
+
     setSaving(true);
     const res = await saveAddress(formData);
     setSaving(false);
@@ -209,17 +261,60 @@ export default function AddressBookPage() {
                 />
               </div>
 
+              {/* PIN Code Verification Row */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="postal_code">PIN Code (6 Digits)</Label>
+                  {pinLoading && (
+                    <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Verifying PIN code...</span>
+                    </span>
+                  )}
+                  {pinVerified && !pinLoading && (
+                    <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Verified via Postal Registry</span>
+                    </Badge>
+                  )}
+                </div>
+                <Input
+                  id="postal_code"
+                  value={formData.postal_code}
+                  onChange={(e) => handlePincodeChange(e.target.value)}
+                  placeholder="e.g. 395007 or 380015"
+                  maxLength={6}
+                  required
+                  className={
+                    pinError
+                      ? "border-rose-500 focus-visible:ring-rose-500"
+                      : pinVerified
+                      ? "border-emerald-500 focus-visible:ring-emerald-500"
+                      : ""
+                  }
+                />
+                {pinError && (
+                  <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{pinError}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* City & State Auto-Filled Inputs */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="city">City</Label>
+                  <Label htmlFor="city">City / District</Label>
                   <Input
                     id="city"
                     value={formData.city}
                     onChange={(e) =>
                       setFormData({ ...formData, city: e.target.value })
                     }
-                    placeholder="Mumbai"
+                    placeholder="City"
+                    readOnly={pinVerified}
                     required
+                    className={pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""}
                   />
                 </div>
                 <div className="space-y-1">
@@ -230,38 +325,25 @@ export default function AddressBookPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, state: e.target.value })
                     }
-                    placeholder="Maharashtra"
+                    placeholder="State"
+                    readOnly={pinVerified}
                     required
+                    className={pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="postal_code">PIN Code (6 Digits)</Label>
-                  <Input
-                    id="postal_code"
-                    value={formData.postal_code}
-                    onChange={(e) =>
-                      setFormData({ ...formData, postal_code: e.target.value })
-                    }
-                    placeholder="400001"
-                    maxLength={6}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    value={formData.country}
-                    onChange={(e) =>
-                      setFormData({ ...formData, country: e.target.value })
-                    }
-                    placeholder="India"
-                    required
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  value={formData.country}
+                  onChange={(e) =>
+                    setFormData({ ...formData, country: e.target.value })
+                  }
+                  placeholder="India"
+                  required
+                />
               </div>
 
               <div className="space-y-1">
@@ -306,8 +388,8 @@ export default function AddressBookPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={saving}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  disabled={saving || pinLoading || !!pinError}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold"
                 >
                   {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Save Address

@@ -16,7 +16,7 @@ import {
   Lock,
   User,
   Phone,
-  Building,
+  AlertCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -34,6 +34,7 @@ import { useIsMounted } from "@/hooks/useIsMounted";
 import { getUserAddresses, saveAddress } from "@/actions/address";
 import { createCheckoutSession } from "@/actions/createCheckoutSession";
 import { addressSchema, AddressInput } from "@/lib/validations/address";
+import { verifyIndianPincode } from "@/lib/services/pincode";
 import { urlFor } from "@/lib/image";
 
 export default function CheckoutPage() {
@@ -50,6 +51,11 @@ export default function CheckoutPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // PIN Code Verification State
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   // Address Form State
   const [formAddress, setFormAddress] = useState<AddressInput>({
@@ -71,6 +77,9 @@ export default function CheckoutPage() {
       if (draft) {
         const parsed = JSON.parse(draft);
         setFormAddress(parsed);
+        if (parsed.postal_code && /^[1-9][0-9]{5}$/.test(parsed.postal_code)) {
+          setPinVerified(true);
+        }
       }
     } catch {
       // ignore parse errors
@@ -87,7 +96,6 @@ export default function CheckoutPage() {
         if (!isMountedFlag) return;
         if (res.success && res.addresses.length > 0) {
           setSavedAddresses(res.addresses);
-          // Auto-select default or first address
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const defaultAddr = res.addresses.find((a: any) => a.is_default || a.is_default_shipping);
           setSelectedAddressId(defaultAddr ? defaultAddr.id : res.addresses[0].id);
@@ -105,6 +113,43 @@ export default function CheckoutPage() {
       isMountedFlag = false;
     };
   }, [isLoaded, isSignedIn]);
+
+  // Handle PIN Code Auto-Fill & Lookup
+  const handlePincodeChange = async (newPin: string) => {
+    setFormAddress((prev) => ({ ...prev, postal_code: newPin }));
+    const cleanPin = newPin.trim();
+
+    if (cleanPin.length === 6) {
+      if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
+        setPinError("Please enter a valid 6-digit Indian PIN code.");
+        setPinVerified(false);
+        return;
+      }
+
+      setPinLoading(true);
+      setPinError(null);
+      const res = await verifyIndianPincode(cleanPin);
+      setPinLoading(false);
+
+      if (res.isValid && res.city && res.state) {
+        setFormAddress((prev) => ({
+          ...prev,
+          city: res.city!,
+          state: res.state!,
+        }));
+        setPinVerified(true);
+        setPinError(null);
+        toast.success(`PIN verified: ${res.city}, ${res.state}`);
+      } else {
+        setPinVerified(false);
+        setPinError(res.error || "Invalid PIN code. No postal office found in India.");
+        toast.error("Invalid PIN code. Please enter a valid Indian PIN code.");
+      }
+    } else {
+      setPinVerified(false);
+      setPinError(null);
+    }
+  };
 
   if (!isLoaded || !isMounted) {
     return (
@@ -155,6 +200,12 @@ export default function CheckoutPage() {
 
   const handleSaveInlineAddress = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (pinError) {
+      toast.error(pinError);
+      return;
+    }
+
     const result = addressSchema.safeParse(formAddress);
     if (!result.success) {
       toast.error(result.error.issues[0]?.message || "Please complete address details");
@@ -175,7 +226,6 @@ export default function CheckoutPage() {
         toast.error(res.error || "Failed to save address");
       }
     } else {
-      // Save guest draft in sessionStorage
       sessionStorage.setItem("checkout_guest_address", JSON.stringify(formAddress));
       toast.success("Delivery address drafted!");
       setShowAddForm(false);
@@ -183,16 +233,13 @@ export default function CheckoutPage() {
   };
 
   const handleProceedToPayment = async () => {
-    // 1. Unauthenticated Checkpoint
     if (!isSignedIn) {
-      // Save draft address to sessionStorage
       sessionStorage.setItem("checkout_guest_address", JSON.stringify(formAddress));
       toast.error("Please sign in to complete your order");
       router.push("/sign-in?redirect=/checkout");
       return;
     }
 
-    // 2. Resolve Selected Address Payload
     let targetAddress = savedAddresses.find((a) => a.id === selectedAddressId);
 
     if (!targetAddress && showAddForm) {
@@ -209,7 +256,7 @@ export default function CheckoutPage() {
     }
 
     if (!targetAddress) {
-      toast.error("Please select or enter a delivery address");
+      toast.error("Please select or enter a valid delivery address");
       return;
     }
 
@@ -390,10 +437,53 @@ export default function CheckoutPage() {
                       />
                     </div>
 
+                    {/* PIN Code Verification Row */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="postal_code" className="text-xs font-semibold">
+                          PIN Code (6 Digits) *
+                        </Label>
+                        {pinLoading && (
+                          <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Verifying PIN code...</span>
+                          </span>
+                        )}
+                        {pinVerified && !pinLoading && (
+                          <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Verified via Postal Registry</span>
+                          </Badge>
+                        )}
+                      </div>
+                      <Input
+                        id="postal_code"
+                        value={formAddress.postal_code}
+                        onChange={(e) => handlePincodeChange(e.target.value)}
+                        placeholder="e.g. 395007 or 380015"
+                        maxLength={6}
+                        required
+                        className={`rounded-xl text-sm ${
+                          pinError
+                            ? "border-rose-500 focus-visible:ring-rose-500"
+                            : pinVerified
+                            ? "border-emerald-500 focus-visible:ring-emerald-500"
+                            : ""
+                        }`}
+                      />
+                      {pinError && (
+                        <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{pinError}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* City & State Auto-Filled Inputs */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="city" className="text-xs font-semibold">
-                          City *
+                          City / District *
                         </Label>
                         <Input
                           id="city"
@@ -401,9 +491,12 @@ export default function CheckoutPage() {
                           onChange={(e) =>
                             setFormAddress({ ...formAddress, city: e.target.value })
                           }
-                          placeholder="Mumbai"
+                          placeholder="City"
+                          readOnly={pinVerified}
                           required
-                          className="rounded-xl text-sm"
+                          className={`rounded-xl text-sm ${
+                            pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""
+                          }`}
                         />
                       </div>
                       <div className="space-y-1">
@@ -416,45 +509,30 @@ export default function CheckoutPage() {
                           onChange={(e) =>
                             setFormAddress({ ...formAddress, state: e.target.value })
                           }
-                          placeholder="Maharashtra"
+                          placeholder="State"
+                          readOnly={pinVerified}
                           required
-                          className="rounded-xl text-sm"
+                          className={`rounded-xl text-sm ${
+                            pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""
+                          }`}
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="postal_code" className="text-xs font-semibold">
-                          PIN Code (6 Digits) *
-                        </Label>
-                        <Input
-                          id="postal_code"
-                          value={formAddress.postal_code}
-                          onChange={(e) =>
-                            setFormAddress({ ...formAddress, postal_code: e.target.value })
-                          }
-                          placeholder="400001"
-                          maxLength={6}
-                          required
-                          className="rounded-xl text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="country" className="text-xs font-semibold">
-                          Country *
-                        </Label>
-                        <Input
-                          id="country"
-                          value={formAddress.country}
-                          onChange={(e) =>
-                            setFormAddress({ ...formAddress, country: e.target.value })
-                          }
-                          placeholder="India"
-                          required
-                          className="rounded-xl text-sm"
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="country" className="text-xs font-semibold">
+                        Country *
+                      </Label>
+                      <Input
+                        id="country"
+                        value={formAddress.country}
+                        onChange={(e) =>
+                          setFormAddress({ ...formAddress, country: e.target.value })
+                        }
+                        placeholder="India"
+                        required
+                        className="rounded-xl text-sm"
+                      />
                     </div>
 
                     <div className="space-y-1">
@@ -502,8 +580,8 @@ export default function CheckoutPage() {
                       )}
                       <Button
                         type="submit"
-                        disabled={savingAddress}
-                        className="bg-shop-orange hover:bg-amber-600 text-white font-bold rounded-xl text-xs"
+                        disabled={savingAddress || pinLoading || !!pinError}
+                        className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs"
                       >
                         {savingAddress && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                         <span>{isSignedIn ? "Save Address" : "Confirm Delivery Address"}</span>
@@ -598,8 +676,8 @@ export default function CheckoutPage() {
               <Button
                 type="button"
                 onClick={handleProceedToPayment}
-                disabled={isProcessingPayment || loadingAddresses}
-                className="w-full bg-shop-orange hover:bg-amber-600 text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                disabled={isProcessingPayment || loadingAddresses || pinLoading || !!pinError}
+                className="w-full bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer"
               >
                 {isProcessingPayment ? (
                   <>
