@@ -185,26 +185,60 @@ export default function CheckoutPage() {
       setPinLoading(false);
 
       if (res.isValid && res.city && res.state) {
-        // Match or find closest State in stateOptions
-        const matchedState = stateOptions.find(
-          (s) => s.toLowerCase() === res.state!.toLowerCase()
-        ) || res.state!;
+        // If database states are loaded, enforce active delivery region serviceability
+        if (dbStates.length > 0) {
+          const stateObj = dbStates.find(
+            (s) => s.name.toLowerCase() === res.state!.toLowerCase()
+          );
 
-        // Add custom city if missing from active database / master list
-        const stateCities = getDbCitiesForState(matchedState);
-        if (res.city && !stateCities.some((c) => c.toLowerCase() === res.city!.toLowerCase())) {
-          setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
+          if (!stateObj) {
+            setPinVerified(false);
+            setPinError("We currently do not deliver to this region.");
+            toast.error("We currently do not deliver to this region.");
+            return;
+          }
+
+          const cityObj = dbCities.find(
+            (c) => c.state_id === stateObj.id && c.name.toLowerCase() === res.city!.toLowerCase()
+          );
+
+          if (!cityObj) {
+            setPinVerified(false);
+            setPinError("We currently do not deliver to this region.");
+            toast.error("We currently do not deliver to this region.");
+            return;
+          }
+
+          setFormAddress((prev) => ({
+            ...prev,
+            state: stateObj.name,
+            city: cityObj.name,
+            country: "India",
+          }));
+          setPinVerified(true);
+          setPinError(null);
+          toast.success(`PIN verified: ${cityObj.name}, ${stateObj.name}`);
+        } else {
+          // Fallback matching when database is uninitialized
+          const matchedState = stateOptions.find(
+            (s) => s.toLowerCase() === res.state!.toLowerCase()
+          ) || res.state!;
+
+          const stateCities = getDbCitiesForState(matchedState);
+          if (res.city && !stateCities.some((c) => c.toLowerCase() === res.city!.toLowerCase())) {
+            setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
+          }
+
+          setFormAddress((prev) => ({
+            ...prev,
+            state: matchedState,
+            city: res.city!,
+            country: "India",
+          }));
+          setPinVerified(true);
+          setPinError(null);
+          toast.success(`PIN verified: ${res.city}, ${matchedState}`);
         }
-
-        setFormAddress((prev) => ({
-          ...prev,
-          state: matchedState,
-          city: res.city!,
-          country: "India",
-        }));
-        setPinVerified(true);
-        setPinError(null);
-        toast.success(`PIN verified: ${res.city}, ${matchedState}`);
       } else {
         setPinVerified(false);
         setPinError(res.error || "Invalid PIN code. No postal office found in India.");

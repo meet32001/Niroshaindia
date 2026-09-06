@@ -149,24 +149,58 @@ export default function AddressBookPage() {
       setPinLoading(false);
 
       if (res.isValid && res.city && res.state) {
-        const matchedState = stateOptions.find(
-          (s) => s.toLowerCase() === res.state!.toLowerCase()
-        ) || res.state!;
+        if (dbStates.length > 0) {
+          const stateObj = dbStates.find(
+            (s) => s.name.toLowerCase() === res.state!.toLowerCase()
+          );
 
-        const stateCities = getDbCitiesForState(matchedState);
-        if (res.city && !stateCities.some((c) => c.toLowerCase() === res.city!.toLowerCase())) {
-          setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
+          if (!stateObj) {
+            setPinVerified(false);
+            setPinError("We currently do not deliver to this region.");
+            toast.error("We currently do not deliver to this region.");
+            return;
+          }
+
+          const cityObj = dbCities.find(
+            (c) => c.state_id === stateObj.id && c.name.toLowerCase() === res.city!.toLowerCase()
+          );
+
+          if (!cityObj) {
+            setPinVerified(false);
+            setPinError("We currently do not deliver to this region.");
+            toast.error("We currently do not deliver to this region.");
+            return;
+          }
+
+          setFormData((prev) => ({
+            ...prev,
+            state: stateObj.name,
+            city: cityObj.name,
+            country: "India",
+          }));
+          setPinVerified(true);
+          setPinError(null);
+          toast.success(`PIN verified: ${cityObj.name}, ${stateObj.name}`);
+        } else {
+          const matchedState = stateOptions.find(
+            (s) => s.toLowerCase() === res.state!.toLowerCase()
+          ) || res.state!;
+
+          const stateCities = getDbCitiesForState(matchedState);
+          if (res.city && !stateCities.some((c) => c.toLowerCase() === res.city!.toLowerCase())) {
+            setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
+          }
+
+          setFormData((prev) => ({
+            ...prev,
+            state: matchedState,
+            city: res.city!,
+            country: "India",
+          }));
+          setPinVerified(true);
+          setPinError(null);
+          toast.success(`PIN verified: ${res.city}, ${matchedState}`);
         }
-
-        setFormData((prev) => ({
-          ...prev,
-          state: matchedState,
-          city: res.city!,
-          country: "India",
-        }));
-        setPinVerified(true);
-        setPinError(null);
-        toast.success(`PIN verified: ${res.city}, ${matchedState}`);
       } else {
         setPinVerified(false);
         setPinError(res.error || "Invalid PIN code. No postal office found in India.");
