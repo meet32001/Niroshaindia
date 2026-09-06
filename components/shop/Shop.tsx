@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Loader2, RotateCcw, Search, X } from "lucide-react";
 import { Title } from "@/components/ui/text";
 import { CategoryList } from "@/components/shop/CategoryList";
 import { BrandList } from "@/components/shop/BrandList";
@@ -20,7 +20,10 @@ export interface ShopProps {
 }
 
 export function Shop({ categories, brands }: ShopProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
+
+  const searchQuery = searchParams.get("search") || searchParams.get("q") || "";
 
   // Active filter state initialized with search params
   const [selectedCategory, setSelectedCategory] = useState<string | null>(searchParams.get("category"));
@@ -39,6 +42,18 @@ export function Shop({ categories, brands }: ShopProps) {
       try {
         const rawProducts = await getAllProducts();
         let filtered = [...(rawProducts.length > 0 ? rawProducts : MOCK_PRODUCTS)];
+
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          filtered = filtered.filter((p: any) => {
+            const title = (p.name || p.title || "").toLowerCase();
+            const desc = (p.description || "").toLowerCase();
+            const cat = (typeof p.category === "string" ? p.category : p.category?.name || p.category?.slug || "").toLowerCase();
+            const brand = (typeof p.brand === "string" ? p.brand : p.brand?.name || p.brand?.slug || "").toLowerCase();
+            return title.includes(q) || desc.includes(q) || cat.includes(q) || brand.includes(q);
+          });
+        }
 
         if (selectedCategory) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,15 +101,18 @@ export function Shop({ categories, brands }: ShopProps) {
     return () => {
       isMounted = false;
     };
-  }, [selectedCategory, selectedBrand, selectedPrice]);
+  }, [searchQuery, selectedCategory, selectedBrand, selectedPrice]);
 
   const handleResetFilters = () => {
     setSelectedCategory(null);
     setSelectedBrand(null);
     setSelectedPrice(null);
+    if (searchQuery) {
+      router.push("/shop");
+    }
   };
 
-  const hasActiveFilters = Boolean(selectedCategory || selectedBrand || selectedPrice);
+  const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedBrand || selectedPrice);
 
   return (
     <div className="space-y-6">
@@ -119,6 +137,25 @@ export function Shop({ categories, brands }: ShopProps) {
           </button>
         )}
       </div>
+
+      {/* Search Query Banner */}
+      {searchQuery && (
+        <div className="flex items-center justify-between gap-3 p-3.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 rounded-xl text-xs">
+          <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-300 font-medium">
+            <Search className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>
+              Showing results for &quot;<strong className="font-bold">{searchQuery}</strong>&quot; ({products.length} {products.length === 1 ? "product" : "products"} found)
+            </span>
+          </div>
+          <button
+            onClick={() => router.push("/shop")}
+            className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:underline font-bold cursor-pointer shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span>Clear Search</span>
+          </button>
+        </div>
+      )}
 
       {/* Main Grid: Left Filters Sidebar & Right Product Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
@@ -152,11 +189,11 @@ export function Shop({ categories, brands }: ShopProps) {
               </span>
             </div>
           ) : products.length === 0 ? (
-            <NoProductAvailable selectedTab="selected filters" />
+            <NoProductAvailable selectedTab={searchQuery || "selected filters"} />
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${selectedCategory}-${selectedBrand}-${selectedPrice}`}
+                key={`${searchQuery}-${selectedCategory}-${selectedBrand}-${selectedPrice}`}
                 initial={{ opacity: 0.2, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
