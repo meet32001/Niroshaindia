@@ -23,7 +23,7 @@ export const POPULAR_CATEGORIES: VisualCategory[] = [
     title: 'Air Conditioners',
     slug: 'ac',
     itemCountLabel: 'Inverter Split & Window ACs',
-    imageUrl: 'https://images.unsplash.com/photo-1631545729918-46c9d1e37456?w=600&auto=format&fit=crop&q=80',
+    imageUrl: 'https://vsprod.vijaysales.com/media/catalog/product/2/5/254547_1__1.jpg?optimize=medium&fit=bounds',
     badge: 'Seasonal',
   },
   {
@@ -42,7 +42,7 @@ export const POPULAR_CATEGORIES: VisualCategory[] = [
     title: 'Home & Kitchen Appliances',
     slug: 'kitchen-appliances',
     itemCountLabel: 'Air Fryers, Water Purifiers & More',
-    imageUrl: 'https://images.unsplash.com/photo-1695653422715-991ec3a0db7a?w=600&auto=format&fit=crop&q=80',
+    imageUrl: 'https://frigidaire.bynder.com/transform/4a092b48-0cd5-4e52-a14b-9570ce3154ee/FRAFM100B-HOV-psd?preset=three-bears',
   },
   {
     title: 'Headphones & Speakers',
