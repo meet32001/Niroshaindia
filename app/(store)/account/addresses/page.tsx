@@ -34,15 +34,15 @@ export default function AddressBookPage() {
   const [editingAddress, setEditingAddress] = useState<AddressInput | null>(null);
 
   const [formData, setFormData] = useState<AddressInput>({
-    full_name: "",
-    street_address: "",
+    recipient_name: "",
+    address_line1: "",
+    address_line2: "",
     city: "",
     state: "",
     postal_code: "",
     country: "India",
     phone: "",
-    is_default_shipping: false,
-    is_default_billing: false,
+    is_default: false,
   });
 
   const fetchAddresses = async () => {
@@ -75,15 +75,15 @@ export default function AddressBookPage() {
   const handleOpenAdd = () => {
     setEditingAddress(null);
     setFormData({
-      full_name: "",
-      street_address: "",
+      recipient_name: "",
+      address_line1: "",
+      address_line2: "",
       city: "",
       state: "",
       postal_code: "",
       country: "India",
       phone: "",
-      is_default_shipping: addresses.length === 0,
-      is_default_billing: addresses.length === 0,
+      is_default: addresses.length === 0,
     });
     setDialogOpen(true);
   };
@@ -93,15 +93,15 @@ export default function AddressBookPage() {
     setEditingAddress(addr);
     setFormData({
       id: addr.id,
-      full_name: addr.full_name || "",
-      street_address: addr.street_address || "",
+      recipient_name: addr.recipient_name || addr.full_name || "",
+      address_line1: addr.address_line1 || addr.street_address || "",
+      address_line2: addr.address_line2 || "",
       city: addr.city || "",
       state: addr.state || "",
       postal_code: addr.postal_code || "",
       country: addr.country || "India",
       phone: addr.phone || "",
-      is_default_shipping: !!addr.is_default_shipping,
-      is_default_billing: !!addr.is_default_billing,
+      is_default: !!addr.is_default || !!addr.is_default_shipping,
     });
     setDialogOpen(true);
   };
@@ -172,12 +172,12 @@ export default function AddressBookPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-2">
               <div className="space-y-1">
-                <Label htmlFor="full_name">Full Name</Label>
+                <Label htmlFor="recipient_name">Recipient Name</Label>
                 <Input
-                  id="full_name"
-                  value={formData.full_name}
+                  id="recipient_name"
+                  value={formData.recipient_name}
                   onChange={(e) =>
-                    setFormData({ ...formData, full_name: e.target.value })
+                    setFormData({ ...formData, recipient_name: e.target.value })
                   }
                   placeholder="John Doe"
                   required
@@ -185,15 +185,27 @@ export default function AddressBookPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="street_address">Street Address</Label>
+                <Label htmlFor="address_line1">Address Line 1</Label>
                 <Input
-                  id="street_address"
-                  value={formData.street_address}
+                  id="address_line1"
+                  value={formData.address_line1}
                   onChange={(e) =>
-                    setFormData({ ...formData, street_address: e.target.value })
+                    setFormData({ ...formData, address_line1: e.target.value })
                   }
                   placeholder="123 Main Street, Apt 4B"
                   required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
+                <Input
+                  id="address_line2"
+                  value={formData.address_line2 || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address_line2: e.target.value })
+                  }
+                  placeholder="Landmark / Suite"
                 />
               </div>
 
@@ -226,7 +238,7 @@ export default function AddressBookPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="postal_code">Postal Code</Label>
+                  <Label htmlFor="postal_code">PIN Code (6 Digits)</Label>
                   <Input
                     id="postal_code"
                     value={formData.postal_code}
@@ -234,6 +246,7 @@ export default function AddressBookPage() {
                       setFormData({ ...formData, postal_code: e.target.value })
                     }
                     placeholder="400001"
+                    maxLength={6}
                     required
                   />
                 </div>
@@ -252,14 +265,15 @@ export default function AddressBookPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Mobile Phone (10 Digits)</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
-                  placeholder="+91 9876543210"
+                  placeholder="9876543210"
+                  maxLength={10}
                   required
                 />
               </div>
@@ -267,33 +281,17 @@ export default function AddressBookPage() {
               <div className="space-y-3 pt-2">
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="is_default_shipping"
-                    checked={formData.is_default_shipping}
+                    id="is_default"
+                    checked={formData.is_default}
                     onCheckedChange={(checked) =>
                       setFormData({
                         ...formData,
-                        is_default_shipping: !!checked,
+                        is_default: !!checked,
                       })
                     }
                   />
-                  <Label htmlFor="is_default_shipping" className="text-sm font-normal">
-                    Set as default shipping address
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_default_billing"
-                    checked={formData.is_default_billing}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        is_default_billing: !!checked,
-                      })
-                    }
-                  />
-                  <Label htmlFor="is_default_billing" className="text-sm font-normal">
-                    Set as default billing address
+                  <Label htmlFor="is_default" className="text-sm font-normal">
+                    Set as default delivery address
                   </Label>
                 </div>
               </div>
@@ -352,28 +350,24 @@ export default function AddressBookPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-base font-semibold">
-                    {addr.full_name}
+                    {addr.recipient_name || addr.full_name}
                   </CardTitle>
                   <div className="flex gap-1.5 flex-wrap">
-                    {addr.is_default_shipping && (
+                    {(addr.is_default || addr.is_default_shipping) && (
                       <Badge className="bg-emerald-600 text-white text-[10px]">
-                        Default Shipping
-                      </Badge>
-                    )}
-                    {addr.is_default_billing && (
-                      <Badge variant="outline" className="text-[10px] border-emerald-600 text-emerald-600">
-                        Default Billing
+                        Default Address
                       </Badge>
                     )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <p>{addr.street_address}</p>
+                <p>{addr.address_line1 || addr.street_address}</p>
+                {addr.address_line2 && <p>{addr.address_line2}</p>}
                 <p>
                   {addr.city}, {addr.state} {addr.postal_code}
                 </p>
-                <p>{addr.country}</p>
+                <p>{addr.country || "India"}</p>
                 <p className="text-xs text-slate-400">Phone: {addr.phone}</p>
 
                 <div className="flex items-center gap-3 pt-3 border-t">

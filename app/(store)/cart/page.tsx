@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
@@ -11,19 +10,16 @@ import { Title } from "@/components/ui/text";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { QuantityButtons } from "@/components/product/QuantityButtons";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
-import { DeliveryAddress, MOCK_ADDRESSES } from "@/components/cart/DeliveryAddress";
 import { NoAccess } from "@/components/cart/NoAccess";
 import { EmptyCart } from "@/components/cart/EmptyCart";
 import { useStore } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { urlFor } from "@/lib/image";
-import { createCheckoutSession } from "@/actions/createCheckoutSession";
 
 export default function CartPage() {
-  const { isLoaded, isSignedIn, user } = useUser();
+  const { isLoaded, isSignedIn } = useUser();
   const { items, deleteCartProduct, resetCart, getTotalPrice, getSubtotalPrice } = useStore();
   const isMounted = useIsMounted();
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   if (!isLoaded || !isMounted) {
     return (
@@ -58,32 +54,6 @@ export default function CartPage() {
     toast.success(`${name.slice(0, 18)}... removed from cart`);
   };
 
-  const handleCheckout = async () => {
-    try {
-      setIsCheckingOut(true);
-      const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-      const metadata = {
-        orderNumber,
-        customerName: user?.fullName || "Customer",
-        customerEmail: user?.primaryEmailAddress?.emailAddress || "customer@example.com",
-        clerkUserId: user?.id || "",
-        address: MOCK_ADDRESSES[0],
-      };
-
-      const checkoutUrl = await createCheckoutSession(items, metadata);
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-      } else {
-        toast.error("Failed to initialize Stripe checkout session");
-        setIsCheckingOut(false);
-      }
-    } catch (err) {
-      console.error("Checkout error:", err);
-      toast.error("An error occurred during checkout setup");
-      setIsCheckingOut(false);
-    }
-  };
-
   const getImageUrl = (img: unknown) => {
     if (!img) return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
     if (typeof img === "string") return img;
@@ -99,152 +69,119 @@ export default function CartPage() {
   };
 
   return (
-    <div className="py-8 md:py-12 pb-24 md:pb-12">
-      <Container>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          {/* Left Column: Items Details Table */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-shop-orange/10 text-shop-orange">
-                  <ShoppingBag className="h-5 w-5" />
-                </div>
-                <div>
-                  <Title className="text-xl font-bold">Shopping Cart</Title>
-                  <span className="text-xs text-slate-500 font-medium">
-                    {items.reduce((acc, item) => acc + item.quantity, 0)} items in your cart
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={handleResetCart}
-                className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 hover:underline cursor-pointer"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset Cart</span>
-              </button>
+    <div className="bg-slate-50/50 dark:bg-slate-950 min-h-screen pb-24">
+      <Container className="py-8 space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-orange-50 dark:bg-orange-950/40 text-shop-orange">
+              <ShoppingBag className="h-6 w-6" />
             </div>
-
-            {/* Items Table Container */}
-            <div className="border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800 overflow-hidden shadow-xs">
-              {items.map((item) => {
-                const product = item.product;
-                const id = String(product._id || product.id || "");
-                const name = product.name || product.title || "Electronics Product";
-                const price = product.price || 0;
-                const itemTotal = price * item.quantity;
-                const stock = product.stock !== undefined ? product.stock : 10;
-                const isStock = stock > 0;
-                const mainImg = Array.isArray(product.images) ? product.images[0] : product.image;
-                const imgUrl = getImageUrl(mainImg);
-                const categoryName = Array.isArray(product.categories)
-                  ? product.categories.join(", ")
-                  : product.productType || "Gadget";
-
-                return (
-                  <div
-                    key={id}
-                    className="p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
-                  >
-                    {/* Thumbnail & Product Details */}
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <Link
-                        href={`/product/${product.slug?.current || product.slug}`}
-                        className="relative h-20 w-20 shrink-0 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 overflow-hidden p-2 flex items-center justify-center group"
-                      >
-                        <Image
-                          src={imgUrl}
-                          alt={name}
-                          fill
-                          sizes="80px"
-                          className="object-contain p-1 group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </Link>
-
-                      <div className="space-y-1.5">
-                        <Link
-                          href={`/product/${product.slug?.current || product.slug}`}
-                          className="text-sm font-bold text-shop-dark dark:text-slate-100 hover:text-shop-orange transition-colors line-clamp-1"
-                        >
-                          {name}
-                        </Link>
-
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-[10px] font-bold text-shop-orange uppercase bg-shop-orange/10 px-2 py-0.5 rounded-md">
-                            {categoryName}
-                          </span>
-
-                          {isStock ? (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
-                              In Stock
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-rose-600 bg-rose-100 dark:bg-rose-950/60 px-2 py-0.5 rounded-md">
-                              Out of Stock
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Sub-Actions: Wishlist & Delete */}
-                        <div className="flex items-center gap-3 pt-1">
-                          <AddToWishlistButton product={product} className="p-1 border-0 shadow-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800" />
-                          <button
-                            onClick={() => handleDeleteItem(id, name)}
-                            className="text-[11px] font-semibold text-slate-400 hover:text-rose-600 flex items-center gap-1 transition-colors cursor-pointer"
-                            title="Remove item"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stepper & Line Price */}
-                    <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
-                      <QuantityButtons product={product} />
-
-                      <div className="text-right min-w-[90px]">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
-                          Line Total
-                        </span>
-                        <PriceFormatter amount={itemTotal} className="text-base font-black text-shop-orange" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div>
+              <Title className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+                Shopping Cart
+              </Title>
+              <p className="text-xs text-slate-500 font-medium">
+                {items.length} {items.length === 1 ? "item" : "items"} in your cart
+              </p>
             </div>
           </div>
 
-          {/* Right Column: Address Selector & Order Summary */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Delivery Address Selector */}
-            <DeliveryAddress />
+          <button
+            onClick={handleResetCart}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-rose-600 font-semibold transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Reset Cart</span>
+          </button>
+        </div>
 
-            {/* Sticky Order Summary Panel */}
-            <div className="sticky top-24 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
-              <h2 className="text-lg font-bold text-shop-dark dark:text-slate-100 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Items List */}
+          <div className="lg:col-span-2 space-y-4">
+            {items.map((cartItem) => {
+              const product = cartItem.product;
+              const productId = product?._id || product?.id || "";
+              const name = product?.name || "Product Name";
+              const price = product?.price || 0;
+              const discount = product?.discount || 0;
+              const originalPrice = discount > 0 ? price / (1 - discount / 100) : price;
+              const image = getImageUrl(product?.images?.[0] || product?.image);
+
+              return (
+                <div
+                  key={productId}
+                  className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center transition-all hover:border-slate-300 dark:hover:border-slate-700"
+                >
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                    <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-100 dark:border-slate-800">
+                      <Image
+                        src={image}
+                        alt={name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">
+                        <Link href={`/product/${product?.slug?.current || product?.slug || productId}`} className="hover:text-shop-orange transition-colors">
+                          {name}
+                        </Link>
+                      </h3>
+                      {product?.variant_name && (
+                        <p className="text-xs text-slate-500 font-medium">Variant: {product.variant_name}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs">
+                        <PriceFormatter amount={price} className="font-black text-slate-900 dark:text-slate-100 text-sm" />
+                        {discount > 0 && (
+                          <PriceFormatter amount={originalPrice} className="line-through text-slate-400 font-medium" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                    <QuantityButtons product={product} />
+
+                    <div className="flex items-center gap-2">
+                      <AddToWishlistButton product={product} className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" />
+                      <button
+                        onClick={() => handleDeleteItem(productId, name)}
+                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        title="Remove Item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Cart Summary */}
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5 sticky top-24">
+              <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-3">
                 Order Summary
               </h2>
 
-              <div className="space-y-3 text-xs md:text-sm">
+              <div className="space-y-2.5 text-xs font-medium">
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span>Subtotal</span>
-                  <PriceFormatter amount={subtotalPrice} className="font-semibold text-slate-900 dark:text-slate-100" />
+                  <span>Subtotal ({items.length} items)</span>
+                  <PriceFormatter amount={subtotalPrice} className="font-bold text-slate-900 dark:text-slate-100" />
                 </div>
 
                 {totalSavings > 0 && (
-                  <div className="flex items-center justify-between text-emerald-600 font-semibold">
+                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-bold">
                     <span>Discount Savings</span>
                     <span>-<PriceFormatter amount={totalSavings} /></span>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span>Estimated Shipping</span>
-                  <span className="text-emerald-600 font-semibold uppercase text-xs">Free</span>
+                  <span>Delivery Charges</span>
+                  <span className="font-bold text-emerald-600">FREE Delivery</span>
                 </div>
 
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
@@ -259,23 +196,15 @@ export default function CartPage() {
               </div>
 
               {/* Checkout CTA */}
-              <button
-                onClick={handleCheckout}
-                disabled={isCheckingOut}
-                className="w-full bg-shop-orange hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-md cursor-pointer"
-              >
-                {isCheckingOut ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Preparing Checkout...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Proceed to Checkout</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
+              <Link href="/checkout" className="block w-full">
+                <button
+                  type="button"
+                  className="w-full bg-shop-orange hover:bg-amber-600 text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-md cursor-pointer"
+                >
+                  <span>Proceed to Checkout</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </Link>
 
               {/* Trust Features */}
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2 text-[11px] text-slate-500">
@@ -298,23 +227,15 @@ export default function CartPage() {
           <PriceFormatter amount={totalPrice} className="text-lg font-extrabold text-shop-orange" />
         </div>
 
-        <button
-          onClick={handleCheckout}
-          disabled={isCheckingOut}
-          className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
-        >
-          {isCheckingOut ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Preparing...</span>
-            </>
-          ) : (
-            <>
-              <span>Checkout</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </>
-          )}
-        </button>
+        <Link href="/checkout">
+          <button
+            type="button"
+            className="bg-shop-orange hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+          >
+            <span>Checkout</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </Link>
       </div>
     </div>
   );

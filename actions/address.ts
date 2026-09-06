@@ -2,21 +2,10 @@
 
 import { z } from 'zod';
 import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
+import { addressSchema, AddressInput } from '@/lib/validations/address';
 
-export const addressSchema = z.object({
-  id: z.string().optional(),
-  full_name: z.string().min(2, 'Full name must be at least 2 characters'),
-  street_address: z.string().min(5, 'Street address is required'),
-  city: z.string().min(2, 'City is required'),
-  state: z.string().min(2, 'State is required'),
-  postal_code: z.string().min(3, 'Postal code is required'),
-  country: z.string().min(2, 'Country is required'),
-  phone: z.string().min(5, 'Phone number is required'),
-  is_default_shipping: z.boolean().default(false),
-  is_default_billing: z.boolean().default(false),
-});
-
-export type AddressInput = z.infer<typeof addressSchema>;
+export { addressSchema };
+export type { AddressInput };
 
 export async function getUserAddresses() {
   try {
@@ -31,7 +20,7 @@ export async function getUserAddresses() {
       .from('addresses')
       .select('*')
       .eq('customer_id', customer.id)
-      .order('is_default_shipping', { ascending: false })
+      .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -57,33 +46,25 @@ export async function saveAddress(rawPayload: AddressInput) {
 
     const validated = addressSchema.parse(rawPayload);
 
-    // If setting as default shipping, unset previous default shipping for this customer
-    if (validated.is_default_shipping) {
+    // If setting as default, unset previous default for this customer
+    if (validated.is_default) {
       await supabaseAdmin
         .from('addresses')
-        .update({ is_default_shipping: false })
-        .eq('customer_id', customer.id);
-    }
-
-    // If setting as default billing, unset previous default billing for this customer
-    if (validated.is_default_billing) {
-      await supabaseAdmin
-        .from('addresses')
-        .update({ is_default_billing: false })
+        .update({ is_default: false })
         .eq('customer_id', customer.id);
     }
 
     const addressData = {
       customer_id: customer.id,
-      full_name: validated.full_name,
-      street_address: validated.street_address,
+      recipient_name: validated.recipient_name,
+      address_line1: validated.address_line1,
+      address_line2: validated.address_line2 || '',
       city: validated.city,
       state: validated.state,
       postal_code: validated.postal_code,
-      country: validated.country,
+      country: validated.country || 'India',
       phone: validated.phone,
-      is_default_shipping: validated.is_default_shipping,
-      is_default_billing: validated.is_default_billing,
+      is_default: validated.is_default,
     };
 
     let result;
