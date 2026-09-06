@@ -123,44 +123,83 @@ export function normalizeProduct(item: any) {
   const defaultFallbackImg =
     "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
 
-  const brandObj = item.brands || item.brand;
-  const brandName = typeof brandObj === "string" ? brandObj : brandObj?.name || brandObj?.title || "Brand";
+  const brandObj = item.brand || item.brands;
+  const brandName = typeof brandObj === "string" ? brandObj : brandObj?.name || brandObj?.title || "Nirosha";
 
-  const catObj = item.categories || item.category;
+  const catObj = item.category || item.categories;
   const categoryName = typeof catObj === "string" ? catObj : catObj?.name || catObj?.title || "Electronics";
 
-  const variants = item.product_variants || item.variants || [];
-  const primaryVariant = variants[0] || {};
+  const rawVariants = item.variants || item.product_variants || [];
+  
+  // Normalize each variant cleanly
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const variants = rawVariants.map((v: any) => {
+    const rawImgs = v.images || v.product_images || [];
+    let variantImages: string[] = [];
+    if (Array.isArray(rawImgs)) {
+      variantImages = rawImgs
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((img: any) => img.image_url || img.url || (typeof img === "string" ? img : null))
+        .filter(Boolean);
+    }
+    if (variantImages.length === 0) {
+      variantImages = [defaultFallbackImg];
+    }
 
-  const priceCents = primaryVariant.price_cents ?? item.price_cents ?? (item.price ? item.price * 100 : 0);
-  const comparePriceCents = primaryVariant.compare_at_price_cents ?? item.compare_at_price_cents ?? (item.discountPrice ? item.discountPrice * 100 : 0);
+    const priceCents = v.price_cents ?? (item.price ? item.price * 100 : 0);
+    const comparePriceCents = v.compare_at_price_cents ?? (item.discountPrice ? item.discountPrice * 100 : 0);
 
-  const price = priceCents ? priceCents / 100 : item.price || 0;
-  const discountPrice = comparePriceCents ? comparePriceCents / 100 : item.discountPrice || item.discount || 0;
+    const price = priceCents ? priceCents / 100 : item.price || 0;
+    const comparePrice = comparePriceCents ? comparePriceCents / 100 : item.discountPrice || 0;
 
-  let images: string[] = [];
-  if (primaryVariant.product_images && Array.isArray(primaryVariant.product_images)) {
-    images = primaryVariant.product_images
-      .map((img: { image_url?: string; url?: string }) => img.image_url || img.url)
-      .filter(Boolean);
-  } else if (item.product_images && Array.isArray(item.product_images)) {
-    images = item.product_images
-      .map((img: { image_url?: string; url?: string }) => img.image_url || img.url)
-      .filter(Boolean);
-  } else if (Array.isArray(item.images)) {
-    images = item.images;
+    const rawSpecs = v.specifications?.specs || (Array.isArray(v.specifications) ? v.specifications[0]?.specs : null) || v.product_specifications?.specs || (Array.isArray(v.product_specifications) ? v.product_specifications[0]?.specs : null) || {};
+
+    const inv = Array.isArray(v.inventory) ? v.inventory[0] : v.inventory || (Array.isArray(v.warehouse_inventory) ? v.warehouse_inventory[0] : v.warehouse_inventory);
+    const stock = inv ? Math.max(0, (inv.quantity_on_hand || 0) - (inv.quantity_reserved || 0)) : (v.stock !== undefined ? v.stock : 10);
+
+    return {
+      id: v.id || `var-${Math.random()}`,
+      sku: v.sku || "SKU-DEFAULT",
+      name: v.name || item.name || "Default Variant",
+      price_cents: priceCents,
+      compare_at_price_cents: comparePriceCents,
+      price,
+      comparePrice,
+      stock,
+      isStock: stock > 0,
+      images: variantImages,
+      specs: rawSpecs,
+      weight_grams: v.weight_grams || null,
+      dimensions_mm_l_w_h: v.dimensions_mm_l_w_h || null,
+    };
+  });
+
+  const primaryVariant = variants[0] || {
+    id: item.id || "var-default",
+    sku: "SKU-DEFAULT",
+    name: item.name || "Default",
+    price: item.price || 0,
+    comparePrice: item.discountPrice || 0,
+    stock: item.stock !== undefined ? item.stock : 10,
+    isStock: (item.stock !== undefined ? item.stock : 10) > 0,
+    images: [defaultFallbackImg],
+    specs: {},
+    weight_grams: null,
+    dimensions_mm_l_w_h: null,
+  };
+
+  // Find lowest price among all variants for catalog card starting price
+  const lowestPrice = variants.length > 0 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? Math.min(...variants.map((v: any) => v.price))
+    : primaryVariant.price;
+
+  let productImages: string[] = primaryVariant.images;
+  if (Array.isArray(item.images) && item.images.length > 0) {
+    productImages = item.images;
   }
-
-  if (images.length === 0) {
-    images = [defaultFallbackImg];
-  }
-
-  const specs =
-    primaryVariant.product_specifications?.specs ||
-    (Array.isArray(primaryVariant.product_specifications)
-      ? primaryVariant.product_specifications[0]?.specs
-      : item.specs) ||
-    {};
 
   return {
     ...item,
@@ -172,11 +211,14 @@ export function normalizeProduct(item: any) {
     brands: typeof brandObj === "object" ? brandObj : { name: brandName },
     category: categoryName,
     categories: typeof catObj === "object" ? catObj : { name: categoryName },
-    price,
-    discountPrice,
-    images,
+    price: primaryVariant.price,
+    discountPrice: primaryVariant.comparePrice,
+    lowestPrice,
+    images: productImages,
+    variants,
     product_variants: variants,
-    specs,
+    specs: primaryVariant.specs,
+    stock: primaryVariant.stock,
   };
 }
 
@@ -191,9 +233,9 @@ export async function getAllProducts() {
         slug,
         description,
         is_active,
-        brands:brand_id ( id, name, slug, logo_url ),
-        categories:category_id ( id, name, slug, description ),
-        product_variants (
+        brand:brands ( id, name, slug, logo_url ),
+        category:categories ( id, name, slug, description ),
+        variants:product_variants (
           id,
           sku,
           name,
@@ -201,8 +243,10 @@ export async function getAllProducts() {
           compare_at_price_cents,
           is_serialized,
           weight_grams,
-          product_images ( id, image_url, sort_order, is_featured ),
-          product_specifications ( specs )
+          dimensions_mm_l_w_h,
+          images:product_images ( id, image_url, sort_order, is_featured ),
+          specifications:product_specifications ( specs ),
+          inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
         )
       `)
       .eq("is_active", true)
@@ -228,9 +272,9 @@ export async function getProductBySlug(slug: string) {
         slug,
         description,
         is_active,
-        brands:brand_id ( id, name, slug, logo_url ),
-        categories:category_id ( id, name, slug, description ),
-        product_variants (
+        brand:brands ( id, name, slug, logo_url ),
+        category:categories ( id, name, slug, description ),
+        variants:product_variants (
           id,
           sku,
           name,
@@ -238,8 +282,10 @@ export async function getProductBySlug(slug: string) {
           compare_at_price_cents,
           is_serialized,
           weight_grams,
-          product_images ( id, image_url, sort_order, is_featured ),
-          product_specifications ( specs )
+          dimensions_mm_l_w_h,
+          images:product_images ( id, image_url, sort_order, is_featured ),
+          specifications:product_specifications ( specs ),
+          inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
         )
       `)
       .eq("slug", slug)
@@ -323,9 +369,9 @@ export async function getProductsByCategory(categorySlug: string) {
         slug,
         description,
         is_active,
-        brands:brand_id ( id, name, slug, logo_url ),
-        categories:category_id!inner ( id, name, slug, description ),
-        product_variants (
+        brand:brands ( id, name, slug, logo_url ),
+        category:categories!inner ( id, name, slug, description ),
+        variants:product_variants (
           id,
           sku,
           name,
@@ -333,11 +379,13 @@ export async function getProductsByCategory(categorySlug: string) {
           compare_at_price_cents,
           is_serialized,
           weight_grams,
-          product_images ( id, image_url, sort_order, is_featured ),
-          product_specifications ( specs )
+          dimensions_mm_l_w_h,
+          images:product_images ( id, image_url, sort_order, is_featured ),
+          specifications:product_specifications ( specs ),
+          inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
         )
       `)
-      .eq("categories.slug", categorySlug)
+      .eq("category.slug", categorySlug)
       .eq("is_active", true);
 
     if (!error && Array.isArray(data) && data.length > 0) {

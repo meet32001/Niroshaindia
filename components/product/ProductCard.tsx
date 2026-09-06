@@ -17,21 +17,24 @@ export function ProductCard(product: any) {
     (typeof product.category === "string" ? product.category : product.category?.title) ||
     "Electronics";
 
-  const primaryVariant = product.product_variants?.[0] || product.variants?.[0];
-  const price = primaryVariant?.price_cents
+  const variants = product.variants || product.product_variants || [];
+  const primaryVariant = variants[0] || {};
+  
+  // Starting price (lowest variant price)
+  const price = product.lowestPrice ?? (primaryVariant?.price_cents
     ? primaryVariant.price_cents / 100
-    : product.price || 0;
+    : product.price || 0);
 
   const discount = primaryVariant?.compare_at_price_cents
     ? primaryVariant.compare_at_price_cents / 100
     : product.discountPrice || product.discount || 0;
 
-  const stock = product.stock !== undefined ? product.stock : 10;
+  const stock = product.stock !== undefined ? product.stock : (primaryVariant?.stock ?? 10);
   const status = product.status || product.tag?.toLowerCase();
 
   let imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
 
-  const variantImg = primaryVariant?.product_images?.[0]?.image_url || primaryVariant?.images?.[0];
+  const variantImg = primaryVariant?.images?.[0] || primaryVariant?.product_images?.[0]?.image_url;
   const directImg = product.product_images?.[0]?.image_url || (Array.isArray(product.images) ? product.images[0] : product.image);
 
   if (variantImg && typeof variantImg === "string") {
