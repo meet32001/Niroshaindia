@@ -1,16 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { HomeTabBar } from "@/components/product/HomeTabBar";
-import { ProductGrid } from "@/components/product/ProductGrid";
+import { CategoryProductSection } from "@/components/home/CategoryProductSection";
 
-export function HomeTabContainer() {
-  const [selectedTab, setSelectedTab] = useState("all");
-
-  return (
-    <section className="space-y-6">
-      <HomeTabBar selectedTab={selectedTab} onTabSelect={setSelectedTab} />
-      <ProductGrid selectedTab={selectedTab} />
-    </section>
-  );
+export interface HomeTabContainerProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialProducts?: any[];
 }
+
+export function HomeTabContainer({ initialProducts = [] }: HomeTabContainerProps) {
+  return <CategoryProductSection initialProducts={initialProducts} />;
+}
+

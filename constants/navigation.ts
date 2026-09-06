@@ -15,6 +15,19 @@ export const PRODUCT_TYPES = [
   { title: "Accessories", value: "accessories" },
 ];
 
+export const VIJAY_SALES_CATEGORIES = [
+  { title: "All Products", value: "all", iconName: "Sparkles" },
+  { title: "AC", value: "ac", iconName: "AirVent" },
+  { title: "Mobiles & Tablets", value: "mobiles-tablets-accessories", iconName: "Smartphone" },
+  { title: "Laptops & PCs", value: "laptops-accessories", iconName: "Laptop" },
+  { title: "Home Appliances", value: "home-appliances", iconName: "Home" },
+  { title: "Kitchen Appliances", value: "kitchen-appliances", iconName: "UtensilsCrossed" },
+  { title: "TV & Vision", value: "tv", iconName: "Tv" },
+  { title: "Audio & Headphones", value: "headphones-speakers", iconName: "Headphones" },
+  { title: "Brand Stores", value: "brand-stores", iconName: "Store" },
+];
+
+
 export const HEADER_NAV_LINKS: NavigationItem[] = [
   { title: "Home", href: "/" },
   { title: "Shop", href: "/shop" },
