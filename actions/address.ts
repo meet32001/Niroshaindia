@@ -4,9 +4,6 @@ import { z } from 'zod';
 import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
 import { addressSchema, AddressInput } from '@/lib/validations/address';
 
-export { addressSchema };
-export type { AddressInput };
-
 export async function getUserAddresses() {
   try {
     const authData = await getAuthenticatedCustomer();

@@ -6,8 +6,8 @@ import {
   getUserAddresses,
   saveAddress,
   deleteAddress,
-  AddressInput,
 } from "@/actions/address";
+import { AddressInput } from "@/lib/validations/address";
 import { Container } from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
