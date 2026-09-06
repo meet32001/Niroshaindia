@@ -56,17 +56,39 @@ export function Shop({ categories, brands }: ShopProps) {
         }
 
         if (selectedCategory) {
+          const catLower = selectedCategory.toLowerCase();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filtered = filtered.filter((p: any) => {
-            const catStr = typeof p.category === "string" ? p.category : p.category?.slug?.current || p.productType || "";
-            return catStr.toLowerCase().includes(selectedCategory.toLowerCase());
+            const catStr = (typeof p.category === "string" ? p.category : p.category?.name || p.category?.slug || p.categories?.slug || p.categories?.name || "").toLowerCase();
+            const nameStr = (p.name || p.title || "").toLowerCase();
+
+            if (catLower === "ac") {
+              return catStr.includes("ac") || catStr.includes("air conditioner") || nameStr.includes("ac") || nameStr.includes("air conditioner");
+            }
+            if (catLower === "tv") {
+              return catStr.includes("tv") || catStr.includes("television") || nameStr.includes("tv") || nameStr.includes("oled");
+            }
+            if (catLower === "mobiles-tablets-accessories") {
+              return catStr.includes("mobile") || catStr.includes("phone") || catStr.includes("tablet") || catStr.includes("gadget") || nameStr.includes("phone") || nameStr.includes("galaxy") || nameStr.includes("iphone");
+            }
+            if (catLower === "laptops-accessories") {
+              return catStr.includes("laptop") || catStr.includes("computer") || nameStr.includes("laptop") || nameStr.includes("macbook") || nameStr.includes("probook");
+            }
+            if (catLower === "kitchen-appliances" || catLower === "home-appliances") {
+              return catStr.includes("appliance") || catStr.includes("kitchen") || nameStr.includes("fryer") || nameStr.includes("purifier") || nameStr.includes("refrigerator");
+            }
+            if (catLower === "headphones-speakers") {
+              return catStr.includes("headphone") || catStr.includes("audio") || nameStr.includes("headphone") || nameStr.includes("speaker") || nameStr.includes("tws") || nameStr.includes("sony wh");
+            }
+
+            return catStr.includes(catLower) || nameStr.includes(catLower);
           });
         }
 
         if (selectedBrand) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filtered = filtered.filter((p: any) => {
-            const brandStr = typeof p.brand === "string" ? p.brand : p.brand?.slug?.current || "";
+            const brandStr = typeof p.brand === "string" ? p.brand : p.brand?.slug?.current || p.brand?.slug || p.brand?.name || "";
             return brandStr.toLowerCase().includes(selectedBrand.toLowerCase());
           });
         }
@@ -189,7 +211,7 @@ export function Shop({ categories, brands }: ShopProps) {
               </span>
             </div>
           ) : products.length === 0 ? (
-            <NoProductAvailable selectedTab={searchQuery || "selected filters"} />
+            <NoProductAvailable selectedTab={selectedCategory || searchQuery || "selected filters"} />
           ) : (
             <AnimatePresence mode="wait">
               <motion.div

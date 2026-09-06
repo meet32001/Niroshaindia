@@ -1,69 +1,111 @@
-import Link from "next/link";
-import Image from "next/image";
-import { getCategories } from "@/lib/db/products";
+'use client';
 
-export async function HomeCategories() {
-  const categories = await getCategories(6);
+import Link from 'next/link';
+import Image from 'next/image';
 
+export interface VisualCategory {
+  title: string;
+  slug: string;
+  itemCountLabel: string;
+  imageUrl: string;
+  badge?: string;
+}
+
+export const POPULAR_CATEGORIES: VisualCategory[] = [
+  {
+    title: 'Smartphones & Tablets',
+    slug: 'mobiles-tablets-accessories',
+    itemCountLabel: 'Flagships, 5G & Foldables',
+    imageUrl: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80',
+    badge: 'Popular',
+  },
+  {
+    title: 'Air Conditioners',
+    slug: 'ac',
+    itemCountLabel: 'Inverter Split & Window ACs',
+    imageUrl: 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=600&auto=format&fit=crop&q=80',
+    badge: 'Seasonal',
+  },
+  {
+    title: 'Televisions & Audio',
+    slug: 'tv',
+    itemCountLabel: 'OLED, QLED & 4K Smart TVs',
+    imageUrl: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    title: 'Laptops & Computers',
+    slug: 'laptops-accessories',
+    itemCountLabel: 'Gaming, Thin & Light, MacBooks',
+    imageUrl: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    title: 'Home & Kitchen Appliances',
+    slug: 'kitchen-appliances',
+    itemCountLabel: 'Air Fryers, Water Purifiers & More',
+    imageUrl: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    title: 'Headphones & Speakers',
+    slug: 'headphones-speakers',
+    itemCountLabel: 'Noise Cancelling TWS & Soundbars',
+    imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80',
+  },
+];
+
+export function HomeCategories() {
   return (
-    <section className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 sm:p-8 my-10 shadow-xs">
-      {/* Header with Divider */}
-      <div className="border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-          Popular Categories
-        </h2>
+    <section className="space-y-6">
+      {/* Section Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+            Explore Popular Categories
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-1">
+            Browse our top electronic departments curated from official brand partners
+          </p>
+        </div>
       </div>
 
-      {/* 3x2 Category Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {categories.map((category, index) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const rawSlug = typeof category.slug === "string" ? category.slug : (category.slug as any)?.current;
-          const slug = rawSlug || "gadgets";
-          const count = category.productCount ?? 0;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const catName = category.name || category.title || (category as any).name || "Category";
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const rawImg = (category as any).image_url || category.image;
+      {/* 6-Column Visual Category Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        {POPULAR_CATEGORIES.map((cat) => (
+          <Link
+            key={cat.slug}
+            href={`/shop?category=${encodeURIComponent(cat.slug)}`}
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all duration-300 group overflow-hidden flex flex-col justify-between"
+          >
+            {/* Image Container */}
+            <div className="relative w-full aspect-square bg-slate-50 dark:bg-slate-800/40 overflow-hidden rounded-t-2xl p-4 flex items-center justify-center">
+              <Image
+                src={cat.imageUrl}
+                alt={cat.title}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+                className="object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+              />
 
-          let imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-          if (typeof rawImg === "string" && rawImg.startsWith("http")) {
-            imageUrl = rawImg;
-          }
+              {/* Optional Badge */}
+              {cat.badge && (
+                <div className="absolute top-2.5 left-2.5 z-10">
+                  <span className="bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-2xs">
+                    {cat.badge}
+                  </span>
+                </div>
+              )}
+            </div>
 
-          return (
-            <Link
-              key={category._id || category.id || index}
-              href={`/category/${slug}`}
-              className="bg-slate-50/90 dark:bg-slate-800/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 rounded-xl p-4 flex items-center gap-4 border border-slate-100 dark:border-slate-700/80 hover:border-slate-200 dark:hover:border-slate-600 transition-all duration-200 group"
-            >
-              {/* Left Square Thumbnail Box */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white dark:bg-slate-900 rounded-lg p-2 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                {imageUrl ? (
-                  <Image
-                    src={imageUrl}
-                    alt={catName}
-                    width={80}
-                    height={80}
-                    className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-slate-100 dark:bg-slate-800 rounded" />
-                )}
-              </div>
-
-              {/* Right Category Details */}
-              <div className="flex flex-col">
-                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 capitalize group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
-                  {catName}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 font-medium">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">({count})</span> items Available
-                </p>
-              </div>
-            </Link>
-          );
-        })}
+            {/* Text Details */}
+            <div className="p-3 text-center flex flex-col items-center justify-center flex-1">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-1">
+                {cat.title}
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5 font-medium">
+                {cat.itemCountLabel}
+              </p>
+            </div>
+          </Link>
+        ))}
       </div>
     </section>
   );
