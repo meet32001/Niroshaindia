@@ -9,6 +9,7 @@ import {
 } from "@/actions/address";
 import { AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
+import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
 import { Container } from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,9 @@ export default function AddressBookPage() {
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
 
+  // Dynamic Custom Cities
+  const [customCities, setCustomCities] = useState<string[]>([]);
+
   const [formData, setFormData] = useState<AddressInput>({
     recipient_name: "",
     address_line1: "",
@@ -50,6 +54,9 @@ export default function AddressBookPage() {
     phone: "",
     is_default: false,
   });
+
+  const baseCities = getAvailableCities(formData.state);
+  const availableCities = Array.from(new Set([...baseCities, ...customCities]));
 
   const fetchAddresses = async () => {
     setLoading(true);
@@ -96,14 +103,24 @@ export default function AddressBookPage() {
       setPinLoading(false);
 
       if (res.isValid && res.city && res.state) {
+        const matchedState = INDIAN_STATES.find(
+          (s) => s.toLowerCase() === res.state!.toLowerCase()
+        ) || res.state!;
+
+        const stateCities = getAvailableCities(matchedState);
+        if (res.city && !stateCities.includes(res.city)) {
+          setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
+        }
+
         setFormData((prev) => ({
           ...prev,
+          state: matchedState,
           city: res.city!,
-          state: res.state!,
+          country: "India",
         }));
         setPinVerified(true);
         setPinError(null);
-        toast.success(`PIN verified: ${res.city}, ${res.state}`);
+        toast.success(`PIN verified: ${res.city}, ${matchedState}`);
       } else {
         setPinVerified(false);
         setPinError(res.error || "Invalid PIN code. No postal office found in India.");
@@ -113,6 +130,14 @@ export default function AddressBookPage() {
       setPinVerified(false);
       setPinError(null);
     }
+  };
+
+  const handleStateChange = (newState: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      state: newState,
+      city: "",
+    }));
   };
 
   const handleOpenAdd = () => {
@@ -146,7 +171,7 @@ export default function AddressBookPage() {
       city: addr.city || "",
       state: addr.state || "",
       postal_code: addr.postal_code || "",
-      country: addr.country || "India",
+      country: "India",
       phone: addr.phone || "",
       is_default: !!addr.is_default || !!addr.is_default_shipping,
     });
@@ -161,7 +186,8 @@ export default function AddressBookPage() {
     }
 
     setSaving(true);
-    const res = await saveAddress(formData);
+    const payload = { ...formData, country: "India" };
+    const res = await saveAddress(payload);
     setSaving(false);
 
     if (res.success) {
@@ -301,48 +327,59 @@ export default function AddressBookPage() {
                 )}
               </div>
 
-              {/* City & State Auto-Filled Inputs */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* State & City Dropdowns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="state">State</Label>
+                  <select
+                    id="state"
+                    value={formData.state}
+                    onChange={(e) => handleStateChange(e.target.value)}
+                    required
+                    className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map((stateName) => (
+                      <option key={stateName} value={stateName}>
+                        {stateName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <Label htmlFor="city">City / District</Label>
-                  <Input
+                  <select
                     id="city"
                     value={formData.city}
                     onChange={(e) =>
                       setFormData({ ...formData, city: e.target.value })
                     }
-                    placeholder="City"
-                    readOnly={pinVerified}
+                    disabled={!formData.state}
                     required
-                    className={pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) =>
-                      setFormData({ ...formData, state: e.target.value })
-                    }
-                    placeholder="State"
-                    readOnly={pinVerified}
-                    required
-                    className={pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""}
-                  />
+                    className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  >
+                    <option value="">
+                      {formData.state ? "Select City / District" : "Select State First"}
+                    </option>
+                    {availableCities.map((cityName) => (
+                      <option key={cityName} value={cityName}>
+                        {cityName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
+              {/* Fixed Locked Country Field */}
               <div className="space-y-1">
-                <Label htmlFor="country">Country</Label>
+                <Label htmlFor="country">Country (Fixed)</Label>
                 <Input
                   id="country"
-                  value={formData.country}
-                  onChange={(e) =>
-                    setFormData({ ...formData, country: e.target.value })
-                  }
-                  placeholder="India"
-                  required
+                  value="India"
+                  readOnly
+                  disabled
+                  className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500 rounded-xl text-sm font-medium border-slate-200 dark:border-slate-700"
                 />
               </div>
 

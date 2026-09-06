@@ -35,6 +35,7 @@ import { getUserAddresses, saveAddress } from "@/actions/address";
 import { createCheckoutSession } from "@/actions/createCheckoutSession";
 import { addressSchema, AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
+import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
 import { urlFor } from "@/lib/image";
 
 export default function CheckoutPage() {
@@ -57,6 +58,9 @@ export default function CheckoutPage() {
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
 
+  // Dynamic Custom Cities (for PIN lookups that return cities outside default lists)
+  const [customCities, setCustomCities] = useState<string[]>([]);
+
   // Address Form State
   const [formAddress, setFormAddress] = useState<AddressInput>({
     recipient_name: "",
@@ -70,13 +74,17 @@ export default function CheckoutPage() {
     is_default: false,
   });
 
+  // Available cities based on selected state
+  const baseCities = getAvailableCities(formAddress.state);
+  const availableCities = Array.from(new Set([...baseCities, ...customCities]));
+
   // Restore guest draft from sessionStorage on mount
   useEffect(() => {
     try {
       const draft = sessionStorage.getItem("checkout_guest_address");
       if (draft) {
         const parsed = JSON.parse(draft);
-        setFormAddress(parsed);
+        setFormAddress({ ...parsed, country: "India" });
         if (parsed.postal_code && /^[1-9][0-9]{5}$/.test(parsed.postal_code)) {
           setPinVerified(true);
         }
@@ -132,14 +140,26 @@ export default function CheckoutPage() {
       setPinLoading(false);
 
       if (res.isValid && res.city && res.state) {
+        // Match or find closest State in INDIAN_STATES
+        const matchedState = INDIAN_STATES.find(
+          (s) => s.toLowerCase() === res.state!.toLowerCase()
+        ) || res.state!;
+
+        // Add custom city if missing from master list
+        const stateCities = getAvailableCities(matchedState);
+        if (res.city && !stateCities.includes(res.city)) {
+          setCustomCities((prev) => Array.from(new Set([...prev, res.city!])));
+        }
+
         setFormAddress((prev) => ({
           ...prev,
+          state: matchedState,
           city: res.city!,
-          state: res.state!,
+          country: "India",
         }));
         setPinVerified(true);
         setPinError(null);
-        toast.success(`PIN verified: ${res.city}, ${res.state}`);
+        toast.success(`PIN verified: ${res.city}, ${matchedState}`);
       } else {
         setPinVerified(false);
         setPinError(res.error || "Invalid PIN code. No postal office found in India.");
@@ -149,6 +169,14 @@ export default function CheckoutPage() {
       setPinVerified(false);
       setPinError(null);
     }
+  };
+
+  const handleStateChange = (newState: string) => {
+    setFormAddress((prev) => ({
+      ...prev,
+      state: newState,
+      city: "", // reset city when state changes
+    }));
   };
 
   if (!isLoaded || !isMounted) {
@@ -206,7 +234,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    const result = addressSchema.safeParse(formAddress);
+    const payload = { ...formAddress, country: "India" };
+    const result = addressSchema.safeParse(payload);
     if (!result.success) {
       toast.error(result.error.issues[0]?.message || "Please complete address details");
       return;
@@ -214,7 +243,7 @@ export default function CheckoutPage() {
 
     if (isSignedIn) {
       setSavingAddress(true);
-      const res = await saveAddress(formAddress);
+      const res = await saveAddress(payload);
       setSavingAddress(false);
 
       if (res.success && res.address) {
@@ -226,7 +255,7 @@ export default function CheckoutPage() {
         toast.error(res.error || "Failed to save address");
       }
     } else {
-      sessionStorage.setItem("checkout_guest_address", JSON.stringify(formAddress));
+      sessionStorage.setItem("checkout_guest_address", JSON.stringify(payload));
       toast.success("Delivery address drafted!");
       setShowAddForm(false);
     }
@@ -234,7 +263,7 @@ export default function CheckoutPage() {
 
   const handleProceedToPayment = async () => {
     if (!isSignedIn) {
-      sessionStorage.setItem("checkout_guest_address", JSON.stringify(formAddress));
+      sessionStorage.setItem("checkout_guest_address", JSON.stringify({ ...formAddress, country: "India" }));
       toast.error("Please sign in to complete your order");
       router.push("/sign-in?redirect=/checkout");
       return;
@@ -243,12 +272,13 @@ export default function CheckoutPage() {
     let targetAddress = savedAddresses.find((a) => a.id === selectedAddressId);
 
     if (!targetAddress && showAddForm) {
-      const validation = addressSchema.safeParse(formAddress);
+      const payload = { ...formAddress, country: "India" };
+      const validation = addressSchema.safeParse(payload);
       if (!validation.success) {
         toast.error(validation.error.issues[0]?.message || "Please complete valid shipping address");
         return;
       }
-      targetAddress = formAddress;
+      targetAddress = payload;
     }
 
     if (!targetAddress && savedAddresses.length > 0) {
@@ -268,7 +298,7 @@ export default function CheckoutPage() {
         customerName: targetAddress.recipient_name || user?.fullName || "Customer",
         customerEmail: user?.primaryEmailAddress?.emailAddress || "",
         clerkUserId: user?.id || "",
-        address: targetAddress,
+        address: { ...targetAddress, country: "India" },
       };
 
       const checkoutUrl = await createCheckoutSession(items, metadata);
@@ -479,59 +509,65 @@ export default function CheckoutPage() {
                       )}
                     </div>
 
-                    {/* City & State Auto-Filled Inputs */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* State & City Dropdown Selectors */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="state" className="text-xs font-semibold">
+                          State *
+                        </Label>
+                        <select
+                          id="state"
+                          value={formAddress.state}
+                          onChange={(e) => handleStateChange(e.target.value)}
+                          required
+                          className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shop-orange"
+                        >
+                          <option value="">Select State</option>
+                          {INDIAN_STATES.map((stateName) => (
+                            <option key={stateName} value={stateName}>
+                              {stateName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className="space-y-1">
                         <Label htmlFor="city" className="text-xs font-semibold">
                           City / District *
                         </Label>
-                        <Input
+                        <select
                           id="city"
                           value={formAddress.city}
                           onChange={(e) =>
                             setFormAddress({ ...formAddress, city: e.target.value })
                           }
-                          placeholder="City"
-                          readOnly={pinVerified}
+                          disabled={!formAddress.state}
                           required
-                          className={`rounded-xl text-sm ${
-                            pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""
-                          }`}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="state" className="text-xs font-semibold">
-                          State *
-                        </Label>
-                        <Input
-                          id="state"
-                          value={formAddress.state}
-                          onChange={(e) =>
-                            setFormAddress({ ...formAddress, state: e.target.value })
-                          }
-                          placeholder="State"
-                          readOnly={pinVerified}
-                          required
-                          className={`rounded-xl text-sm ${
-                            pinVerified ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""
-                          }`}
-                        />
+                          className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-shop-orange"
+                        >
+                          <option value="">
+                            {formAddress.state ? "Select City / District" : "Select State First"}
+                          </option>
+                          {availableCities.map((cityName) => (
+                            <option key={cityName} value={cityName}>
+                              {cityName}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
+                    {/* Fixed Locked Country Field */}
                     <div className="space-y-1">
                       <Label htmlFor="country" className="text-xs font-semibold">
-                        Country *
+                        Country (Fixed)
                       </Label>
                       <Input
                         id="country"
-                        value={formAddress.country}
-                        onChange={(e) =>
-                          setFormAddress({ ...formAddress, country: e.target.value })
-                        }
-                        placeholder="India"
-                        required
-                        className="rounded-xl text-sm"
+                        value="India"
+                        readOnly
+                        disabled
+                        className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500 rounded-xl text-sm font-medium border-slate-200 dark:border-slate-700"
                       />
                     </div>
 
@@ -581,7 +617,7 @@ export default function CheckoutPage() {
                       <Button
                         type="submit"
                         disabled={savingAddress || pinLoading || !!pinError}
-                        className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs"
+                        className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-xs"
                       >
                         {savingAddress && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                         <span>{isSignedIn ? "Save Address" : "Confirm Delivery Address"}</span>
