@@ -373,7 +373,7 @@ export default function AddressBookPage() {
 
               {/* Fixed Locked Country Field */}
               <div className="space-y-1">
-                <Label htmlFor="country">Country (Fixed)</Label>
+                <Label htmlFor="country">Country</Label>
                 <Input
                   id="country"
                   value="India"

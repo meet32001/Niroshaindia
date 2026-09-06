@@ -560,7 +560,7 @@ export default function CheckoutPage() {
                     {/* Fixed Locked Country Field */}
                     <div className="space-y-1">
                       <Label htmlFor="country" className="text-xs font-semibold">
-                        Country (Fixed)
+                        Country
                       </Label>
                       <Input
                         id="country"
