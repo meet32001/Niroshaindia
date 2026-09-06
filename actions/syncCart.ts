@@ -2,20 +2,41 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { supabaseServer } from '@/lib/supabase/server';
+import { z } from 'zod';
 
 export interface CartItemSyncInput {
-  productId: string;
-  variantId: string;
+  productId?: string;
+  variantId: string | number;
   quantity: number;
 }
+
+const cartItemSyncSchema = z.object({
+  productId: z.string().optional(),
+  variantId: z.union([z.string(), z.number()]),
+  quantity: z.number().int().min(1).max(100),
+});
+
+const syncCartSchema = z.object({
+  guestToken: z.string().optional().nullable(),
+  localItems: z.array(cartItemSyncSchema),
+});
 
 export async function syncUserCartAction(
   guestToken: string,
   localItems: CartItemSyncInput[]
 ) {
   try {
+    const parseResult = syncCartSchema.safeParse({ guestToken, localItems });
+    if (!parseResult.success) {
+      return { success: false, error: 'Invalid cart sync payload' };
+    }
+
+    const validatedGuestToken = parseResult.data.guestToken || '';
+    const validatedItems = parseResult.data.localItems;
+
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthenticated' };
+
 
     // 1. Fetch Supabase customer record
     const { data: customer } = await supabaseServer

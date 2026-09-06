@@ -8,10 +8,11 @@ export interface SocialLink {
 }
 
 export const PRODUCT_TYPES = [
-  { title: "Gadget", value: "gadget" },
-  { title: "Appliances", value: "appliances" },
-  { title: "Refrigerators", value: "refrigerators" },
-  { title: "Others", value: "others" },
+  { title: "All Products", value: "all" },
+  { title: "Smartphones", value: "smartphones" },
+  { title: "Air Conditioners", value: "air-conditioners" },
+  { title: "Tablets & iPads", value: "tablets-ipads" },
+  { title: "Accessories", value: "accessories" },
 ];
 
 export const HEADER_NAV_LINKS: NavigationItem[] = [

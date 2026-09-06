@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
+        hostname: "vsprod.vijaysales.com",
+      },
+      {
+        protocol: "https",
+        hostname: "www.vijaysales.com",
+      },
+      {
+        protocol: "https",
         hostname: "images.unsplash.com",
       },
       {

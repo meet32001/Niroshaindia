@@ -3,6 +3,31 @@
 import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+
+const variantIdSchema = z.union([
+  z.number().int().positive(),
+  z.string().regex(/^\d+$/).transform(Number),
+]);
+
+const removeFromWishlistSchema = z.union([
+  z.object({
+    wishlistItemId: z.union([z.number().int().positive(), z.string().regex(/^\d+$/).transform(Number)]).optional().nullable(),
+    variantId: z.union([z.number().int().positive(), z.string().regex(/^\d+$/).transform(Number)]).optional().nullable(),
+  }),
+  z.number().int().positive(),
+  z.string().regex(/^\d+$/).transform(Number),
+]);
+
+const moveToCartSchema = z.union([
+  z.object({
+    variantId: z.union([z.number().int().positive(), z.string().regex(/^\d+$/).transform(Number)]),
+    wishlistItemId: z.union([z.number().int().positive(), z.string().regex(/^\d+$/).transform(Number)]).optional().nullable(),
+    quantity: z.number().int().min(1).max(10).optional().default(1),
+  }),
+  z.number().int().positive(),
+  z.string().regex(/^\d+$/).transform(Number),
+]);
 
 function getSupabaseAdmin() {
   return createClient(
@@ -64,10 +89,11 @@ export async function toggleWishlistItem(variantId?: string | number | null) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthorized', isInWishlist: false };
 
-    const numericVariantId = Number(variantId);
-    if (!variantId || isNaN(numericVariantId)) {
+    const parseResult = variantIdSchema.safeParse(variantId);
+    if (!parseResult.success) {
       return { success: false, error: 'Invalid Variant ID', isInWishlist: false };
     }
+    const numericVariantId = parseResult.data;
 
     const supabase = getSupabaseAdmin();
 
@@ -131,20 +157,24 @@ export async function removeFromWishlist(params: {
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthorized' };
 
+    const parseResult = removeFromWishlistSchema.safeParse(params);
+    if (!parseResult.success) {
+      return { success: false, error: 'Invalid parameters provided for wishlist removal' };
+    }
+
     let wishlistItemId: number | null = null;
     let variantId: number | null = null;
 
-    if (typeof params === 'object' && params !== null) {
-      if (params.wishlistItemId) wishlistItemId = Number(params.wishlistItemId);
-      if (params.variantId) variantId = Number(params.variantId);
-    } else if (params !== undefined && params !== null) {
-      const num = Number(params);
-      if (!isNaN(num)) {
-        variantId = num;
-      }
+    const parsedData = parseResult.data;
+    if (typeof parsedData === 'object' && parsedData !== null) {
+      if (parsedData.wishlistItemId) wishlistItemId = parsedData.wishlistItemId;
+      if (parsedData.variantId) variantId = parsedData.variantId;
+    } else if (typeof parsedData === 'number') {
+      variantId = parsedData;
     }
 
     const supabase = getSupabaseAdmin();
+
 
     // 1. Resolve Customer Record
     const { data: customer } = await supabase
@@ -204,22 +234,28 @@ export async function moveToCart(params: {
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthorized' };
 
-    let variantIdVal: string | number;
-    let wishlistItemIdVal: string | number | null = null;
-    let quantityVal = 1;
-
-    if (typeof params === 'object' && params !== null) {
-      variantIdVal = params.variantId;
-      wishlistItemIdVal = params.wishlistItemId || null;
-      quantityVal = params.quantity || 1;
-    } else {
-      variantIdVal = params;
+    const parseResult = moveToCartSchema.safeParse(params);
+    if (!parseResult.success) {
+      return { success: false, error: 'Invalid parameters for moving item to cart' };
     }
 
-    const numericVariantId = Number(variantIdVal);
-    if (isNaN(numericVariantId)) return { success: false, error: 'Invalid Variant ID' };
+    let variantIdVal: number;
+    let wishlistItemIdVal: number | null = null;
+    let quantityVal = 1;
+
+    const parsedData = parseResult.data;
+    if (typeof parsedData === 'object' && parsedData !== null) {
+      variantIdVal = parsedData.variantId;
+      wishlistItemIdVal = parsedData.wishlistItemId || null;
+      quantityVal = parsedData.quantity || 1;
+    } else {
+      variantIdVal = parsedData;
+    }
+
+    const numericVariantId = variantIdVal;
 
     const supabase = getSupabaseAdmin();
+
 
     // 1. Resolve Customer
     const { data: customer } = await supabase

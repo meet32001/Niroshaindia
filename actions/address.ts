@@ -42,7 +42,14 @@ export async function saveAddress(rawPayload: AddressInput) {
 
     const { customer, supabaseAdmin } = authData;
 
-    const validated = addressSchema.parse(rawPayload);
+    const parseResult = addressSchema.safeParse(rawPayload);
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.issues[0]?.message || 'Invalid input data',
+      };
+    }
+    const validated = parseResult.data;
 
     // Verify PIN code against official India Post Registry
     const pinCheck = await verifyIndianPincode(validated.postal_code);
@@ -112,8 +119,15 @@ export async function saveAddress(rawPayload: AddressInput) {
   }
 }
 
+const addressIdSchema = z.string().min(1, 'Address ID is required');
+
 export async function deleteAddress(addressId: string) {
   try {
+    const parseResult = addressIdSchema.safeParse(addressId);
+    if (!parseResult.success) {
+      return { success: false, error: 'Invalid Address ID' };
+    }
+
     const authData = await getAuthenticatedCustomer();
     if (!authData) {
       return { success: false, error: 'Unauthenticated' };
@@ -124,7 +138,7 @@ export async function deleteAddress(addressId: string) {
     const { error } = await supabaseAdmin
       .from('addresses')
       .delete()
-      .eq('id', addressId)
+      .eq('id', parseResult.data)
       .eq('customer_id', customer.id);
 
     if (error) {
@@ -138,3 +152,4 @@ export async function deleteAddress(addressId: string) {
     return { success: false, error: errorMessage };
   }
 }
+

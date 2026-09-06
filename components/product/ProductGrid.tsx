@@ -23,12 +23,23 @@ export function ProductGrid({ selectedTab }: ProductGridProps) {
       try {
         const allProducts = await getAllProducts();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const filtered = allProducts.filter((p: any) => {
-          const type = (p.productType || p.category || "").toLowerCase();
-          return type.includes(selectedTab.toLowerCase());
-        });
+        let filtered = allProducts;
+        const tab = selectedTab.toLowerCase();
+        if (tab !== "all") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          filtered = allProducts.filter((p: any) => {
+            const cat = (typeof p.category === "string" ? p.category : p.category?.name || p.categories?.name || "").toLowerCase();
+            const slug = (p.categories?.slug || "").toLowerCase();
+            const name = (p.name || p.title || "").toLowerCase();
+            if (tab === "air-conditioners") return cat.includes("air conditioner") || slug.includes("air-conditioner") || name.includes("air conditioner") || name.includes("ac ");
+            if (tab === "smartphones") return cat.includes("smartphone") || slug.includes("smartphone");
+            if (tab === "tablets-ipads") return cat.includes("tablet") || slug.includes("tablet") || cat.includes("ipad");
+            if (tab === "accessories") return cat.includes("cable") || cat.includes("charger") || cat.includes("power bank") || cat.includes("accessories");
+            return cat.includes(tab) || slug.includes(tab);
+          });
+        }
         if (isMounted) {
-          setProducts(filtered.length > 0 ? filtered : allProducts);
+          setProducts(filtered);
           setLoading(false);
         }
       } catch {

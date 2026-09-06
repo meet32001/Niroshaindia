@@ -308,7 +308,7 @@ export async function getCategories(quantity?: number) {
   try {
     const query = supabase
       .from("categories")
-      .select("id, name, slug, description, image_url")
+      .select("id, name, slug, description")
       .order("name", { ascending: true });
 
     if (quantity) {
@@ -320,7 +320,7 @@ export async function getCategories(quantity?: number) {
       return data.map((cat: any) => ({
         ...cat,
         title: cat.name || cat.title,
-        image: cat.image_url || cat.image,
+        image: cat.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
       }));
     }
     return quantity ? MOCK_CATEGORIES.slice(0, quantity) : MOCK_CATEGORIES;

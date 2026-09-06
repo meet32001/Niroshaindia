@@ -5,7 +5,7 @@ import { HomeTabBar } from "@/components/product/HomeTabBar";
 import { ProductGrid } from "@/components/product/ProductGrid";
 
 export function HomeTabContainer() {
-  const [selectedTab, setSelectedTab] = useState("gadget");
+  const [selectedTab, setSelectedTab] = useState("all");
 
   return (
     <section className="space-y-6">

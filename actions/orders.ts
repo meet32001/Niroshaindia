@@ -1,6 +1,7 @@
 'use server';
 
 import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
+import { z } from 'zod';
 
 export async function getUserOrders() {
   try {
@@ -55,8 +56,15 @@ export async function getUserOrders() {
   }
 }
 
+const orderIdSchema = z.string().min(1, 'Order ID is required');
+
 export async function getOrderById(orderId: string) {
   try {
+    const parseResult = orderIdSchema.safeParse(orderId);
+    if (!parseResult.success) {
+      return { success: false, error: 'Invalid Order ID', order: null };
+    }
+
     const authData = await getAuthenticatedCustomer();
     if (!authData) {
       return { success: false, error: 'Unauthenticated', order: null };
@@ -96,9 +104,10 @@ export async function getOrderById(orderId: string) {
           )
         )
       `)
-      .eq('id', orderId)
+      .eq('id', parseResult.data)
       .eq('customer_id', customer.id)
       .single();
+
 
     if (error || !order) {
       console.error('[GET ORDER BY ID ERROR]:', error);
