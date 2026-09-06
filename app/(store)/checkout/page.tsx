@@ -129,10 +129,12 @@ export default function CheckoutPage() {
       const draft = sessionStorage.getItem("checkout_guest_address");
       if (draft) {
         const parsed = JSON.parse(draft);
-        setFormAddress({ ...parsed, country: "India" });
-        if (parsed.postal_code && /^[1-9][0-9]{5}$/.test(parsed.postal_code)) {
-          setPinVerified(true);
-        }
+        queueMicrotask(() => {
+          setFormAddress({ ...parsed, country: "India" });
+          if (parsed.postal_code && /^[1-9][0-9]{5}$/.test(parsed.postal_code)) {
+            setPinVerified(true);
+          }
+        });
       }
     } catch {
       // ignore parse errors
@@ -158,8 +160,12 @@ export default function CheckoutPage() {
         setLoadingAddresses(false);
       });
     } else {
-      setShowAddForm(true);
-      setLoadingAddresses(false);
+      queueMicrotask(() => {
+        if (isMountedFlag) {
+          setShowAddForm(true);
+          setLoadingAddresses(false);
+        }
+      });
     }
 
     return () => {

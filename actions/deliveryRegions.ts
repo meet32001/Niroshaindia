@@ -23,7 +23,7 @@ export async function seedDeliveryRegions() {
     }));
 
     // Upsert or insert states
-    const { data: insertedStates, error: stateError } = await supabase
+    const { error: stateError } = await supabase
       .from('delivery_states')
       .upsert(statesToInsert, { onConflict: 'name', ignoreDuplicates: true })
       .select('id, name');
@@ -84,11 +84,13 @@ export async function getActiveDeliveryRegions() {
   try {
     const supabase = getAdminClient();
 
-    let { data: states, error: statesError } = await supabase
+    const { data: initialStates, error: statesError } = await supabase
       .from('delivery_states')
       .select('id, name, code, is_active')
       .eq('is_active', true)
       .order('name', { ascending: true });
+
+    let states = initialStates;
 
     if (statesError || !states || states.length === 0) {
       console.log('[DELIVERY REGIONS]: No states found in database, seeding default Indian states and cities...');
