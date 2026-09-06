@@ -2,7 +2,7 @@ import { Container } from "@/components/layout/Container";
 import { HomeBanner } from "@/components/layout/HomeBanner";
 import { HomeTabContainer } from "@/components/product/HomeTabContainer";
 import { HomeCategories } from "@/components/home/HomeCategories";
-import { ShopByBrand } from "@/components/home/ShopByBrand";
+import { DiscoverBrandsSection } from "@/components/home/DiscoverBrandsSection";
 import { getCategoryGridProducts } from "@/actions/categoryGrid";
 
 export default async function StoreHomePage() {
@@ -20,8 +20,8 @@ export default async function StoreHomePage() {
         {/* 3. Popular Categories Grid */}
         <HomeCategories />
 
-        {/* 4. Shop by Brand & Trust Guarantee Strip */}
-        <ShopByBrand />
+        {/* 4. Vijay Sales-Style Discover Leading Brands Strip */}
+        <DiscoverBrandsSection />
       </Container>
     </div>
   );

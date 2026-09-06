@@ -30,6 +30,13 @@ export function Shop({ categories, brands }: ShopProps) {
   const [selectedBrand, setSelectedBrand] = useState<string | null>(searchParams.get("brand"));
   const [selectedPrice, setSelectedPrice] = useState<string | null>(searchParams.get("price"));
 
+  // Sync state when URL searchParams change
+  useEffect(() => {
+    setSelectedCategory(searchParams.get("category"));
+    setSelectedBrand(searchParams.get("brand"));
+    setSelectedPrice(searchParams.get("price"));
+  }, [searchParams]);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,10 +93,15 @@ export function Shop({ categories, brands }: ShopProps) {
         }
 
         if (selectedBrand) {
+          const bLower = selectedBrand.toLowerCase();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filtered = filtered.filter((p: any) => {
-            const brandStr = typeof p.brand === "string" ? p.brand : p.brand?.slug?.current || p.brand?.slug || p.brand?.name || "";
-            return brandStr.toLowerCase().includes(selectedBrand.toLowerCase());
+            const brandObj = p.brand;
+            const brandStr = typeof brandObj === "string" ? brandObj : brandObj?.slug?.current || brandObj?.slug || brandObj?.name || "";
+            const nameStr = (p.name || p.title || "").toLowerCase();
+            const descStr = (p.description || "").toLowerCase();
+
+            return brandStr.toLowerCase().includes(bLower) || nameStr.includes(bLower) || descStr.includes(bLower);
           });
         }
 
@@ -129,9 +141,7 @@ export function Shop({ categories, brands }: ShopProps) {
     setSelectedCategory(null);
     setSelectedBrand(null);
     setSelectedPrice(null);
-    if (searchQuery) {
-      router.push("/shop");
-    }
+    router.push("/shop");
   };
 
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedBrand || selectedPrice);
@@ -175,6 +185,29 @@ export function Shop({ categories, brands }: ShopProps) {
           >
             <X className="h-3.5 w-3.5" />
             <span>Clear Search</span>
+          </button>
+        </div>
+      )}
+
+      {/* Active Brand Filter Banner Pill */}
+      {selectedBrand && (
+        <div className="flex items-center justify-between gap-3 p-3.5 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 rounded-xl text-xs">
+          <div className="flex items-center gap-2 text-blue-900 dark:text-blue-300 font-medium">
+            <span>
+              Filtering by Brand: <strong className="font-bold uppercase">{selectedBrand}</strong> ({products.length} {products.length === 1 ? "product" : "products"} found)
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedBrand(null);
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("brand");
+              router.push(`/shop${params.toString() ? `?${params.toString()}` : ""}`);
+            }}
+            className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-400 hover:underline font-bold cursor-pointer shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span>✕</span>
           </button>
         </div>
       )}
