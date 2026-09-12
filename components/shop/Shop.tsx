@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, RotateCcw, Search, X } from "lucide-react";
+import {
+  Loader2,
+  RotateCcw,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  Filter,
+} from "lucide-react";
 import { Title } from "@/components/ui/text";
 import { CategoryList } from "@/components/shop/CategoryList";
 import { BrandList } from "@/components/shop/BrandList";
 import { PriceList } from "@/components/shop/PriceList";
 import { ProductCard } from "@/components/product/ProductCard";
 import { NoProductAvailable } from "@/components/product/NoProductAvailable";
-import { getAllProducts, MOCK_PRODUCTS } from "@/lib/db/products";
+import { getShopCatalog, ShopCatalogResult } from "@/lib/db/products";
 
 export interface ShopProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,253 +31,386 @@ export interface ShopProps {
 export function Shop({ categories, brands }: ShopProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
 
+  // Read URL search params
   const searchQuery = searchParams.get("search") || searchParams.get("q") || "";
+  const selectedCategory = searchParams.get("category");
+  const selectedBrand = searchParams.get("brand");
+  const selectedPrice = searchParams.get("price");
+  const selectedSort = searchParams.get("sort") || "newest";
+  const currentPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
 
-  // Active filter state initialized with search params
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(searchParams.get("category"));
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(searchParams.get("brand"));
-  const [selectedPrice, setSelectedPrice] = useState<string | null>(searchParams.get("price"));
-
-  // Sync state when URL searchParams change
-  useEffect(() => {
-    setSelectedCategory(searchParams.get("category"));
-    setSelectedBrand(searchParams.get("brand"));
-    setSelectedPrice(searchParams.get("price"));
-  }, [searchParams]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [products, setProducts] = useState<any[]>([]);
+  // Catalog State
+  const [catalog, setCatalog] = useState<ShopCatalogResult>({
+    products: [],
+    totalCount: 0,
+    page: currentPage,
+    pageSize: 24,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  // Helper to update URL search parameters cleanly
+  const updateParams = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    Object.entries(updates).forEach(([key, val]) => {
+      if (val === null || val === undefined || val === "") {
+        params.delete(key);
+      } else {
+        params.set(key, val);
+      }
+    });
+
+    // Reset to page 1 whenever any filter other than page changes
+    if (!("page" in updates)) {
+      params.delete("page");
+    }
+
+    startTransition(() => {
+      const qs = params.toString();
+      router.push(`/shop${qs ? `?${qs}` : ""}`, { scroll: false });
+    });
+  };
+
+  // Convert selectedPrice string (e.g. "0-10000") to paise
+  let minPricePaise: number | null = null;
+  let maxPricePaise: number | null = null;
+  if (selectedPrice) {
+    const parts = selectedPrice.split("-").map(Number);
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      minPricePaise = parts[0] * 100;
+      maxPricePaise = parts[1] * 100;
+    }
+  }
+
+  // Fetch live products from Supabase whenever URL params change
   useEffect(() => {
     let isMounted = true;
 
-    async function loadFilteredProducts() {
+    async function loadCatalog() {
       setLoading(true);
       try {
-        const rawProducts = await getAllProducts();
-        let filtered = [...(rawProducts.length > 0 ? rawProducts : MOCK_PRODUCTS)];
-
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          filtered = filtered.filter((p: any) => {
-            const title = (p.name || p.title || "").toLowerCase();
-            const desc = (p.description || "").toLowerCase();
-            const cat = (typeof p.category === "string" ? p.category : p.category?.name || p.category?.slug || "").toLowerCase();
-            const brand = (typeof p.brand === "string" ? p.brand : p.brand?.name || p.brand?.slug || "").toLowerCase();
-            return title.includes(q) || desc.includes(q) || cat.includes(q) || brand.includes(q);
-          });
-        }
-
-        if (selectedCategory) {
-          const catLower = selectedCategory.toLowerCase();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          filtered = filtered.filter((p: any) => {
-            const catStr = (typeof p.category === "string" ? p.category : p.category?.name || p.category?.slug || p.categories?.slug || p.categories?.name || "").toLowerCase();
-            const nameStr = (p.name || p.title || "").toLowerCase();
-
-            if (catLower === "ac") {
-              return catStr.includes("ac") || catStr.includes("air conditioner") || nameStr.includes("ac") || nameStr.includes("air conditioner");
-            }
-            if (catLower === "tv") {
-              return catStr.includes("tv") || catStr.includes("television") || nameStr.includes("tv") || nameStr.includes("oled");
-            }
-            if (catLower === "mobiles-tablets-accessories") {
-              return catStr.includes("mobile") || catStr.includes("phone") || catStr.includes("tablet") || catStr.includes("gadget") || nameStr.includes("phone") || nameStr.includes("galaxy") || nameStr.includes("iphone");
-            }
-            if (catLower === "laptops-accessories") {
-              return catStr.includes("laptop") || catStr.includes("computer") || nameStr.includes("laptop") || nameStr.includes("macbook") || nameStr.includes("probook");
-            }
-            if (catLower === "kitchen-appliances" || catLower === "home-appliances") {
-              return catStr.includes("appliance") || catStr.includes("kitchen") || nameStr.includes("fryer") || nameStr.includes("purifier") || nameStr.includes("refrigerator");
-            }
-            if (catLower === "headphones-speakers") {
-              return catStr.includes("headphone") || catStr.includes("audio") || nameStr.includes("headphone") || nameStr.includes("speaker") || nameStr.includes("tws") || nameStr.includes("sony wh");
-            }
-
-            return catStr.includes(catLower) || nameStr.includes(catLower);
-          });
-        }
-
-        if (selectedBrand) {
-          const bLower = selectedBrand.toLowerCase();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          filtered = filtered.filter((p: any) => {
-            const brandObj = p.brand;
-            const brandStr = typeof brandObj === "string" ? brandObj : brandObj?.slug?.current || brandObj?.slug || brandObj?.name || "";
-            const nameStr = (p.name || p.title || "").toLowerCase();
-            const descStr = (p.description || "").toLowerCase();
-
-            return brandStr.toLowerCase().includes(bLower) || nameStr.includes(bLower) || descStr.includes(bLower);
-          });
-        }
-
-        if (selectedPrice) {
-          const parts = selectedPrice.split("-").map(Number);
-          if (parts.length === 2) {
-            const minPrice = parts[0];
-            const maxPrice = parts[1];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            filtered = filtered.filter((p: any) => {
-              const price = p.price || 0;
-              return price >= minPrice && price <= maxPrice;
-            });
-          }
-        }
+        const result = await getShopCatalog({
+          category: selectedCategory,
+          brand: selectedBrand,
+          minPrice: minPricePaise,
+          maxPrice: maxPricePaise,
+          search: searchQuery || null,
+          sort: selectedSort,
+          page: currentPage,
+          pageSize: 24,
+        });
 
         if (isMounted) {
-          setProducts(filtered);
+          setCatalog(result);
           setLoading(false);
         }
-      } catch {
+      } catch (err) {
+        console.error("Failed to load catalog:", err);
         if (isMounted) {
-          setProducts(MOCK_PRODUCTS);
+          setCatalog({
+            products: [],
+            totalCount: 0,
+            page: 1,
+            pageSize: 24,
+            totalPages: 1,
+          });
           setLoading(false);
         }
       }
     }
 
-    loadFilteredProducts();
+    loadCatalog();
 
     return () => {
       isMounted = false;
     };
-  }, [searchQuery, selectedCategory, selectedBrand, selectedPrice]);
+  }, [
+    searchQuery,
+    selectedCategory,
+    selectedBrand,
+    selectedPrice,
+    selectedSort,
+    currentPage,
+  ]);
 
   const handleResetFilters = () => {
-    setSelectedCategory(null);
-    setSelectedBrand(null);
-    setSelectedPrice(null);
-    router.push("/shop");
+    startTransition(() => {
+      router.push("/shop", { scroll: false });
+    });
   };
 
-  const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedBrand || selectedPrice);
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= catalog.totalPages && newPage !== currentPage) {
+      updateParams({ page: newPage.toString() });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const hasActiveFilters = Boolean(
+    searchQuery || selectedCategory || selectedBrand || selectedPrice || (selectedSort && selectedSort !== "newest")
+  );
+
+  const startItem = catalog.totalCount === 0 ? 0 : (catalog.page - 1) * catalog.pageSize + 1;
+  const endItem = Math.min(catalog.page * catalog.pageSize, catalog.totalCount);
+
+  // Active brand list for tags
+  const activeBrandList = selectedBrand
+    ? selectedBrand.split(",").map((b) => b.trim()).filter(Boolean)
+    : [];
 
   return (
     <div className="space-y-6">
-      {/* Header & Reset Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      {/* Header & Controls */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <Title className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
             Storefront Catalog
           </Title>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Discover premier consumer electronics, flagship audio, smart laptops, and IoT appliances.
+            Browse genuine consumer electronics, laptops, mobiles, and home appliances directly from our inventory.
           </p>
         </div>
 
-        {hasActiveFilters && (
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Mobile Filter Toggle Button */}
           <button
-            onClick={handleResetFilters}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
+            onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+            className="lg:hidden inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset All Filters</span>
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters {hasActiveFilters && "•"}</span>
           </button>
-        )}
+
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs">
+            <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-slate-400 font-medium">Sort:</span>
+            <select
+              value={selectedSort}
+              onChange={(e) => updateParams({ sort: e.target.value })}
+              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="newest">Newest Arrivals</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="alpha">Alphabetical (A-Z)</option>
+            </select>
+          </div>
+
+          {/* Reset Action */}
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900 transition-all cursor-pointer shrink-0"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset All</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Search Query Banner */}
-      {searchQuery && (
-        <div className="flex items-center justify-between gap-3 p-3.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 rounded-xl text-xs">
-          <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-300 font-medium">
-            <Search className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span>
-              Showing results for &quot;<strong className="font-bold">{searchQuery}</strong>&quot; ({products.length} {products.length === 1 ? "product" : "products"} found)
+      {/* Active Filter Tags */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-slate-400 font-medium">Active Filters:</span>
+
+          {searchQuery && (
+            <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-full font-medium">
+              <Search className="h-3 w-3" />
+              <span>&quot;{searchQuery}&quot;</span>
+              <button
+                onClick={() => updateParams({ search: null, q: null })}
+                className="hover:text-emerald-900 cursor-pointer ml-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </span>
-          </div>
-          <button
-            onClick={() => router.push("/shop")}
-            className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:underline font-bold cursor-pointer shrink-0"
-          >
-            <X className="h-3.5 w-3.5" />
-            <span>Clear Search</span>
-          </button>
+          )}
+
+          {selectedCategory && (
+            <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-950/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full font-medium capitalize">
+              <span>Category: {selectedCategory.replace(/-/g, " ")}</span>
+              <button
+                onClick={() => updateParams({ category: null })}
+                className="hover:text-green-900 cursor-pointer ml-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {activeBrandList.map((b) => (
+            <span
+              key={b}
+              className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-full font-medium uppercase text-[11px]"
+            >
+              <span>{b}</span>
+              <button
+                onClick={() => {
+                  const updated = activeBrandList.filter((x) => x !== b);
+                  updateParams({ brand: updated.length > 0 ? updated.join(",") : null });
+                }}
+                className="hover:text-blue-900 cursor-pointer ml-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+
+          {selectedPrice && (
+            <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full font-medium">
+              <span>
+                ₹{selectedPrice.split("-")[0]} – ₹{selectedPrice.split("-")[1]}
+              </span>
+              <button
+                onClick={() => updateParams({ price: null })}
+                className="hover:text-amber-900 cursor-pointer ml-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
         </div>
       )}
 
-      {/* Active Brand Filter Banner Pill */}
-      {selectedBrand && (
-        <div className="flex items-center justify-between gap-3 p-3.5 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 rounded-xl text-xs">
-          <div className="flex items-center gap-2 text-blue-900 dark:text-blue-300 font-medium">
-            <span>
-              Filtering by Brand: <strong className="font-bold uppercase">{selectedBrand}</strong> ({products.length} {products.length === 1 ? "product" : "products"} found)
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedBrand(null);
-              const params = new URLSearchParams(searchParams.toString());
-              params.delete("brand");
-              router.push(`/shop${params.toString() ? `?${params.toString()}` : ""}`);
-            }}
-            className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-400 hover:underline font-bold cursor-pointer shrink-0"
-          >
-            <X className="h-3.5 w-3.5" />
-            <span>✕</span>
-          </button>
-        </div>
-      )}
-
-      {/* Main Grid: Left Filters Sidebar & Right Product Grid */}
+      {/* Main Grid: Sidebar + Product Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* Left Filters Sidebar */}
-        <aside className="lg:col-span-1 space-y-6 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+        {/* Left Filters Sidebar (Desktop + Collapsible Mobile) */}
+        <aside
+          className={`${
+            mobileFilterOpen ? "block" : "hidden"
+          } lg:block lg:col-span-1 space-y-6 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs`}
+        >
           <CategoryList
             categories={categories}
             selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
+            setSelectedCategory={(cat) => updateParams({ category: cat })}
           />
 
           <BrandList
             brands={brands}
             selectedBrand={selectedBrand}
-            setSelectedBrand={setSelectedBrand}
+            setSelectedBrand={(brand) => updateParams({ brand })}
           />
 
           <PriceList
             selectedPrice={selectedPrice}
-            setSelectedPrice={setSelectedPrice}
+            setSelectedPrice={(price) => updateParams({ price })}
           />
         </aside>
 
-        {/* Right Products Section */}
-        <main className="lg:col-span-3 min-h-[400px]">
+        {/* Right Product Grid & Pagination */}
+        <main className="lg:col-span-3 min-h-[450px] flex flex-col justify-between">
+          {/* Item Count & Current Range */}
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium mb-4">
+            <span>
+              Showing <strong className="text-slate-800 dark:text-slate-200 font-bold">{startItem}–{endItem}</strong> of{" "}
+              <strong className="text-slate-800 dark:text-slate-200 font-bold">
+                {catalog.totalCount.toLocaleString()}
+              </strong>{" "}
+              products
+            </span>
+            {catalog.totalPages > 1 && (
+              <span>
+                Page {catalog.page} of {catalog.totalPages}
+              </span>
+            )}
+          </div>
+
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="flex flex-col items-center justify-center py-28 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
               <span className="text-xs font-semibold text-slate-500 tracking-wide">
-                Filtering catalog inventory...
+                Querying live catalog inventory...
               </span>
             </div>
-          ) : products.length === 0 ? (
-            <NoProductAvailable selectedTab={selectedCategory || searchQuery || "selected filters"} />
+          ) : catalog.products.length === 0 ? (
+            <NoProductAvailable
+              selectedTab={selectedCategory || searchQuery || (selectedBrand ? `Brand: ${selectedBrand}` : "active filters")}
+            />
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${searchQuery}-${selectedCategory}-${selectedBrand}-${selectedPrice}`}
+                key={`${searchQuery}-${selectedCategory}-${selectedBrand}-${selectedPrice}-${selectedSort}-${currentPage}`}
                 initial={{ opacity: 0.2, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.25 }}
                 className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4"
               >
-                {products.map((product, index) => (
+                {catalog.products.map((product, index) => (
                   <motion.div
-                    key={product._id || product.id || index}
+                    key={product.id || product._id || index}
                     layout
                     initial={{ opacity: 0.2 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2, delay: index * 0.03 }}
+                    transition={{ duration: 0.2, delay: index * 0.02 }}
                   >
                     <ProductCard {...product} />
                   </motion.div>
                 ))}
               </motion.div>
             </AnimatePresence>
+          )}
+
+          {/* Pagination Controls */}
+          {catalog.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-6 mt-8">
+              <button
+                onClick={() => handlePageChange(catalog.page - 1)}
+                disabled={catalog.page <= 1 || loading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Previous</span>
+              </button>
+
+              {/* Page Number Pills */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, catalog.totalPages) }, (_, i) => {
+                  let pageNum = i + 1;
+                  if (catalog.totalPages > 5) {
+                    if (catalog.page > 3) {
+                      pageNum = catalog.page - 2 + i;
+                    }
+                    if (pageNum > catalog.totalPages) {
+                      pageNum = catalog.totalPages - (4 - i);
+                    }
+                  }
+
+                  const isCurrent = pageNum === catalog.page;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      disabled={loading}
+                      className={`h-8 w-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        isCurrent
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(catalog.page + 1)}
+                disabled={catalog.page >= catalog.totalPages || loading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </main>
       </div>

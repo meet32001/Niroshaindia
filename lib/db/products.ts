@@ -303,25 +303,38 @@ export async function getProductBySlug(slug: string) {
   }
 }
 
-// Fetch categories matching PostgREST schema
+// Fetch categories matching PostgREST schema with accurate product counts
 export async function getCategories(quantity?: number) {
   try {
-    const query = supabase
+    const { data: cats, error } = await supabase
       .from("categories")
       .select("id, name, slug, description")
       .order("name", { ascending: true });
 
-    if (quantity) {
-      query.limit(quantity);
-    }
-    const { data, error } = await query;
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(cats) && cats.length > 0) {
+      // Fetch live product counts per category
+      const { data: prods } = await supabase.from("products").select("category_id").eq("is_active", true).limit(10000);
+      const counts: Record<string | number, number> = {};
+      if (Array.isArray(prods)) {
+        prods.forEach((p: { category_id: number }) => {
+          if (p.category_id) counts[p.category_id] = (counts[p.category_id] || 0) + 1;
+        });
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.map((cat: any) => ({
-        ...cat,
-        title: cat.name || cat.title,
-        image: cat.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
-      }));
+      const mapped = cats
+        .map((cat: any) => ({
+          ...cat,
+          title: cat.name || cat.title,
+          productCount: counts[cat.id] || 0,
+          image: cat.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
+        }))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((cat: any) => (cat.productCount || 0) > 0)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .sort((a: any, b: any) => (b.productCount || 0) - (a.productCount || 0));
+
+      return quantity ? mapped.slice(0, quantity) : mapped;
     }
     return quantity ? MOCK_CATEGORIES.slice(0, quantity) : MOCK_CATEGORIES;
   } catch {
@@ -329,21 +342,38 @@ export async function getCategories(quantity?: number) {
   }
 }
 
-// Fetch brands matching PostgREST schema
+// Fetch brands matching PostgREST schema with accurate product counts
 export async function getBrands() {
   try {
-    const { data, error } = await supabase
+    const { data: brands, error } = await supabase
       .from("brands")
       .select("id, name, slug, logo_url")
       .order("name", { ascending: true });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(brands) && brands.length > 0) {
+      // Fetch live product counts per brand
+      const { data: prods } = await supabase.from("products").select("brand_id").eq("is_active", true).limit(10000);
+      const counts: Record<string | number, number> = {};
+      if (Array.isArray(prods)) {
+        prods.forEach((p: { brand_id: number }) => {
+          if (p.brand_id) counts[p.brand_id] = (counts[p.brand_id] || 0) + 1;
+        });
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.map((b: any) => ({
-        ...b,
-        title: b.name || b.title,
-        image: b.logo_url || b.image,
-      }));
+      const mapped = brands
+        .map((b: any) => ({
+          ...b,
+          title: b.name || b.title,
+          image: b.logo_url || b.image,
+          productCount: counts[b.id] || 0,
+        }))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((b: any) => (b.productCount || 0) > 0)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .sort((a: any, b: any) => (b.productCount || 0) - (a.productCount || 0));
+
+      return mapped;
     }
     return MOCK_BRANDS;
   } catch {
@@ -352,6 +382,146 @@ export async function getBrands() {
 }
 
 export const getAllBrands = getBrands;
+
+export interface ShopCatalogParams {
+  category?: string | null;
+  brand?: string | null; // single or comma-separated slugs
+  minPrice?: number | null; // in paise
+  maxPrice?: number | null; // in paise
+  search?: string | null;
+  sort?: string | null; // "newest" | "price_asc" | "price_desc" | "alpha"
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ShopCatalogResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  products: any[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+// Server-side paginated and filtered catalog fetching from Supabase
+export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<ShopCatalogResult> {
+  const {
+    category,
+    brand,
+    minPrice,
+    maxPrice,
+    search,
+    sort = "newest",
+    page = 1,
+    pageSize = 24,
+  } = params;
+
+  try {
+    const hasCategoryFilter = Boolean(category);
+    const hasBrandFilter = Boolean(brand);
+    const hasPriceFilter = minPrice !== undefined && minPrice !== null || maxPrice !== undefined && maxPrice !== null;
+
+    let query = supabase
+      .from("products")
+      .select(
+        `
+        id,
+        name,
+        slug,
+        description,
+        brand_id,
+        category_id,
+        brands${hasBrandFilter ? "!inner" : ""} ( id, name, slug, logo_url ),
+        categories${hasCategoryFilter ? "!inner" : ""} ( id, name, slug, description ),
+        product_variants${hasPriceFilter ? "!inner" : ""} (
+          id,
+          sku,
+          name,
+          price_cents,
+          compare_at_price_cents,
+          warehouse_inventory ( quantity_on_hand, quantity_reserved ),
+          product_images ( id, image_url, sort_order, is_featured )
+        )
+      `,
+        { count: "exact" }
+      )
+      .eq("is_active", true);
+
+    if (category) {
+      query = query.eq("categories.slug", category);
+    }
+
+    if (brand) {
+      const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
+      if (brandList.length === 1) {
+        query = query.eq("brands.slug", brandList[0]);
+      } else if (brandList.length > 1) {
+        query = query.in("brands.slug", brandList);
+      }
+    }
+
+    if (minPrice !== undefined && minPrice !== null) {
+      query = query.gte("product_variants.price_cents", minPrice);
+    }
+    if (maxPrice !== undefined && maxPrice !== null) {
+      query = query.lte("product_variants.price_cents", maxPrice);
+    }
+
+    if (search) {
+      query = query.ilike("name", `%${search}%`);
+    }
+
+    // Apply sorting
+    if (sort === "price_asc") {
+      query = query.order("price_cents", { referencedTable: "product_variants", ascending: true });
+    } else if (sort === "price_desc") {
+      query = query.order("price_cents", { referencedTable: "product_variants", ascending: false });
+    } else if (sort === "alpha") {
+      query = query.order("name", { ascending: true });
+    } else {
+      // Default: newest additions
+      query = query.order("id", { ascending: false });
+    }
+
+    const currentPage = Math.max(1, page);
+    const from = (currentPage - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+
+    if (!error && Array.isArray(data)) {
+      const normalized = data.map(normalizeProduct).filter(Boolean);
+      const total = count ?? normalized.length;
+      return {
+        products: normalized,
+        totalCount: total,
+        page: currentPage,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize) || 1,
+      };
+    }
+
+    // If query returned error, log and fallback to empty
+    console.error("Supabase getShopCatalog error:", error);
+    return {
+      products: [],
+      totalCount: 0,
+      page: currentPage,
+      pageSize,
+      totalPages: 1,
+    };
+  } catch (err) {
+    console.error("Exception in getShopCatalog:", err);
+    return {
+      products: [],
+      totalCount: 0,
+      page: 1,
+      pageSize,
+      totalPages: 1,
+    };
+  }
+}
 
 // Fetch hot deals products
 export async function getDealProducts() {
