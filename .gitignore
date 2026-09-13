@@ -40,7 +40,8 @@ next-env.d.ts
 
 # background scripts & database seeds (keep out of Vercel production builds)
 /scripts/
-/supabase/
-*.sql
+/supabase/*.sql
+!/supabase/migrations/
+!/supabase/migrations/*.sql
 /.scratch/
 

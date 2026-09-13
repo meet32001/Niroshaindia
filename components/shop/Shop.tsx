@@ -19,7 +19,7 @@ import { BrandList } from "@/components/shop/BrandList";
 import { PriceList } from "@/components/shop/PriceList";
 import { ProductCard } from "@/components/product/ProductCard";
 import { NoProductAvailable } from "@/components/product/NoProductAvailable";
-import { getShopCatalog, ShopCatalogResult } from "@/lib/db/products";
+import { getShopCatalog, getContextualBrands, ShopCatalogResult } from "@/lib/db/products";
 
 export interface ShopProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,6 +40,33 @@ export function Shop({ categories, brands }: ShopProps) {
   const selectedPrice = searchParams.get("price");
   const selectedSort = searchParams.get("sort") || "newest";
   const currentPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+
+  // Contextual Brands State
+  const [currentBrands, setCurrentBrands] = useState(brands);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadContextualBrands() {
+      try {
+        const contextual = await getContextualBrands(selectedCategory);
+        if (isMounted) {
+          if (contextual && contextual.length > 0) {
+            setCurrentBrands(contextual);
+          } else if (!selectedCategory) {
+            setCurrentBrands(brands);
+          }
+        }
+      } catch (err) {
+        console.error("Contextual brands fetch error:", err);
+      }
+    }
+
+    loadContextualBrands();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCategory, brands]);
 
   // Catalog State
   const [catalog, setCatalog] = useState<ShopCatalogResult>({
@@ -293,7 +320,7 @@ export function Shop({ categories, brands }: ShopProps) {
           />
 
           <BrandList
-            brands={brands}
+            brands={currentBrands}
             selectedBrand={selectedBrand}
             setSelectedBrand={(brand) => updateParams({ brand })}
           />

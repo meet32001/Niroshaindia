@@ -417,6 +417,85 @@ export async function getBrands() {
 
 export const getAllBrands = getBrands;
 
+// Contextual brand facets for category: RPC call with fast fallback
+export async function getContextualBrands(categorySlug?: string | null) {
+  try {
+    // 1. Try RPC function if migration has been executed
+    const { data: rpcBrands, error: rpcErr } = await supabase.rpc(
+      "get_contextual_category_brands",
+      { cat_slug: categorySlug || null }
+    );
+
+    if (!rpcErr && Array.isArray(rpcBrands) && rpcBrands.length > 0) {
+      return rpcBrands.map((b: { brand_id?: number | string; id?: number | string; brand_name?: string; name?: string; title?: string; brand_slug?: string; slug?: string; product_count?: number }) => ({
+        id: String(b.brand_id || b.id),
+        title: b.brand_name || b.name || b.title,
+        name: b.brand_name || b.name,
+        slug: b.brand_slug || b.slug,
+        productCount: Number(b.product_count || 0),
+      }));
+    }
+
+    // 2. High-speed resilient fallback
+    let targetCatIds: number[] | null = null;
+    if (categorySlug && categorySlug !== "all") {
+      const cleanSlug = categorySlug.trim().toLowerCase();
+      const { data: cat } = await supabase
+        .from("categories")
+        .select("id, parent_id")
+        .eq("slug", cleanSlug)
+        .maybeSingle();
+
+      if (cat) {
+        if (cat.parent_id === null) {
+          const { data: children } = await supabase
+            .from("categories")
+            .select("id")
+            .eq("parent_id", cat.id);
+          targetCatIds = [cat.id, ...(children || []).map((c) => c.id)];
+        } else {
+          targetCatIds = [cat.id];
+        }
+      }
+    }
+
+    let prodQuery = supabase.from("products").select("brand_id").eq("is_active", true);
+    if (targetCatIds && targetCatIds.length > 0) {
+      prodQuery = prodQuery.in("category_id", targetCatIds);
+    }
+
+    const { data: prods } = await prodQuery.limit(5000);
+    const counts: Record<number | string, number> = {};
+    prods?.forEach((p: { brand_id: number }) => {
+      if (p.brand_id) counts[p.brand_id] = (counts[p.brand_id] || 0) + 1;
+    });
+
+    const brandIds = Object.keys(counts);
+    if (brandIds.length === 0) return [];
+
+    const { data: brands } = await supabase
+      .from("brands")
+      .select("id, name, slug, logo_url")
+      .in("id", brandIds);
+
+    return (brands || [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((b: any) => ({
+        id: String(b.id),
+        title: b.name,
+        name: b.name,
+        slug: b.slug,
+        image: b.logo_url,
+        productCount: counts[b.id] || 0,
+      }))
+      .filter((b) => b.productCount > 0)
+      .sort((a, b) => b.productCount - a.productCount);
+  } catch (err) {
+    console.error("getContextualBrands error:", err);
+    return [];
+  }
+}
+
 export interface ShopCatalogParams {
   category?: string | null;
   brand?: string | null; // single or comma-separated slugs
@@ -507,10 +586,20 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     // 2. Resolve Brand Filter (direct indexed lookup on products.brand_id)
     if (brand) {
       const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
-      const { data: matchedBrands } = await supabase
+      let { data: matchedBrands } = await supabase
         .from("brands")
         .select("id, slug")
         .in("slug", brandList);
+
+      if (!matchedBrands || matchedBrands.length === 0) {
+        // Fallback: match via ILIKE on slug or name
+        const orClauses = brandList.map((b) => `slug.ilike.${b},name.ilike.${b}`).join(",");
+        const { data: ilikeBrands } = await supabase
+          .from("brands")
+          .select("id, slug")
+          .or(orClauses);
+        matchedBrands = ilikeBrands;
+      }
 
       if (matchedBrands && matchedBrands.length > 0) {
         const brandIds = matchedBrands.map((b) => b.id);
@@ -537,9 +626,42 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     const from = (currentPage - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    // 5. High-Performance Price Sorting
+    // 5. Native Price Sorting with Fallback
     if (sort === "price_asc" || sort === "price_desc") {
-      // Fetch matching product IDs first
+      const isAsc = sort === "price_asc";
+
+      // Attempt native indexed sort on products.min_price_cents
+      try {
+        const nativeQuery = query
+          .order("min_price_cents", { ascending: isAsc })
+          .range(from, to);
+
+        const { data: nativeData, count: nativeCount, error: nativeErr } = await nativeQuery;
+
+        // If min_price_cents column exists and products have populated cached prices
+        if (!nativeErr && Array.isArray(nativeData) && nativeData.length > 0) {
+          const hasPopulatedPrices = nativeData.some(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (p: any) => (p.min_price_cents ?? 0) > 0
+          );
+
+          if (hasPopulatedPrices) {
+            const normalized = nativeData.map(normalizeProduct).filter(Boolean);
+            const total = nativeCount ?? nativeData.length;
+            return {
+              products: normalized,
+              totalCount: total,
+              page: currentPage,
+              pageSize,
+              totalPages: Math.ceil(total / pageSize) || 1,
+            };
+          }
+        }
+      } catch {
+        // Fall through to high-speed variant sorting
+      }
+
+      // High-Speed Variant Price Sorting Fallback (executes when min_price_cents is not yet populated)
       const { data: matchedProds, count: filterCount, error: filterErr } = await query.select("id");
       if (filterErr || !matchedProds || matchedProds.length === 0) {
         return {
@@ -560,7 +682,7 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         .select("product_id, price_cents")
         .in("product_id", allMatchedIds)
         .gt("price_cents", 0)
-        .order("price_cents", { ascending: sort === "price_asc" });
+        .order("price_cents", { ascending: isAsc });
 
       if (minPrice !== undefined && minPrice !== null) {
         variantQuery = variantQuery.gte("price_cents", minPrice);
@@ -641,6 +763,7 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     if (sort === "alpha") {
       query = query.order("name", { ascending: true });
     } else {
+      // Order by primary key id (auto-incrementing serial = newest additions, guaranteed indexed)
       query = query.order("id", { ascending: false });
     }
 
