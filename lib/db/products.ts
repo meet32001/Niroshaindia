@@ -303,36 +303,70 @@ export async function getProductBySlug(slug: string) {
   }
 }
 
-// Fetch categories matching PostgREST schema with accurate product counts
-export async function getCategories(quantity?: number) {
+// Fetch categories matching PostgREST schema with accurate hierarchical product counts
+export async function getCategories(quantity?: number): Promise<Category[]> {
   try {
     const { data: cats, error } = await supabase
       .from("categories")
-      .select("id, name, slug, description")
+      .select("id, name, slug, description, parent_id")
       .order("name", { ascending: true });
 
     if (!error && Array.isArray(cats) && cats.length > 0) {
-      // Fetch live product counts per category
-      const { data: prods } = await supabase.from("products").select("category_id").eq("is_active", true).limit(10000);
-      const counts: Record<string | number, number> = {};
-      if (Array.isArray(prods)) {
-        prods.forEach((p: { category_id: number }) => {
-          if (p.category_id) counts[p.category_id] = (counts[p.category_id] || 0) + 1;
-        });
+      // Fetch live product counts per category across all catalog products
+      let prods: { category_id: number }[] = [];
+      let page = 0;
+      while (true) {
+        const { data: chunk, error: chunkErr } = await supabase
+          .from("products")
+          .select("category_id")
+          .eq("is_active", true)
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (chunkErr || !chunk || chunk.length === 0) break;
+        prods = prods.concat(chunk);
+        if (chunk.length < 1000) break;
+        page++;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped = cats
-        .map((cat: any) => ({
-          ...cat,
-          title: cat.name || cat.title,
-          productCount: counts[cat.id] || 0,
-          image: cat.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
-        }))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((cat: any) => (cat.productCount || 0) > 0)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .sort((a: any, b: any) => (b.productCount || 0) - (a.productCount || 0));
+      const counts: Record<string | number, number> = {};
+      prods.forEach((p) => {
+        if (p.category_id) counts[p.category_id] = (counts[p.category_id] || 0) + 1;
+      });
+
+      const parentCats = cats.filter((c) => c.parent_id === null);
+      const mapped = parentCats
+        .map((parent) => {
+          const children = cats
+            .filter((child) => child.parent_id === parent.id)
+            .map((child) => ({
+              id: String(child.id),
+              title: child.name,
+              name: child.name,
+              slug: child.slug,
+              description: child.description,
+              parent_id: parent.id,
+              productCount: counts[child.id] || 0,
+              image: (child as { image?: string }).image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
+            }))
+            .filter((child) => (child.productCount || 0) > 0)
+            .sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
+
+          const childTotal = children.reduce((sum, ch) => sum + (ch.productCount || 0), 0);
+          const totalProductCount = (counts[parent.id] || 0) + childTotal;
+
+          return {
+            id: String(parent.id),
+            title: parent.name,
+            name: parent.name,
+            slug: parent.slug,
+            description: parent.description,
+            parent_id: null,
+            productCount: totalProductCount,
+            children,
+            image: (parent as { image?: string }).image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
+          };
+        })
+        .filter((cat) => (cat.productCount || 0) > 0)
+        .sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
 
       return quantity ? mapped.slice(0, quantity) : mapped;
     }
@@ -417,10 +451,6 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
   } = params;
 
   try {
-    const hasCategoryFilter = Boolean(category);
-    const hasBrandFilter = Boolean(brand);
-    const hasPriceFilter = minPrice !== undefined && minPrice !== null || maxPrice !== undefined && maxPrice !== null;
-
     let query = supabase
       .from("products")
       .select(
@@ -431,9 +461,9 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         description,
         brand_id,
         category_id,
-        brands${hasBrandFilter ? "!inner" : ""} ( id, name, slug, logo_url ),
-        categories${hasCategoryFilter ? "!inner" : ""} ( id, name, slug, description ),
-        product_variants${hasPriceFilter ? "!inner" : ""} (
+        brands ( id, name, slug, logo_url ),
+        categories ( id, name, slug, description, parent_id ),
+        product_variants (
           id,
           sku,
           name,
@@ -447,19 +477,55 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
       )
       .eq("is_active", true);
 
+    // 1. Resolve Category Filter (supports root departments and child subcategories)
     if (category) {
-      query = query.eq("categories.slug", category);
-    }
+      const cleanCatSlug = category.trim().toLowerCase();
+      const { data: matchedCat } = await supabase
+        .from("categories")
+        .select("id, parent_id")
+        .eq("slug", cleanCatSlug)
+        .maybeSingle();
 
-    if (brand) {
-      const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
-      if (brandList.length === 1) {
-        query = query.eq("brands.slug", brandList[0]);
-      } else if (brandList.length > 1) {
-        query = query.in("brands.slug", brandList);
+      if (matchedCat) {
+        if (matchedCat.parent_id === null) {
+          // It's a ROOT department! Query all its child categories
+          const { data: childCats } = await supabase
+            .from("categories")
+            .select("id")
+            .eq("parent_id", matchedCat.id);
+          const catIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
+          query = query.in("category_id", catIds);
+        } else {
+          // Specific subcategory
+          query = query.eq("category_id", matchedCat.id);
+        }
+      } else {
+        query = query.eq("category_id", -1); // No match
       }
     }
 
+    // 2. Resolve Brand Filter (direct indexed lookup on products.brand_id)
+    if (brand) {
+      const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
+      const { data: matchedBrands } = await supabase
+        .from("brands")
+        .select("id, slug")
+        .in("slug", brandList);
+
+      if (matchedBrands && matchedBrands.length > 0) {
+        const brandIds = matchedBrands.map((b) => b.id);
+        query = query.in("brand_id", brandIds);
+      } else {
+        query = query.eq("brand_id", -1); // No match
+      }
+    }
+
+    // 3. Search filter
+    if (search) {
+      query = query.ilike("name", `%${search}%`);
+    }
+
+    // 4. Price range filter (via joined variants inner join if price range is specified)
     if (minPrice !== undefined && minPrice !== null) {
       query = query.gte("product_variants.price_cents", minPrice);
     }
@@ -467,25 +533,117 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
       query = query.lte("product_variants.price_cents", maxPrice);
     }
 
-    if (search) {
-      query = query.ilike("name", `%${search}%`);
-    }
-
-    // Apply sorting
-    if (sort === "price_asc") {
-      query = query.order("price_cents", { referencedTable: "product_variants", ascending: true });
-    } else if (sort === "price_desc") {
-      query = query.order("price_cents", { referencedTable: "product_variants", ascending: false });
-    } else if (sort === "alpha") {
-      query = query.order("name", { ascending: true });
-    } else {
-      // Default: newest additions
-      query = query.order("id", { ascending: false });
-    }
-
     const currentPage = Math.max(1, page);
     const from = (currentPage - 1) * pageSize;
     const to = from + pageSize - 1;
+
+    // 5. High-Performance Price Sorting
+    if (sort === "price_asc" || sort === "price_desc") {
+      // Fetch matching product IDs first
+      const { data: matchedProds, count: filterCount, error: filterErr } = await query.select("id");
+      if (filterErr || !matchedProds || matchedProds.length === 0) {
+        return {
+          products: [],
+          totalCount: 0,
+          page: currentPage,
+          pageSize,
+          totalPages: 1,
+        };
+      }
+
+      const total = filterCount ?? matchedProds.length;
+      const allMatchedIds = matchedProds.map((p) => p.id);
+
+      // Order by price_cents via product_variants
+      let variantQuery = supabase
+        .from("product_variants")
+        .select("product_id, price_cents")
+        .in("product_id", allMatchedIds)
+        .gt("price_cents", 0)
+        .order("price_cents", { ascending: sort === "price_asc" });
+
+      if (minPrice !== undefined && minPrice !== null) {
+        variantQuery = variantQuery.gte("price_cents", minPrice);
+      }
+      if (maxPrice !== undefined && maxPrice !== null) {
+        variantQuery = variantQuery.lte("price_cents", maxPrice);
+      }
+
+      const { data: sortedVariants } = await variantQuery;
+
+      // Deduplicate to preserve unique products in order of their min/max variant price
+      const seenProdIds = new Set<number>();
+      const orderedProductIds: number[] = [];
+      sortedVariants?.forEach((v) => {
+        if (!seenProdIds.has(v.product_id)) {
+          seenProdIds.add(v.product_id);
+          orderedProductIds.push(v.product_id);
+        }
+      });
+
+      // Append any products with unlisted variant prices at the end
+      allMatchedIds.forEach((id) => {
+        if (!seenProdIds.has(id)) {
+          orderedProductIds.push(id);
+        }
+      });
+
+      const pageProductIds = orderedProductIds.slice(from, to + 1);
+      if (pageProductIds.length === 0) {
+        return {
+          products: [],
+          totalCount: total,
+          page: currentPage,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize) || 1,
+        };
+      }
+
+      // Fetch full details for the paginated products
+      const { data: pageProducts } = await supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          brand_id,
+          category_id,
+          brands ( id, name, slug, logo_url ),
+          categories ( id, name, slug, description, parent_id ),
+          product_variants (
+            id,
+            sku,
+            name,
+            price_cents,
+            compare_at_price_cents,
+            warehouse_inventory ( quantity_on_hand, quantity_reserved ),
+            product_images ( id, image_url, sort_order, is_featured )
+          )
+        `)
+        .in("id", pageProductIds);
+
+      // Restore exact sorted order
+      const prodMap = new Map(pageProducts?.map((p) => [p.id, p]));
+      const ordered = pageProductIds.map((id) => prodMap.get(id)).filter(Boolean);
+      const normalized = ordered.map(normalizeProduct).filter(Boolean);
+
+      return {
+        products: normalized,
+        totalCount: total,
+        page: currentPage,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize) || 1,
+      };
+    }
+
+    // 6. Alphabetical & Default Newest Sorting
+    if (sort === "alpha") {
+      query = query.order("name", { ascending: true });
+    } else {
+      query = query.order("id", { ascending: false });
+    }
+
     query = query.range(from, to);
 
     const { data, count, error } = await query;
@@ -502,7 +660,6 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
       };
     }
 
-    // If query returned error, log and fallback to empty
     console.error("Supabase getShopCatalog error:", error);
     return {
       products: [],

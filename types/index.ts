@@ -32,6 +32,8 @@ export interface Category {
   productCount?: number;
   image?: string;
   description?: string;
+  parent_id?: number | string | null;
+  children?: Category[];
 }
 
 export interface Brand {
