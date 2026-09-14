@@ -130,6 +130,11 @@ export function normalizeProduct(item: any) {
   const categoryName = typeof catObj === "string" ? catObj : catObj?.name || catObj?.title || "Electronics";
 
   const rawVariants = item.variants || item.product_variants || [];
+  if (!Array.isArray(rawVariants) || rawVariants.length === 0) {
+    if (!item.price || item.price <= 0) {
+      return null;
+    }
+  }
   
   // Normalize each variant cleanly
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -542,7 +547,7 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         category_id,
         brands ( id, name, slug, logo_url ),
         categories ( id, name, slug, description, parent_id ),
-        product_variants (
+        product_variants!inner (
           id,
           sku,
           name,
@@ -554,7 +559,8 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
       `,
         { count: "exact" }
       )
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .gt("product_variants.price_cents", 0);
 
     // 1. Resolve Category Filter (supports root departments and child subcategories)
     if (category) {
@@ -626,26 +632,37 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     const from = (currentPage - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    // 5. Native Price Sorting with Fallback
+    // 5. Price Sorting (Native min_price_cents with robust Variant Price fallback)
     if (sort === "price_asc" || sort === "price_desc") {
       const isAsc = sort === "price_asc";
+      const sortColumn = isAsc ? "min_price_cents" : "max_price_cents";
 
-      // Attempt native indexed sort on products.min_price_cents
+      // 5a. Check if products table has min_price_cents column populated
+      let hasNativePrice = false;
       try {
-        const nativeQuery = query
-          .order("min_price_cents", { ascending: isAsc })
-          .range(from, to);
+        const { data: testData, error: testErr } = await supabase
+          .from("products")
+          .select("id, min_price_cents")
+          .gt("min_price_cents", 0)
+          .limit(1);
 
-        const { data: nativeData, count: nativeCount, error: nativeErr } = await nativeQuery;
+        if (!testErr && Array.isArray(testData) && testData.length > 0) {
+          hasNativePrice = true;
+        }
+      } catch {
+        hasNativePrice = false;
+      }
 
-        // If min_price_cents column exists and products have populated cached prices
-        if (!nativeErr && Array.isArray(nativeData) && nativeData.length > 0) {
-          const hasPopulatedPrices = nativeData.some(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (p: any) => (p.min_price_cents ?? 0) > 0
-          );
+      if (hasNativePrice) {
+        try {
+          const nativeQuery = query
+            .gt("min_price_cents", 0)
+            .order(sortColumn, { ascending: isAsc })
+            .range(from, to);
 
-          if (hasPopulatedPrices) {
+          const { data: nativeData, count: nativeCount, error: nativeErr } = await nativeQuery;
+
+          if (!nativeErr && Array.isArray(nativeData) && nativeData.length > 0) {
             const normalized = nativeData.map(normalizeProduct).filter(Boolean);
             const total = nativeCount ?? nativeData.length;
             return {
@@ -655,35 +672,105 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
               pageSize,
               totalPages: Math.ceil(total / pageSize) || 1,
             };
+          } else if (nativeErr) {
+            console.error("Native price sorting query error:", nativeErr);
+          }
+        } catch (nativeExc) {
+          console.warn("Native price sorting exception, falling back:", nativeExc);
+        }
+      }
+
+      // 5b. High-Speed Variant Price Sorting Fallback
+      // If filtering by category, brand, search, or price, resolve the filtered product IDs
+      const hasFilters = Boolean(category || brand || search || minPrice || maxPrice);
+
+      let targetProductIds: number[] | null = null;
+      let totalFilteredCount = 0;
+
+      if (hasFilters) {
+        let filterIdQuery = supabase
+          .from("products")
+          .select("id, product_variants!inner(price_cents)", { count: "exact" })
+          .eq("is_active", true)
+          .gt("product_variants.price_cents", 0);
+
+        if (category) {
+          const cleanCatSlug = category.trim().toLowerCase();
+          const { data: matchedCat } = await supabase
+            .from("categories")
+            .select("id, parent_id")
+            .eq("slug", cleanCatSlug)
+            .maybeSingle();
+
+          if (matchedCat) {
+            if (matchedCat.parent_id === null) {
+              const { data: childCats } = await supabase
+                .from("categories")
+                .select("id")
+                .eq("parent_id", matchedCat.id);
+              const catIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
+              filterIdQuery = filterIdQuery.in("category_id", catIds);
+            } else {
+              filterIdQuery = filterIdQuery.eq("category_id", matchedCat.id);
+            }
+          } else {
+            filterIdQuery = filterIdQuery.eq("category_id", -1);
           }
         }
-      } catch {
-        // Fall through to high-speed variant sorting
+
+        if (brand) {
+          const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
+          const { data: matchedBrands } = await supabase
+            .from("brands")
+            .select("id")
+            .in("slug", brandList);
+          if (matchedBrands && matchedBrands.length > 0) {
+            filterIdQuery = filterIdQuery.in("brand_id", matchedBrands.map((b) => b.id));
+          } else {
+            filterIdQuery = filterIdQuery.eq("brand_id", -1);
+          }
+        }
+
+        if (search) {
+          filterIdQuery = filterIdQuery.ilike("name", `%${search}%`);
+        }
+        if (minPrice !== undefined && minPrice !== null) {
+          filterIdQuery = filterIdQuery.gte("product_variants.price_cents", minPrice);
+        }
+        if (maxPrice !== undefined && maxPrice !== null) {
+          filterIdQuery = filterIdQuery.lte("product_variants.price_cents", maxPrice);
+        }
+
+        const { data: matchedProds, count: filterCount, error: fErr } = await filterIdQuery;
+        if (fErr) {
+          console.error("Filter ID query error:", fErr);
+          return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
+        }
+        if (!matchedProds || matchedProds.length === 0) {
+          return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
+        }
+
+        targetProductIds = matchedProds.map((p) => p.id);
+        totalFilteredCount = filterCount ?? targetProductIds.length;
+      } else {
+        const { count: catalogCount } = await supabase
+          .from("products")
+          .select("id, product_variants!inner(price_cents)", { count: "exact", head: true })
+          .eq("is_active", true)
+          .gt("product_variants.price_cents", 0);
+        totalFilteredCount = catalogCount ?? 5562;
       }
 
-      // High-Speed Variant Price Sorting Fallback (executes when min_price_cents is not yet populated)
-      const { data: matchedProds, count: filterCount, error: filterErr } = await query.select("id");
-      if (filterErr || !matchedProds || matchedProds.length === 0) {
-        return {
-          products: [],
-          totalCount: 0,
-          page: currentPage,
-          pageSize,
-          totalPages: 1,
-        };
-      }
-
-      const total = filterCount ?? matchedProds.length;
-      const allMatchedIds = matchedProds.map((p) => p.id);
-
-      // Order by price_cents via product_variants
+      // Query product_variants for ordered product IDs
       let variantQuery = supabase
         .from("product_variants")
         .select("product_id, price_cents")
-        .in("product_id", allMatchedIds)
         .gt("price_cents", 0)
         .order("price_cents", { ascending: isAsc });
 
+      if (targetProductIds && targetProductIds.length > 0) {
+        variantQuery = variantQuery.in("product_id", targetProductIds);
+      }
       if (minPrice !== undefined && minPrice !== null) {
         variantQuery = variantQuery.gte("price_cents", minPrice);
       }
@@ -691,9 +778,18 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         variantQuery = variantQuery.lte("price_cents", maxPrice);
       }
 
-      const { data: sortedVariants } = await variantQuery;
+      if (!targetProductIds) {
+        const fetchBuffer = from + pageSize + 100;
+        variantQuery = variantQuery.range(0, fetchBuffer * 2);
+      }
 
-      // Deduplicate to preserve unique products in order of their min/max variant price
+      const { data: sortedVariants, error: varErr } = await variantQuery;
+      if (varErr) {
+        console.error("Variant sort error:", varErr);
+        return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
+      }
+
+      // Deduplicate to preserve unique product order
       const seenProdIds = new Set<number>();
       const orderedProductIds: number[] = [];
       sortedVariants?.forEach((v) => {
@@ -703,26 +799,19 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         }
       });
 
-      // Append any products with unlisted variant prices at the end
-      allMatchedIds.forEach((id) => {
-        if (!seenProdIds.has(id)) {
-          orderedProductIds.push(id);
-        }
-      });
-
       const pageProductIds = orderedProductIds.slice(from, to + 1);
       if (pageProductIds.length === 0) {
         return {
           products: [],
-          totalCount: total,
+          totalCount: totalFilteredCount,
           page: currentPage,
           pageSize,
-          totalPages: Math.ceil(total / pageSize) || 1,
+          totalPages: Math.ceil(totalFilteredCount / pageSize) || 1,
         };
       }
 
-      // Fetch full details for the paginated products
-      const { data: pageProducts } = await supabase
+      // Fetch full product details for the page
+      const { data: pageProducts, error: pErr } = await supabase
         .from("products")
         .select(`
           id,
@@ -733,7 +822,7 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
           category_id,
           brands ( id, name, slug, logo_url ),
           categories ( id, name, slug, description, parent_id ),
-          product_variants (
+          product_variants!inner (
             id,
             sku,
             name,
@@ -743,7 +832,13 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
             product_images ( id, image_url, sort_order, is_featured )
           )
         `)
-        .in("id", pageProductIds);
+        .in("id", pageProductIds)
+        .gt("product_variants.price_cents", 0);
+
+      if (pErr) {
+        console.error("Error fetching page products:", pErr);
+        return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
+      }
 
       // Restore exact sorted order
       const prodMap = new Map(pageProducts?.map((p) => [p.id, p]));
@@ -752,10 +847,10 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
 
       return {
         products: normalized,
-        totalCount: total,
+        totalCount: totalFilteredCount,
         page: currentPage,
         pageSize,
-        totalPages: Math.ceil(total / pageSize) || 1,
+        totalPages: Math.ceil(totalFilteredCount / pageSize) || 1,
       };
     }
 
@@ -763,7 +858,7 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     if (sort === "alpha") {
       query = query.order("name", { ascending: true });
     } else {
-      // Order by primary key id (auto-incrementing serial = newest additions, guaranteed indexed)
+      // Order by primary key id (guaranteed indexed B-Tree)
       query = query.order("id", { ascending: false });
     }
 

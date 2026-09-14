@@ -60,7 +60,7 @@ RETURNS TABLE (
   product_count BIGINT
 ) AS $$
 BEGIN
-  IF cat_slug IS NULL OR cat_slug = ' OR cat_slug = 'all' THEN
+  IF cat_slug IS NULL OR cat_slug = '' OR cat_slug = 'all' THEN
     RETURN QUERY
     SELECT 
       b.id,
