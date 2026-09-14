@@ -1,0 +1,381 @@
+{
+  "scrapedAt": "2026-09-14T04:32:21.307Z",
+  "sourceUrl": "https://www.vijaysales.com",
+  "totalBannersScraped": 13,
+  "canvasStandards": {
+    "desktop": {
+      "recommendedResolution": "1920x562 (or 1280x375 @ 2x/3x)",
+      "aspectRatio": "3.41:1 (approx 27:8 ultra-wide panoramic)",
+      "layoutGrid": "2-Column Split: Left 45% Typography & Value Proposition / Right 55% Hero Product Cutout",
+      "safeZoneMargin": "48px left padding, 40px top/bottom safe margin to avoid carousel chevron overlap"
+    },
+    "mobile": {
+      "recommendedResolution": "1280x939 (or 768x560 @ 2x)",
+      "aspectRatio": "1.36:1 (approx 4:3 compact vertical poster)",
+      "layoutGrid": "Vertical Stack: Top 30% Offer Typography / Center 70% Product Hero Focus",
+      "safeZoneMargin": "32px margin with high contrast text over dark or neutral background"
+    }
+  },
+  "topCopyFormulas": [
+    {
+      "formula": "The Category Bonanza / Super Store",
+      "example": "The Air Conditioner Store / TV Coupon Bonanza",
+      "purpose": "Anchors category authority and promises massive seasonal inventory depth."
+    },
+    {
+      "formula": "Festive Occasion Event Framing",
+      "example": "Ganeshotsav Sale 2026 / Mega Savings Fest",
+      "purpose": "Triggers urgent holiday purchase intent aligned with Indian festive calendar."
+    },
+    {
+      "formula": "New Product Introduction (NPI) Pre-Booking Hook",
+      "example": "Samsung S26 FE - Notify Me / Pre-Book Now",
+      "purpose": "Captures high-intent pre-orders and early adopters for flagship electronics."
+    },
+    {
+      "formula": "Product Tiering & Family Grouping",
+      "example": "iPad Family / iPhone Pro Series - Elevate Your Workflow",
+      "purpose": "Encourages trade-up from entry-level to pro models without hard price anchoring."
+    },
+    {
+      "formula": "Exclusive Brand Partnership / Innovation Spotlight",
+      "example": "Ninja Crispi CleanCrisp™ 4-in-1 Glass Air Fryer - Exclusive Launch",
+      "purpose": "Showcases premium technological novelty to drive high average order value (AOV)."
+    }
+  ],
+  "bankOfferPartnerStrip": {
+    "presence": "Dedicated sticky marquee directly below hero carousel",
+    "partnersObserved": [
+      "HDFC Bank",
+      "American Express",
+      "HSBC",
+      "ICICI Bank",
+      "SBI Card",
+      "OneCard",
+      "Yes Bank",
+      "IDFC FIRST Bank",
+      "Bank of Baroda",
+      "DBS",
+      "MobiKwik",
+      "AU Small Finance Bank",
+      "IndusInd Bank",
+      "RBL Bank",
+      "Federal Bank"
+    ],
+    "conversionRole": "Suppresses price resistance at the fold by immediately assuring 5-10% instant checkout discounts."
+  },
+  "banners": [
+    {
+      "index": 1,
+      "id": "banner-01",
+      "altText": "apple NPI",
+      "category": "Apple Ecosystem",
+      "theme": "Flagship Smartphone Launch",
+      "destinationUrl": "https://www.vijaysales.com/sale/apple-buckets/apple-iphone-18-pro-series?utm_source=Website&utm_medium=Banner&utm_campaign=apple_iphone_18_pro_series_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/iphone-18-pro-desktop-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-01-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/iphone-18-pro-mobile-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-01-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 2,
+      "id": "banner-02",
+      "altText": "ganapti fest",
+      "category": "Festive Super Sale",
+      "theme": "Ganeshotsav Special Offers",
+      "destinationUrl": "https://www.vijaysales.com/event-pages/ganesh-chaturthi-offers?utm_source=Website&utm_medium=Banner&utm_campaign=ganesh_chaturthi_offers_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ganeshotsav-sale-2026-desktop-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-02-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ganeshotsav-sale-2026-mobile-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-02-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 3,
+      "id": "banner-03",
+      "altText": "airpods",
+      "category": "Apple Ecosystem",
+      "theme": "Premium Audio",
+      "destinationUrl": "https://www.vijaysales.com/sale/apple-buckets/apple-airpods-5?utm_source=Website&utm_medium=Banner&utm_campaign=apple_airpods_5_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/airpods-5-desktop-2?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-03-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/airpods-5-mobile-2?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-03-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 4,
+      "id": "banner-04",
+      "altText": "apple watch",
+      "category": "Apple Ecosystem",
+      "theme": "Smart Wearables",
+      "destinationUrl": "https://www.vijaysales.com/sale/Apple-Watch-Series-12?utm_source=Website&utm_medium=Banner&utm_campaign=Apple_Watch_Series_12_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/watch-series-12-desktop-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-04-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/watch-series-12-mobile-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-04-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 5,
+      "id": "banner-05",
+      "altText": "AC banner",
+      "category": "Air Conditioners",
+      "theme": "Seasonal Climate Comfort Super Sale",
+      "destinationUrl": "https://www.vijaysales.com/event-pages/air-conditioner-store?utm_source=website&utm_medium=banner&utm_campaign=air_conditioner_store_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/air-conditioner-desktop-2?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-05-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/air-conditioner-mobile-2?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-05-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 6,
+      "id": "banner-06",
+      "altText": "tv",
+      "category": "Televisions & Home Entertainment",
+      "theme": "Coupon Bonanza / Big Screen Festival",
+      "destinationUrl": "https://www.vijaysales.com/sale/television-buckets/tv-coupon-bonanza?utm_source=website&utm_medium=banner&utm_campaign=tv_coupon_bonanza_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/tv-desktop-5?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-06-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/tv-mobile-5?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-06-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 7,
+      "id": "banner-07",
+      "altText": "Samsung",
+      "category": "Smartphones",
+      "theme": "Flagship Pre-Order / Notify Me Campaign",
+      "destinationUrl": "https://www.vijaysales.com/samsung-s26-fe?utm_source=website&utm_medium=banner&utm_campaign=samsung_s26_fe_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/s-26-fe-notify-me-desktop-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-07-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/s-26-fe-notify-me-mobile-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-07-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 8,
+      "id": "banner-08",
+      "altText": "ref",
+      "category": "Refrigerators & Kitchen",
+      "theme": "Major Home Appliances Exchange",
+      "destinationUrl": "https://www.vijaysales.com/c/refrigerators?utm_source=website&utm_medium=banner&utm_campaign=refrigerators_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ref-desktop-8?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-08-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ref-mobile-8?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-08-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 9,
+      "id": "banner-09",
+      "altText": "crispi",
+      "category": "Air Conditioners",
+      "theme": "Seasonal Climate Comfort Super Sale",
+      "destinationUrl": "https://www.vijaysales.com/p/P260515/260515/ninja-crispi-1700w-cleancrisptm-glass-air-fryer-4-in-1-cooking-1-4l-3-8l-glass-containers-recrisp-technology-360-clear-view-cooking-up-to-75-less-oil-fn101ingy-cyberspace-grey",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ninja-crispi-desktop-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-09-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ninja-crispi-mobile-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-09-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 10,
+      "id": "banner-10",
+      "altText": "Large appliance",
+      "category": "Laptops & Computing",
+      "theme": "High-Performance Gaming & Productivity",
+      "destinationUrl": "https://www.vijaysales.com/sale/laptop-buckets/gaming-laptop?utm_source=website&utm_medium=banner&utm_campaign=gaming_laptop_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/laptops-desktop-3?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-10-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/laptops-mobile-3?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-10-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 11,
+      "id": "banner-11",
+      "altText": "Ipad family",
+      "category": "General Electronics",
+      "theme": "Special Promotional Deal",
+      "destinationUrl": "https://www.vijaysales.com/sale/ipad-buckets/ipad-family?utm_source=website&utm_medium=banner&utm_campaign=ipad_family_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ipad-deskotp-6?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-11-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/ipad-mobile-6?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-11-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 12,
+      "id": "banner-12",
+      "altText": "TWS",
+      "category": "Personal Audio",
+      "theme": "Audio Accessories Launch",
+      "destinationUrl": "https://www.vijaysales.com/sale/vivo-Buds-XE-W39",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/vivo-buds-desktop-jpg?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-12-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/vivo-buds-mobile-jpg?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-12-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    },
+    {
+      "index": 13,
+      "id": "banner-13",
+      "altText": "ps5",
+      "category": "Gaming & Consoles",
+      "theme": "Console Gaming Release",
+      "destinationUrl": "https://www.vijaysales.com/p/258491/sony-ps5r-marvel-s-wolverine?utm_source=Website&utm_medium=Banner&utm_campaign=sony_ps5r_marvel_s_wolverine_hmp",
+      "desktop": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/wolverine-ps5-desktop-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/desktop/banner-13-desktop.jpg",
+        "dimensions": "2560x750 (WEBP)",
+        "aspectRatio": "3.41:1",
+        "width": 2560,
+        "height": 750
+      },
+      "mobile": {
+        "url": "https://s7ap1.scene7.com/is/image/vsproddmfinal/wolverine-ps5-mobile-1?dpr=on,2&bfc=on",
+        "localAsset": "public/marketing-intelligence/vijaysales/mobile/banner-13-mobile.jpg",
+        "dimensions": "2250x1650 (WEBP)",
+        "aspectRatio": "1.36:1",
+        "width": 2250,
+        "height": 1650
+      }
+    }
+  ]
+}
