@@ -6,18 +6,19 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles,
   AirVent,
+  Wind,
   Smartphone,
   Laptop,
   Home,
   UtensilsCrossed,
+  Utensils,
   Tv,
   Headphones,
-  Store,
   ChevronLeft,
   ChevronRight,
   ArrowRight,
 } from 'lucide-react';
-import { VIJAY_SALES_CATEGORIES } from '@/constants/navigation';
+import { PREVIEW_TABS } from '@/constants/navigation';
 import { getCategoryGridProducts } from '@/actions/categoryGrid';
 import { ProductCard } from '@/components/product/ProductCard';
 import { NoProductAvailable } from '@/components/product/NoProductAvailable';
@@ -26,13 +27,14 @@ import { cn } from '@/lib/utils';
 const ICON_MAP: Record<string, React.ElementType> = {
   Sparkles,
   AirVent,
+  Wind,
   Smartphone,
   Laptop,
   Home,
   UtensilsCrossed,
+  Utensils,
   Tv,
   Headphones,
-  Store,
 };
 
 export interface CategoryProductSectionProps {
@@ -67,7 +69,9 @@ export function CategoryProductSection({ initialProducts = [] }: CategoryProduct
     }
   };
 
-  const seeAllHref = activeTab === 'all' ? '/shop' : `/shop?category=${encodeURIComponent(activeTab)}`;
+  const currentTab = PREVIEW_TABS.find((t) => t.id === activeTab || t.value === activeTab);
+  const primaryCategory = currentTab?.categorySlugs?.[0];
+  const seeAllHref = !primaryCategory ? '/shop' : `/shop?category=${encodeURIComponent(primaryCategory)}`;
 
   return (
     <section className="space-y-6">
@@ -90,15 +94,18 @@ export function CategoryProductSection({ initialProducts = [] }: CategoryProduct
             ref={scrollRef}
             className="flex items-center gap-2.5 overflow-x-auto scrollbar-none py-1 scroll-smooth w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
-            {VIJAY_SALES_CATEGORIES.map((cat) => {
-              const isActive = activeTab.toLowerCase() === cat.value.toLowerCase();
-              const IconComponent = ICON_MAP[cat.iconName] || Sparkles;
+            {PREVIEW_TABS.map((cat) => {
+              const tabId = cat.id || cat.value || 'all';
+              const tabLabel = cat.label || cat.title || 'Products';
+              const iconKey = cat.icon || cat.iconName || 'Sparkles';
+              const isActive = activeTab.toLowerCase() === tabId.toLowerCase();
+              const IconComponent = ICON_MAP[iconKey] || Sparkles;
 
               return (
                 <button
-                  key={cat.value}
+                  key={tabId}
                   type="button"
-                  onClick={() => handleTabChange(cat.value)}
+                  onClick={() => handleTabChange(tabId)}
                   className={cn(
                     'inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 border',
                     isActive
@@ -107,7 +114,7 @@ export function CategoryProductSection({ initialProducts = [] }: CategoryProduct
                   )}
                 >
                   <IconComponent className={cn('h-3.5 w-3.5', isActive ? 'text-white' : 'text-emerald-600')} />
-                  <span>{cat.title}</span>
+                  <span>{tabLabel}</span>
                 </button>
               );
             })}

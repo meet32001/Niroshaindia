@@ -15,17 +15,110 @@ export const PRODUCT_TYPES = [
   { title: "Accessories", value: "accessories" },
 ];
 
-export const VIJAY_SALES_CATEGORIES = [
-  { title: "All Products", value: "all", iconName: "Sparkles" },
-  { title: "AC", value: "ac", iconName: "AirVent" },
-  { title: "Mobiles & Tablets", value: "mobiles-tablets-accessories", iconName: "Smartphone" },
-  { title: "Laptops & PCs", value: "laptops-accessories", iconName: "Laptop" },
-  { title: "Home Appliances", value: "home-appliances", iconName: "Home" },
-  { title: "Kitchen Appliances", value: "kitchen-appliances", iconName: "UtensilsCrossed" },
-  { title: "TV & Vision", value: "tv", iconName: "Tv" },
-  { title: "Audio & Headphones", value: "headphones-speakers", iconName: "Headphones" },
-  { title: "Brand Stores", value: "brand-stores", iconName: "Store" },
+export interface PreviewTab {
+  id: string;
+  label: string;
+  icon: string;
+  categorySlugs: string[];
+  title?: string;
+  value?: string;
+  iconName?: string;
+}
+
+export const PREVIEW_TABS: PreviewTab[] = [
+  {
+    id: "all",
+    label: "All Products",
+    icon: "Sparkles",
+    categorySlugs: [], // Fetches balanced featured items across catalog
+    title: "All Products",
+    value: "all",
+    iconName: "Sparkles",
+  },
+  {
+    id: "ac",
+    label: "Air Conditioners",
+    icon: "AirVent",
+    // Strictly air conditioners only
+    categorySlugs: ["air-conditioners", "split-air-conditioners", "window-air-conditioners"],
+    title: "Air Conditioners",
+    value: "ac",
+    iconName: "AirVent",
+  },
+  {
+    id: "mobiles-tablets",
+    label: "Mobiles & Tablets",
+    icon: "Smartphone",
+    // Strictly phones and tablets - EXCLUDES chargers, cases, smartwatches
+    categorySlugs: ["smartphones", "tablets-ipads"],
+    title: "Mobiles & Tablets",
+    value: "mobiles-tablets",
+    iconName: "Smartphone",
+  },
+  {
+    id: "laptops-pcs",
+    label: "Laptops & MacBooks",
+    icon: "Laptop",
+    // Strictly computers - EXCLUDES laptop bags, cables, external storage
+    categorySlugs: [
+      "laptops-macbooks",
+      "gaming-laptops",
+      "laptops-ultrabooks",
+      "laptops",
+      "monitors-desktops",
+    ],
+    title: "Laptops & MacBooks",
+    value: "laptops-pcs",
+    iconName: "Laptop",
+  },
+  {
+    id: "tv-vision",
+    label: "TV & Vision",
+    icon: "Tv",
+    // Strictly TVs
+    categorySlugs: ["4k-oled-smart-tvs", "4k-smart-tvs", "televisions"],
+    title: "TV & Vision",
+    value: "tv-vision",
+    iconName: "Tv",
+  },
+  {
+    id: "audio-headphones",
+    label: "Audio & Headphones",
+    icon: "Headphones",
+    // Strictly audio items - EXCLUDES tablets, phones, smartwatches
+    categorySlugs: [
+      "tws-earbuds",
+      "headphones",
+      "bluetooth-speakers",
+      "soundbars-home-theatres",
+      "party-speakers",
+      "headphones-tws",
+    ],
+    title: "Audio & Headphones",
+    value: "audio-headphones",
+    iconName: "Headphones",
+  },
+  {
+    id: "home-appliances",
+    label: "Home Appliances",
+    icon: "Home",
+    categorySlugs: ["refrigerators", "washing-machines", "air-conditioners"],
+    title: "Home Appliances",
+    value: "home-appliances",
+    iconName: "Home",
+  },
+  {
+    id: "kitchen-appliances",
+    label: "Kitchen Appliances",
+    icon: "UtensilsCrossed",
+    categorySlugs: ["microwaves-otgs", "mixers-juicers-blenders", "air-fryers"],
+    title: "Kitchen Appliances",
+    value: "kitchen-appliances",
+    iconName: "UtensilsCrossed",
+  },
 ];
+
+export const VIJAY_SALES_CATEGORIES = PREVIEW_TABS;
 
 
 export const HEADER_NAV_LINKS: NavigationItem[] = [

@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { MOCK_PRODUCTS, normalizeProduct } from '@/lib/db/products';
+import { PREVIEW_TABS } from '@/constants/navigation';
 
 function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -17,17 +18,29 @@ function getSupabaseAdmin() {
 
 const slugSchema = z.string().trim().max(100);
 
+// Backward-compatible category slug mapping for legacy URLs
+const LEGACY_SLUG_MAP: Record<string, string> = {
+  'mobiles-tablets-accessories': 'mobiles-tablets',
+  'laptops-accessories': 'laptops-pcs',
+  tv: 'tv-vision',
+  'headphones-speakers': 'audio-headphones',
+};
+
 export async function getCategoryGridProducts(categorySlug: string) {
   const parseResult = slugSchema.safeParse(categorySlug);
   if (!parseResult.success) return [];
 
-  const slug = parseResult.data.toLowerCase();
+  const rawSlug = parseResult.data.toLowerCase();
+  const slug = LEGACY_SLUG_MAP[rawSlug] || rawSlug;
   const supabase = getSupabaseAdmin();
 
   try {
-    // 1. SPECIFIC CATEGORY FILTER (AC, TV, Mobiles, Laptops, etc.)
+    // 1. SPECIFIC TAB FILTER (Strict category slug mapping, NO fuzzy name matching)
     if (slug !== 'all') {
-      let query = supabase
+      const targetTab = PREVIEW_TABS.find((t) => t.id === slug);
+      const targetSlugs = targetTab ? targetTab.categorySlugs : [slug];
+
+      const { data: products, error } = await supabase
         .from('products')
         .select(
           `
@@ -37,8 +50,8 @@ export async function getCategoryGridProducts(categorySlug: string) {
           description,
           is_active,
           brand:brands ( id, name, slug, logo_url ),
-          category:categories ( id, name, slug, description ),
-          variants:product_variants (
+          category:categories!inner ( id, name, slug, description ),
+          variants:product_variants!inner (
             id,
             sku,
             name,
@@ -53,78 +66,43 @@ export async function getCategoryGridProducts(categorySlug: string) {
           )
         `
         )
-        .eq('is_active', true);
-
-      if (slug === 'ac') {
-        query = query.or('name.ilike.%AC%,name.ilike.%Air Conditioner%,description.ilike.%split ac%');
-      } else if (slug === 'tv') {
-        query = query.or('name.ilike.%TV%,name.ilike.%Television%,name.ilike.%OLED%,name.ilike.%Smart TV%');
-      } else if (slug === 'mobiles-tablets-accessories') {
-        query = query.or('name.ilike.%Phone%,name.ilike.%Mobile%,name.ilike.%Tablet%,name.ilike.%iPad%,name.ilike.%Galaxy%');
-      } else if (slug === 'laptops-accessories') {
-        query = query.or('name.ilike.%Laptop%,name.ilike.%MacBook%,name.ilike.%Notebook%,name.ilike.%ProBook%');
-      } else if (slug === 'home-appliances') {
-        query = query.or('name.ilike.%Purifier%,name.ilike.%Refrigerator%,name.ilike.%Washing%,name.ilike.%Vacuum%');
-      } else if (slug === 'kitchen-appliances') {
-        query = query.or('name.ilike.%Air Fryer%,name.ilike.%Blender%,name.ilike.%Oven%,name.ilike.%Mixer%');
-      } else if (slug === 'headphones-speakers') {
-        query = query.or('name.ilike.%Headphone%,name.ilike.%TWS%,name.ilike.%Speaker%,name.ilike.%Sony WH%');
-      } else if (slug === 'brand-stores') {
-        query = query.order('created_at', { ascending: false });
-      } else {
-        query = query.or(`name.ilike.%${slug}%,description.ilike.%${slug}%`);
-      }
-
-      const { data: products, error } = await query.limit(15);
+        .in('category.slug', targetSlugs)
+        .gt('product_variants.price_cents', 0)
+        .eq('is_active', true)
+        .order('id', { ascending: false })
+        .limit(15);
 
       if (!error && Array.isArray(products) && products.length > 0) {
         return products.map(normalizeProduct);
       }
 
-      // Fallback filtering on MOCK_PRODUCTS if database query returns fewer items
-      let mockFiltered = MOCK_PRODUCTS.map(normalizeProduct);
-      if (slug === 'ac') {
-        mockFiltered = mockFiltered.filter(
-          (p) => (p.name || '').toLowerCase().includes('ac') || (p.category || '').toLowerCase().includes('appliance')
-        );
-      } else if (slug === 'tv') {
-        mockFiltered = mockFiltered.filter(
-          (p) => (p.name || '').toLowerCase().includes('tv') || (p.category || '').toLowerCase().includes('smart')
-        );
-      } else if (slug === 'mobiles-tablets-accessories') {
-        mockFiltered = mockFiltered.filter(
-          (p) => (p.category || '').toLowerCase().includes('gadget') || (p.name || '').toLowerCase().includes('phone')
-        );
-      } else if (slug === 'laptops-accessories') {
-        mockFiltered = mockFiltered.filter(
-          (p) => (p.name || '').toLowerCase().includes('laptop') || (p.name || '').toLowerCase().includes('probook')
-        );
-      }
-
-      return mockFiltered.slice(0, 15);
+      // Safe fallback from mock products
+      return MOCK_PRODUCTS.slice(0, 15).map(normalizeProduct);
     }
 
-    // 2. "ALL PRODUCTS": Cross-Category Balanced Distribution (3x5 = 15 items)
-    const targetCategoryKeywords = [
-      { key: 'phone', filter: 'name.ilike.%Phone%,name.ilike.%Galaxy%,name.ilike.%iPhone%' },
-      { key: 'ac', filter: 'name.ilike.%AC%,name.ilike.%Air Conditioner%,name.ilike.%Inverter%' },
-      { key: 'laptop', filter: 'name.ilike.%Laptop%,name.ilike.%MacBook%,name.ilike.%ProBook%' },
-      { key: 'tv', filter: 'name.ilike.%TV%,name.ilike.%OLED%,name.ilike.%Smart TV%' },
-      { key: 'audio_kitchen', filter: 'name.ilike.%Headphone%,name.ilike.%Purifier%,name.ilike.%Air Fryer%,name.ilike.%Sony%' },
+    // 2. "ALL PRODUCTS": Balanced multi-category showcase across flagship devices
+    const flagshipCategorySlugs = [
+      ['smartphones'],
+      ['laptops-macbooks', 'gaming-laptops'],
+      ['air-conditioners'],
+      ['4k-oled-smart-tvs', '4k-smart-tvs'],
+      ['tws-earbuds', 'headphones', 'bluetooth-speakers'],
+      ['refrigerators', 'washing-machines', 'air-fryers'],
     ];
 
-    const bucketPromises = targetCategoryKeywords.map((b) =>
+    const bucketPromises = flagshipCategorySlugs.map((slugs) =>
       supabase
         .from('products')
-        .select(`
+        .select(
+          `
           id,
           name,
           slug,
           description,
           is_active,
           brand:brands ( id, name, slug, logo_url ),
-          category:categories ( id, name, slug, description ),
-          variants:product_variants (
+          category:categories!inner ( id, name, slug, description ),
+          variants:product_variants!inner (
             id,
             sku,
             name,
@@ -137,15 +115,16 @@ export async function getCategoryGridProducts(categorySlug: string) {
             specifications:product_specifications ( specs ),
             inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
           )
-        `)
+        `
+        )
+        .in('category.slug', slugs)
+        .gt('product_variants.price_cents', 0)
         .eq('is_active', true)
-        .or(b.filter)
-        .limit(4)
+        .order('id', { ascending: false })
+        .limit(3)
     );
 
     const bucketResults = await Promise.all(bucketPromises);
-
-    // Interleave across buckets
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pool: any[] = [];
     const maxItemsPerBucket = 3;
@@ -158,56 +137,10 @@ export async function getCategoryGridProducts(categorySlug: string) {
       }
     }
 
-    // Fill remaining slots if pool has fewer than 15 items
-    if (pool.length < 15) {
-      const existingIds = pool.map((p) => p.id);
-      const { data: fillers } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          slug,
-          description,
-          is_active,
-          brand:brands ( id, name, slug, logo_url ),
-          category:categories ( id, name, slug, description ),
-          variants:product_variants (
-            id,
-            sku,
-            name,
-            price_cents,
-            compare_at_price_cents,
-            is_serialized,
-            weight_grams,
-            dimensions_mm_l_w_h,
-            images:product_images ( id, image_url, sort_order, is_featured ),
-            specifications:product_specifications ( specs ),
-            inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
-          )
-        `)
-        .eq('is_active', true)
-        .not('id', 'in', `(${existingIds.length ? existingIds.join(',') : '0'})`)
-        .limit(15 - pool.length);
-
-      if (fillers && fillers.length > 0) {
-        pool.push(...fillers);
-      }
-    }
-
-    // Fallback to MOCK_PRODUCTS if database return pool is smaller than 15
-    if (pool.length < 15) {
-      const mockNormalized = MOCK_PRODUCTS.map(normalizeProduct);
-      for (const mockItem of mockNormalized) {
-        if (pool.length >= 15) break;
-        if (!pool.some((p) => p.id === mockItem.id || p.id === mockItem._id)) {
-          pool.push(mockItem);
-        }
-      }
-    }
-
     // Deduplicate by ID
     const uniqueMap = new Map();
-    pool.forEach((p) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pool.forEach((p: any) => {
       const pid = p.id || p._id;
       if (!uniqueMap.has(pid)) {
         uniqueMap.set(pid, p);
@@ -215,16 +148,9 @@ export async function getCategoryGridProducts(categorySlug: string) {
     });
 
     const uniquePool = Array.from(uniqueMap.values()).slice(0, 15);
-
-    // Fisher-Yates Shuffle for dynamic multi-category placement
-    for (let i = uniquePool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [uniquePool[i], uniquePool[j]] = [uniquePool[j], uniquePool[i]];
-    }
-
     return uniquePool.map(normalizeProduct);
   } catch (error) {
-    console.error('[CATEGORY GRID BALANCED SAMPLING EXCEPTION]:', error);
+    console.error('[CATEGORY GRID QUERY EXCEPTION]:', error);
     return MOCK_PRODUCTS.map(normalizeProduct).slice(0, 15);
   }
 }
