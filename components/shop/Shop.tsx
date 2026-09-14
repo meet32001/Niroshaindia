@@ -17,8 +17,6 @@ import { Title } from "@/components/ui/text";
 import { CategoryList } from "@/components/shop/CategoryList";
 import { BrandList } from "@/components/shop/BrandList";
 import { PriceFilter } from "@/components/shop/PriceFilter";
-import { RatingFilter } from "@/components/shop/RatingFilter";
-import { OffersFilter } from "@/components/shop/OffersFilter";
 import { ProductCard } from "@/components/product/ProductCard";
 import { NoProductAvailable } from "@/components/product/NoProductAvailable";
 import { getShopCatalog, getContextualBrands, ShopCatalogResult } from "@/lib/db/products";
@@ -42,10 +40,6 @@ export function Shop({ categories, brands }: ShopProps) {
   const selectedPrice = searchParams.get("price");
   const minPriceParam = searchParams.get("min_price");
   const maxPriceParam = searchParams.get("max_price");
-  const ratingParam = searchParams.get("rating");
-  const inStockParam = searchParams.get("in_stock");
-  const bankDiscountParam = searchParams.get("bank_discount");
-  const noCostEmiParam = searchParams.get("no_cost_emi");
   const selectedSort = searchParams.get("sort") || "newest";
   const currentPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
 
@@ -59,12 +53,6 @@ export function Shop({ categories, brands }: ShopProps) {
       maxPrice = parts[1];
     }
   }
-
-  // Resolved Rating & Offers
-  const selectedRating = ratingParam ? parseInt(ratingParam, 10) : null;
-  const inStockOnly = inStockParam === "true";
-  const bankDiscount = bankDiscountParam === "true";
-  const noCostEmi = noCostEmiParam === "true";
 
   // Contextual Brands State
   const [currentBrands, setCurrentBrands] = useState(brands);
@@ -139,10 +127,6 @@ export function Shop({ categories, brands }: ShopProps) {
           brand: selectedBrand,
           minPrice: minPrice,
           maxPrice: maxPrice,
-          rating: selectedRating,
-          inStockOnly,
-          bankDiscount,
-          noCostEmi,
           search: searchQuery || null,
           sort: selectedSort,
           page: currentPage,
@@ -179,10 +163,6 @@ export function Shop({ categories, brands }: ShopProps) {
     selectedBrand,
     minPrice,
     maxPrice,
-    selectedRating,
-    inStockOnly,
-    bankDiscount,
-    noCostEmi,
     selectedSort,
     currentPage,
   ]);
@@ -192,30 +172,6 @@ export function Shop({ categories, brands }: ShopProps) {
       min_price: min !== null ? min.toString() : null,
       max_price: max !== null ? max.toString() : null,
       price: null,
-    });
-  };
-
-  const handleRatingChange = (rating: number | null) => {
-    updateParams({
-      rating: rating !== null ? rating.toString() : null,
-    });
-  };
-
-  const handleOfferToggle = (key: "inStockOnly" | "bankDiscount" | "noCostEmi") => {
-    if (key === "inStockOnly") {
-      updateParams({ in_stock: inStockOnly ? null : "true" });
-    } else if (key === "bankDiscount") {
-      updateParams({ bank_discount: bankDiscount ? null : "true" });
-    } else if (key === "noCostEmi") {
-      updateParams({ no_cost_emi: noCostEmi ? null : "true" });
-    }
-  };
-
-  const handleResetOffers = () => {
-    updateParams({
-      in_stock: null,
-      bank_discount: null,
-      no_cost_emi: null,
     });
   };
 
@@ -239,10 +195,6 @@ export function Shop({ categories, brands }: ShopProps) {
       selectedPrice ||
       minPrice !== null ||
       maxPrice !== null ||
-      selectedRating !== null ||
-      inStockOnly ||
-      bankDiscount ||
-      noCostEmi ||
       (selectedSort && selectedSort !== "newest")
   );
 
@@ -372,54 +324,6 @@ export function Shop({ categories, brands }: ShopProps) {
             </span>
           )}
 
-          {selectedRating && (
-            <span className="inline-flex items-center gap-1 bg-yellow-50 dark:bg-yellow-950/50 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800 px-2.5 py-1 rounded-full font-medium">
-              <span>{selectedRating}★ & above</span>
-              <button
-                onClick={() => updateParams({ rating: null })}
-                className="hover:text-yellow-900 dark:hover:text-yellow-100 cursor-pointer ml-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
-
-          {inStockOnly && (
-            <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-full font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-0.5"></span>
-              <span>In Stock Only</span>
-              <button
-                onClick={() => updateParams({ in_stock: null })}
-                className="hover:text-emerald-900 dark:hover:text-emerald-100 cursor-pointer ml-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
-
-          {bankDiscount && (
-            <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-full font-medium">
-              <span>Instant Bank Discount</span>
-              <button
-                onClick={() => updateParams({ bank_discount: null })}
-                className="hover:text-blue-900 dark:hover:text-blue-100 cursor-pointer ml-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
-
-          {noCostEmi && (
-            <span className="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-2.5 py-1 rounded-full font-medium">
-              <span>No Cost EMI</span>
-              <button
-                onClick={() => updateParams({ no_cost_emi: null })}
-                className="hover:text-purple-900 dark:hover:text-purple-100 cursor-pointer ml-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
         </div>
       )}
 
@@ -447,20 +351,6 @@ export function Shop({ categories, brands }: ShopProps) {
             minPrice={minPrice}
             maxPrice={maxPrice}
             onPriceChange={handlePriceChange}
-          />
-
-          <RatingFilter
-            selectedRating={selectedRating}
-            onRatingChange={handleRatingChange}
-            totalProductsCount={catalog.totalCount > 0 ? catalog.totalCount : 5562}
-          />
-
-          <OffersFilter
-            inStockOnly={inStockOnly}
-            bankDiscount={bankDiscount}
-            noCostEmi={noCostEmi}
-            onOfferToggle={handleOfferToggle}
-            onResetOffers={handleResetOffers}
           />
         </aside>
 
@@ -496,7 +386,7 @@ export function Shop({ categories, brands }: ShopProps) {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${searchQuery}-${selectedCategory}-${selectedBrand}-${minPrice}-${maxPrice}-${selectedRating}-${inStockOnly}-${bankDiscount}-${noCostEmi}-${selectedSort}-${currentPage}`}
+                key={`${searchQuery}-${selectedCategory}-${selectedBrand}-${minPrice}-${maxPrice}-${selectedSort}-${currentPage}`}
                 initial={{ opacity: 0.2, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
