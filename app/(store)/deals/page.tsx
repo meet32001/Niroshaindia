@@ -1,7 +1,7 @@
 import { Container } from "@/components/layout/Container";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, ArrowRight, ShieldCheck, Truck, RefreshCw, CreditCard, Flame } from "lucide-react";
+import { ArrowRight, Flame } from "lucide-react";
 import { DealsCountdown } from "@/components/deals/DealsCountdown";
 import { DealsCouponBar } from "@/components/deals/DealsCouponBar";
 import { selectWeeklyDeals, SelectedDealProduct } from "@/lib/deals/deal-selector";
@@ -226,38 +226,6 @@ export default async function DealsPage() {
               </Link>
             </div>
           ))}
-        </div>
-
-        {/* Trust Anchors Ribbon */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-6 border-t border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-            <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">100% Genuine</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Direct Brand Warranty</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-            <Truck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">Pan-India Express</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">19,000+ Pincodes</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-            <RefreshCw className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">7-Day Replacement</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Hassle-Free Guarantee</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-            <CreditCard className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">Flexible No-Cost EMI</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Leading Indian Banks</div>
-            </div>
-          </div>
         </div>
       </Container>
     </div>
