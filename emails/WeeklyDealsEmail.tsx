@@ -20,6 +20,7 @@ export interface DealEmailItem {
   name: string;
   categoryName: string;
   imageUrl: string;
+  anchorPriceFormatted?: string;
   mrpFormatted: string;
   dealPriceFormatted: string;
   savingsFormatted: string;
@@ -73,7 +74,7 @@ export function WeeklyDealsEmail({
             <Section style={couponBox}>
               <Text style={couponLabel}>USE VIP COUPON AT CHECKOUT</Text>
               <Text style={couponCodeStyle}>{couponCode}</Text>
-              <Text style={couponDesc}>Instant VIP discount on all 6 drops • Orders above ₹20,000</Text>
+              <Text style={couponDesc}>Instant VIP discount on all drops • Orders above ₹20,000</Text>
             </Section>
           </Section>
 
@@ -101,11 +102,15 @@ export function WeeklyDealsEmail({
 
               <div style={priceContainer}>
                 <span style={bumperPrice}>{bumperDeal.dealPriceFormatted}</span>
-                {bumperDeal.mrpFormatted && <span style={mrpPrice}>MRP: {bumperDeal.mrpFormatted}</span>}
+                {bumperDeal.anchorPriceFormatted ? (
+                  <span style={mrpPrice}>WAS {bumperDeal.anchorPriceFormatted}</span>
+                ) : bumperDeal.mrpFormatted ? (
+                  <span style={mrpPrice}>WAS {bumperDeal.mrpFormatted}</span>
+                ) : null}
               </div>
 
               <div style={bumperSavingsPill}>
-                Save {bumperDeal.savingsFormatted} (25% Festival Discount)
+                Save {bumperDeal.savingsFormatted} (FLAT 25% FESTIVAL OFF)
               </div>
 
               <Section style={{ textAlign: "center", marginTop: "18px" }}>

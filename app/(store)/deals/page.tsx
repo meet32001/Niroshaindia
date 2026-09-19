@@ -149,16 +149,16 @@ export default async function DealsPage() {
                   </div>
 
                   <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
-                    <span className="text-xs text-slate-500 block">Store MRP:</span>
+                    <span className="text-xs text-slate-500 block">Anchor Price:</span>
                     <span className="text-base font-semibold line-through text-slate-400">
-                      {formatINR(bumperDeal.mrpCents)}
+                      WAS {formatINR(bumperDeal.anchorPriceCents || bumperDeal.mrpCents)}
                     </span>
                   </div>
 
                   <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
                     <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold block">Instant Savings:</span>
                     <span className="text-base font-extrabold text-emerald-700 dark:text-emerald-400">
-                      Save {formatINR(bumperDeal.savingsCents)} (25% OFF)
+                      Save {formatINR(bumperDeal.savingsCents)} (FLAT 25% OFF)
                     </span>
                   </div>
                 </div>
@@ -174,7 +174,7 @@ export default async function DealsPage() {
                       name: bumperDeal.name,
                       slug: bumperDeal.slug,
                       dealPriceCents: bumperDeal.dealPriceCents,
-                      mrpCents: bumperDeal.mrpCents,
+                      mrpCents: bumperDeal.anchorPriceCents || bumperDeal.mrpCents,
                       imageUrl: bumperDeal.imageUrl,
                     }}
                     className="w-full sm:w-auto"

@@ -72,11 +72,13 @@ async function dispatchWeeklyDeals() {
     console.log(`       Price: ₹${Math.round(d.dealPriceCents / 100).toLocaleString("en-IN")} (Original: ₹${Math.round(d.originalPriceCents / 100).toLocaleString("en-IN")}, Save: ₹${Math.round(d.savingsCents / 100).toLocaleString("en-IN")})`);
   });
 
+  const hasBumper = deals.some((d) => d.isBumperDeal);
+  const bumperDeal = deals.find((d) => d.isBumperDeal);
+
   // Step B: Record Deals in weekly_deals Table
   console.log("\n💾 Storing weekly deals in Supabase...");
   try {
     const weekIdentifier = `${year}-W${String(weekNumber).padStart(2, "0")}`;
-    const hasBumper = deals.some((d) => d.isBumperDeal);
 
     const { error: upsertError } = await supabase.from("weekly_deals").upsert(
       {
@@ -85,6 +87,7 @@ async function dispatchWeeklyDeals() {
         discount_pct: 15,
         discount_percent: 15,
         is_bumper_deal: hasBumper,
+        anchor_price_cents: bumperDeal ? bumperDeal.anchorPriceCents : null,
         products: deals,
         starts_at: startsAt.toISOString(),
         expires_at: expiresAt.toISOString(),
@@ -94,7 +97,7 @@ async function dispatchWeeklyDeals() {
     );
 
     if (upsertError) {
-      if (upsertError.message?.includes("column") || upsertError.message?.includes("discount_percent")) {
+      if (upsertError.message?.includes("column") || upsertError.message?.includes("discount_percent") || upsertError.message?.includes("anchor_price_cents")) {
         // Fallback to storing in JSONB payload until migration is executed
         const { error: fallbackError } = await supabase.from("weekly_deals").upsert(
           {
@@ -185,6 +188,7 @@ async function dispatchWeeklyDeals() {
     name: d.name,
     categoryName: d.categoryName,
     imageUrl: d.imageUrl,
+    anchorPriceFormatted: formatINR(d.anchorPriceCents || d.mrpCents),
     mrpFormatted: formatINR(d.mrpCents),
     dealPriceFormatted: formatINR(d.dealPriceCents),
     savingsFormatted: formatINR(d.savingsCents),
@@ -230,12 +234,16 @@ async function dispatchWeeklyDeals() {
   let successCount = 0;
   let failCount = 0;
 
+  const emailSubject = hasBumper
+    ? `🔥 25% FESTIVAL BUMPER OFFER: ${bumperDeal?.name} + 6 High-Ticket Tech Deals (Week ${weekNumber})`
+    : `Exclusive Monday Drop: 6 High-Ticket Tech Deals for VIP Members (Week ${weekNumber})`;
+
   for (const sub of subscribers) {
     try {
       const { error: sendError } = await resend.emails.send({
         from: fromEmail,
         to: sub.email,
-        subject: `Exclusive Monday Drop: 6 High-Ticket Tech Deals for VIP Members (Week ${weekNumber})`,
+        subject: emailSubject,
         html: emailHtml,
       });
 
