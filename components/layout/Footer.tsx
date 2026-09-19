@@ -20,8 +20,6 @@ export function Footer() {
   const CUSTOMER_SUPPORT_LINKS = [
     { title: "Track Your Order", href: "/orders" },
     { title: "Return & Replacement", href: "/terms#returns" },
-    { title: "Warranty & Service", href: "/contact" },
-    { title: "Shipping & Delivery", href: "/terms#shipping" },
     { title: "Frequently Asked Questions", href: "/contact#faqs" },
     { title: "Contact Us", href: "/contact" },
   ];
