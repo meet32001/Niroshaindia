@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Container } from "@/components/layout/Container";
 import { Logo } from "@/components/header/Logo";
-import { SocialMedia } from "@/components/shared/SocialMedia";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
@@ -41,15 +40,12 @@ export function Footer() {
       <Container>
         {/* Main 4-Column Footer */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-12">
-          {/* Col 1: Brand & Social */}
+          {/* Col 1: Brand */}
           <div className="space-y-4">
             <Logo spanClassName="text-white" />
             <p className="text-xs text-slate-400 leading-relaxed">
               Nirosha India is your premier destination for high-performance consumer electronics, noise-cancelling audio, smart appliances, and fast charging gear.
             </p>
-            <div className="pt-2">
-              <SocialMedia iconClassName="border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-400" />
-            </div>
           </div>
 
           {/* Col 2: Quick Links */}
