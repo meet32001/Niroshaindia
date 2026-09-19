@@ -75,28 +75,51 @@ async function dispatchWeeklyDeals() {
   // Step B: Record Deals in weekly_deals Table
   console.log("\n💾 Storing weekly deals in Supabase...");
   try {
-    // Delete any existing deals for this week to avoid duplicates
-    await supabase.from("weekly_deals").delete().match({ week_number: weekNumber, year });
+    const weekIdentifier = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+    const hasBumper = deals.some((d) => d.isBumperDeal);
 
-    const rowsToInsert = deals.map((d) => ({
-      week_number: weekNumber,
-      year,
-      product_id: d.id,
-      deal_price_cents: d.dealPriceCents,
-      coupon_code: couponCode,
-      starts_at: startsAt.toISOString(),
-      expires_at: expiresAt.toISOString(),
-    }));
+    const { error: upsertError } = await supabase.from("weekly_deals").upsert(
+      {
+        week_identifier: weekIdentifier,
+        coupon_code: couponCode,
+        discount_pct: 15,
+        discount_percent: 15,
+        is_bumper_deal: hasBumper,
+        products: deals,
+        starts_at: startsAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      },
+      { onConflict: "week_identifier" }
+    );
 
-    const { error: insertDealsError } = await supabase.from("weekly_deals").insert(rowsToInsert);
-    if (insertDealsError) {
-      if (insertDealsError.message?.includes("does not exist") || insertDealsError.code === "42P01") {
-        console.warn("⚠️  Table 'weekly_deals' does not exist yet. Run migration 20260920_newsletter_deals_system.sql.");
+    if (upsertError) {
+      if (upsertError.message?.includes("column") || upsertError.message?.includes("discount_percent")) {
+        // Fallback to storing in JSONB payload until migration is executed
+        const { error: fallbackError } = await supabase.from("weekly_deals").upsert(
+          {
+            week_identifier: weekIdentifier,
+            coupon_code: couponCode,
+            discount_pct: 15,
+            products: deals,
+            starts_at: startsAt.toISOString(),
+            expires_at: expiresAt.toISOString(),
+            is_active: true,
+          },
+          { onConflict: "week_identifier" }
+        );
+        if (!fallbackError) {
+          console.log(`✅ Recorded drop '${weekIdentifier}' in 'weekly_deals' (JSONB products payload).`);
+        } else {
+          console.warn("⚠️  weekly_deals table write note:", fallbackError.message);
+        }
+      } else if (upsertError.message?.includes("does not exist") || upsertError.code === "42P01") {
+        console.warn("⚠️  Table 'weekly_deals' does not exist yet. Run migrations.");
       } else {
-        console.error("⚠️  Failed to insert into weekly_deals:", insertDealsError.message);
+        console.error("⚠️  Failed to upsert weekly_deals:", upsertError.message);
       }
     } else {
-      console.log(`✅ Successfully recorded ${rowsToInsert.length} deals in 'weekly_deals'.`);
+      console.log(`✅ Successfully recorded drop '${weekIdentifier}' in 'weekly_deals' (Bumper: ${hasBumper}).`);
     }
   } catch (err: any) {
     console.warn("⚠️  weekly_deals table write skipped:", err.message);
@@ -158,12 +181,16 @@ async function dispatchWeeklyDeals() {
 
   const emailDeals: DealEmailItem[] = deals.map((d) => ({
     id: d.id,
+    variantId: d.variantId,
     name: d.name,
     categoryName: d.categoryName,
     imageUrl: d.imageUrl,
     mrpFormatted: formatINR(d.mrpCents),
     dealPriceFormatted: formatINR(d.dealPriceCents),
     savingsFormatted: formatINR(d.savingsCents),
+    discountPercentage: d.discountPercentage,
+    discountPercent: d.discountPercent,
+    isBumperDeal: d.isBumperDeal,
     productUrl: `${baseUrl}/product/${d.slug}`,
   }));
 

@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const syncedRef = useRef(false);
 
   useEffect(() => {
@@ -43,18 +44,35 @@ export default function AuthCallbackPage() {
       } catch (err) {
         console.error('[AUTH-CALLBACK] Sync fetch failed:', err);
       } finally {
-        // Guarantee navigation to /shop regardless of network latency
-        router.replace('/shop');
+        // Navigate to specified redirect path or fallback to /shop
+        const redirectParam = searchParams.get('redirect') || searchParams.get('redirect_url');
+        const destination = redirectParam ? decodeURIComponent(redirectParam) : '/shop';
+        router.replace(destination);
       }
     };
 
     syncCustomer();
-  }, [isLoaded, isSignedIn, user, router]);
+  }, [isLoaded, isSignedIn, user, router, searchParams]);
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
       <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
       <p className="text-gray-600 font-medium">Finalizing your account setup...</p>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-600 font-medium">Finalizing your account setup...</p>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

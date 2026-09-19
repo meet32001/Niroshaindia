@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import {
   ShieldCheck,
@@ -17,6 +17,8 @@ import {
   User,
   Phone,
   AlertCircle,
+  Ticket,
+  Flame,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -34,6 +36,7 @@ import { useIsMounted } from "@/hooks/useIsMounted";
 import { getUserAddresses, saveAddress } from "@/actions/address";
 import { getActiveDeliveryRegions } from "@/actions/deliveryRegions";
 import { createCheckoutSession } from "@/actions/createCheckoutSession";
+import { getVariantForCheckout, validateCouponAction, CouponValidationResult } from "@/actions/deals";
 import { addressSchema, AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
 import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
@@ -51,11 +54,62 @@ interface DeliveryCityItem {
   name: string;
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isLoaded, isSignedIn, user } = useUser();
   const { items, getTotalPrice, getSubtotalPrice } = useStore();
   const isMounted = useIsMounted();
+
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [isAutoAddingVariant, setIsAutoAddingVariant] = useState(false);
+
+  const variantIdParam = searchParams.get("variant_id");
+  const couponParam = searchParams.get("coupon") || searchParams.get("apply_deal");
+
+  // Auto-load variant into cart if missing from deep-link
+  useEffect(() => {
+    if (!variantIdParam || !isMounted) return;
+    const vid = Number(variantIdParam);
+    if (isNaN(vid) || vid <= 0) return;
+
+    const exists = items.some((item) => {
+      const v = item.product?.variantId || item.product?.id;
+      return Number(v) === vid;
+    });
+
+    if (!exists) {
+      setIsAutoAddingVariant(true);
+      getVariantForCheckout(vid)
+        .then((res) => {
+          if (res.success && res.product) {
+            useStore.getState().addItem(res.product);
+            toast.success("VIP Deal product added to your bag!", { id: "deal-auto-added" });
+          }
+        })
+        .catch((err) => {
+          console.warn("[checkout] Error auto-loading variant:", err);
+        })
+        .finally(() => {
+          setIsAutoAddingVariant(false);
+        });
+    }
+  }, [variantIdParam, isMounted, items]);
+
+  // Auto-apply coupon from URL searchParams
+  useEffect(() => {
+    if (!couponParam || !isMounted || appliedCoupon) return;
+    const baseTotal = getTotalPrice();
+    if (baseTotal <= 0) return;
+
+    const subtotalCents = Math.round(baseTotal * 100);
+    validateCouponAction(couponParam, subtotalCents).then((res) => {
+      if (res.valid) {
+        setAppliedCoupon(res);
+        toast.success(`VIP Deal Applied: ${res.code}`, { id: "vip-coupon-applied" });
+      }
+    });
+  }, [couponParam, isMounted, appliedCoupon, getTotalPrice]);
 
   // Address state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -264,11 +318,13 @@ export default function CheckoutPage() {
     }));
   };
 
-  if (!isLoaded || !isMounted) {
+  if (!isLoaded || !isMounted || isAutoAddingVariant || (variantIdParam && items.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-shop-orange" />
-        <span className="text-xs font-semibold text-slate-500">Preparing checkout...</span>
+        <span className="text-xs font-semibold text-slate-500">
+          {isAutoAddingVariant ? "Adding your VIP deal item to checkout..." : "Preparing checkout..."}
+        </span>
       </div>
     );
   }
@@ -293,8 +349,10 @@ export default function CheckoutPage() {
     );
   }
 
-  const totalPrice = getTotalPrice();
+  const baseTotalPrice = getTotalPrice();
   const subtotalPrice = getSubtotalPrice();
+  const couponDiscountAmount = appliedCoupon ? appliedCoupon.discountCents / 100 : 0;
+  const totalPrice = Math.max(0, baseTotalPrice - couponDiscountAmount);
   const totalSavings = Math.max(0, subtotalPrice - totalPrice);
 
   const getImageUrl = (img: unknown) => {
@@ -384,6 +442,8 @@ export default function CheckoutPage() {
         customerEmail: user?.primaryEmailAddress?.emailAddress || "",
         clerkUserId: user?.id || "",
         address: { ...targetAddress, country: "India" },
+        couponCode: appliedCoupon?.code,
+        discountCents: appliedCoupon?.discountCents,
       };
 
       const checkoutUrl = await createCheckoutSession(items, metadata);
@@ -770,7 +830,17 @@ export default function CheckoutPage() {
                   <PriceFormatter amount={subtotalPrice} className="font-bold text-slate-900 dark:text-slate-100" />
                 </div>
 
-                {totalSavings > 0 && (
+                {appliedCoupon && (
+                  <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                    <div className="flex items-center gap-1.5">
+                      <Ticket className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>VIP Deal Applied ({appliedCoupon.code})</span>
+                    </div>
+                    <span>-<PriceFormatter amount={couponDiscountAmount} /></span>
+                  </div>
+                )}
+
+                {totalSavings > 0 && !appliedCoupon && (
                   <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-bold">
                     <span>Discount Savings</span>
                     <span>-<PriceFormatter amount={totalSavings} /></span>
@@ -824,3 +894,19 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-shop-orange" />
+          <span className="text-xs font-semibold text-slate-500">Preparing checkout...</span>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  );
+}
+

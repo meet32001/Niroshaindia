@@ -1,12 +1,22 @@
 import { SignIn } from "@clerk/nextjs";
 
-export default function SignInPage() {
+interface SignInPageProps {
+  searchParams?: Promise<{ redirect?: string; redirect_url?: string }>;
+}
+
+export default async function SignInPage({ searchParams }: SignInPageProps) {
+  const params = await searchParams;
+  const targetRedirect = params?.redirect || params?.redirect_url;
+  const callbackUrl = targetRedirect
+    ? `/auth-callback?redirect=${encodeURIComponent(targetRedirect)}`
+    : "/auth-callback";
+
   return (
     <SignIn
       path="/sign-in"
       routing="path"
       signUpUrl="/sign-up"
-      forceRedirectUrl="/auth-callback"
+      forceRedirectUrl={callbackUrl}
       appearance={{
         elements: {
           rootBox: "w-full shadow-lg rounded-2xl overflow-hidden",

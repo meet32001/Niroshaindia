@@ -11,6 +11,8 @@ export interface CheckoutMetadata {
   clerkUserId?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   address: any;
+  couponCode?: string;
+  discountCents?: number;
 }
 
 export async function createCheckoutSession(
@@ -69,6 +71,19 @@ export async function createCheckoutSession(
       };
     });
 
+    // If discountCents is present, apply proportional discount to unit_amounts
+    if (metadata.discountCents && metadata.discountCents > 0) {
+      const totalCents = line_items.reduce((sum, item) => sum + (item.price_data.unit_amount * item.quantity), 0);
+      if (totalCents > 0) {
+        const discountRatio = Math.min(1, metadata.discountCents / totalCents);
+        line_items.forEach((item) => {
+          const originalUnit = item.price_data.unit_amount;
+          const discountedUnit = Math.max(100, Math.round(originalUnit * (1 - discountRatio)));
+          item.price_data.unit_amount = discountedUnit;
+        });
+      }
+    }
+
     // 3. Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -84,6 +99,8 @@ export async function createCheckoutSession(
         customerEmail: metadata.customerEmail,
         clerkUserId: metadata.clerkUserId || "",
         address: JSON.stringify(metadata.address),
+        couponCode: metadata.couponCode || "",
+        discountCents: String(metadata.discountCents || 0),
       },
       line_items,
       success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}&order_number=${metadata.orderNumber}`,
