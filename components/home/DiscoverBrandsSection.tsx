@@ -37,7 +37,7 @@ export function DiscoverBrandsSection() {
 
       {/* CTA Button */}
       <Link
-        href="/brands"
+        href="/shop"
         className="inline-flex items-center justify-center px-8 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors shadow-xs"
       >
         Shop Top Brands
