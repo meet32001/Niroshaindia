@@ -3,17 +3,38 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Container } from "@/components/layout/Container";
-import { Sparkles, Mail, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sparkles, Mail, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { subscribeNewsletter } from "@/actions/newsletter";
+import { toast } from "react-hot-toast";
 
 export function Footer() {
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
-      setSubscribed(true);
-      setEmail("");
+    if (!email.trim()) return;
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.set("email", email);
+
+      const res = await subscribeNewsletter(formData);
+      if (res.success) {
+        setSubscribed(true);
+        setSuccessMessage(res.message);
+        toast.success(res.message);
+        setEmail("");
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error("Failed to subscribe. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -109,9 +130,9 @@ export function Footer() {
               </p>
 
               {subscribed ? (
-                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 p-3 rounded-lg border border-emerald-800">
+                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-800/80">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>Thank you for subscribing to Nirosha India!</span>
+                  <span>{successMessage || "Thank you for subscribing to Nirosha VIP Club!"}</span>
                 </div>
               ) : (
                 <form onSubmit={handleSubscribe} className="space-y-2.5">
@@ -123,18 +144,29 @@ export function Footer() {
                       <input
                         type="email"
                         required
+                        disabled={loading}
                         placeholder="Enter your email address..."
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2.5 bg-[#0B1120] border border-[#1E293B] rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                        className="w-full pl-9 pr-3 py-2.5 bg-[#0B1120] border border-[#1E293B] rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all disabled:opacity-50"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="px-5 py-2.5 bg-[#10B981] hover:bg-emerald-600 active:bg-emerald-700 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-md shadow-emerald-950/40 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                      disabled={loading}
+                      className="px-5 py-2.5 bg-[#10B981] hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-md shadow-emerald-950/40 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <span>Subscribe</span>
-                      <ArrowRight className="w-3.5 h-3.5 font-bold" />
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Joining...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Subscribe</span>
+                          <ArrowRight className="w-3.5 h-3.5 font-bold" />
+                        </>
+                      )}
                     </button>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-500">

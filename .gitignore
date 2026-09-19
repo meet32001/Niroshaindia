@@ -39,7 +39,8 @@ next-env.d.ts
 .clerk/
 
 # background scripts & database seeds (keep out of Vercel production builds)
-/scripts/
+/scripts/*
+!/scripts/dispatch-weekly-deals.ts
 /supabase/*.sql
 !/supabase/migrations/
 !/supabase/migrations/*.sql
