@@ -36,7 +36,7 @@ import { useIsMounted } from "@/hooks/useIsMounted";
 import { getUserAddresses, saveAddress } from "@/actions/address";
 import { getActiveDeliveryRegions } from "@/actions/deliveryRegions";
 import { createCheckoutSession } from "@/actions/createCheckoutSession";
-import { getVariantForCheckout, validateCouponAction, CouponValidationResult } from "@/actions/deals";
+import { getVariantForCheckout, validateCouponAction, getDealDetailsAction, CouponValidationResult } from "@/actions/deals";
 import { addressSchema, AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
 import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
@@ -58,16 +58,74 @@ function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoaded, isSignedIn, user } = useUser();
-  const { items, getTotalPrice, getSubtotalPrice } = useStore();
+  const { items, getTotalPrice, getSubtotalPrice, activeDeal, setActiveDeal } = useStore();
   const isMounted = useIsMounted();
 
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
   const [isAutoAddingVariant, setIsAutoAddingVariant] = useState(false);
 
+  const dealIdParam = searchParams.get("deal_id") || searchParams.get("deal");
   const variantIdParam = searchParams.get("variant_id");
   const couponParam = searchParams.get("coupon") || searchParams.get("apply_deal");
 
-  // Auto-load variant into cart if missing from deep-link
+  // 1. Resolve Deal details & apply VIP discount
+  useEffect(() => {
+    if (!isMounted) return;
+
+    // A. Priority: activeDeal from Zustand store
+    if (activeDeal) {
+      setAppliedCoupon({
+        valid: true,
+        code: activeDeal.couponCode,
+        discountCents: activeDeal.savingsCents,
+        discountPercent: activeDeal.discountPercent,
+        message: `VIP Deal Applied (${activeDeal.discountPercent}% OFF)`,
+      });
+      return;
+    }
+
+    // B. Resolve from URL searchParams
+    const targetVariantId = Number(variantIdParam || 0);
+    const targetDealId = Number(dealIdParam || 0);
+
+    if (targetVariantId > 0 || targetDealId > 0 || couponParam) {
+      getDealDetailsAction(targetVariantId, targetDealId, couponParam || undefined).then((deal) => {
+        if (deal && deal.found) {
+          setActiveDeal({
+            dealId: deal.dealId,
+            variantId: deal.variantId,
+            productId: deal.productId,
+            couponCode: deal.couponCode,
+            originalPriceCents: deal.originalPriceCents,
+            dealPriceCents: deal.dealPriceCents,
+            discountPercent: deal.discountPercent,
+            savingsCents: deal.savingsCents,
+            isBumper: deal.isBumper,
+          });
+          setAppliedCoupon({
+            valid: true,
+            code: deal.couponCode,
+            discountCents: deal.savingsCents,
+            discountPercent: deal.discountPercent,
+            message: `VIP Deal Applied (${deal.discountPercent}% OFF)`,
+          });
+          toast.success(`VIP Deal Applied (${deal.discountPercent}% OFF)`, { id: "vip-deal-applied" });
+        } else if (couponParam) {
+          const baseTotal = getTotalPrice();
+          if (baseTotal > 0) {
+            validateCouponAction(couponParam, Math.round(baseTotal * 100)).then((res) => {
+              if (res.valid) {
+                setAppliedCoupon(res);
+                toast.success(`VIP Deal Applied: ${res.code}`, { id: "vip-coupon-applied" });
+              }
+            });
+          }
+        }
+      });
+    }
+  }, [isMounted, activeDeal, variantIdParam, dealIdParam, couponParam, setActiveDeal, getTotalPrice]);
+
+  // 2. Auto-load variant into cart if missing from deep-link
   useEffect(() => {
     if (!variantIdParam || !isMounted) return;
     const vid = Number(variantIdParam);
@@ -83,7 +141,20 @@ function CheckoutContent() {
       getVariantForCheckout(vid)
         .then((res) => {
           if (res.success && res.product) {
-            useStore.getState().addItem(res.product);
+            const itemPrice =
+              activeDeal && activeDeal.variantId === vid
+                ? activeDeal.originalPriceCents / 100
+                : res.product.price;
+            const itemDiscount =
+              activeDeal && activeDeal.variantId === vid
+                ? activeDeal.discountPercent
+                : res.product.discount;
+
+            useStore.getState().addItem({
+              ...res.product,
+              price: itemPrice,
+              discount: itemDiscount,
+            });
             toast.success("VIP Deal product added to your bag!", { id: "deal-auto-added" });
           }
         })
@@ -94,22 +165,7 @@ function CheckoutContent() {
           setIsAutoAddingVariant(false);
         });
     }
-  }, [variantIdParam, isMounted, items]);
-
-  // Auto-apply coupon from URL searchParams
-  useEffect(() => {
-    if (!couponParam || !isMounted || appliedCoupon) return;
-    const baseTotal = getTotalPrice();
-    if (baseTotal <= 0) return;
-
-    const subtotalCents = Math.round(baseTotal * 100);
-    validateCouponAction(couponParam, subtotalCents).then((res) => {
-      if (res.valid) {
-        setAppliedCoupon(res);
-        toast.success(`VIP Deal Applied: ${res.code}`, { id: "vip-coupon-applied" });
-      }
-    });
-  }, [couponParam, isMounted, appliedCoupon, getTotalPrice]);
+  }, [variantIdParam, isMounted, items, activeDeal]);
 
   // Address state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -834,7 +890,9 @@ function CheckoutContent() {
                   <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
                     <div className="flex items-center gap-1.5">
                       <Ticket className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>VIP Deal Applied ({appliedCoupon.code})</span>
+                      <span>
+                        VIP Discount {appliedCoupon.discountPercent ? `(${appliedCoupon.discountPercent}% OFF)` : `(${appliedCoupon.code})`}
+                      </span>
                     </div>
                     <span>-<PriceFormatter amount={couponDiscountAmount} /></span>
                   </div>
@@ -858,7 +916,7 @@ function CheckoutContent() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-base font-extrabold text-slate-900 dark:text-slate-100">
-                  <span>Total Payable</span>
+                  <span>Total Amount</span>
                   <PriceFormatter amount={totalPrice} className="text-lg font-black text-shop-orange" />
                 </div>
               </div>

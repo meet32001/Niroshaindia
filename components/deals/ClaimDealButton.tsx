@@ -11,14 +11,18 @@ import { cn } from "@/lib/utils";
 
 interface ClaimDealButtonProps {
   variantId: number;
+  dealId?: number;
   couponCode: string;
   isBumper?: boolean;
   product?: {
     id: number;
     name: string;
     slug: string;
+    originalPriceCents?: number;
     dealPriceCents: number;
     mrpCents: number;
+    savingsCents?: number;
+    discountPercent?: number;
     imageUrl: string;
   };
   className?: string;
@@ -27,6 +31,7 @@ interface ClaimDealButtonProps {
 
 export function ClaimDealButton({
   variantId,
+  dealId,
   couponCode,
   isBumper = false,
   product,
@@ -35,7 +40,7 @@ export function ClaimDealButton({
 }: ClaimDealButtonProps) {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useUser();
-  const { addItem } = useStore();
+  const { addItem, setActiveDeal } = useStore();
   const [loading, setLoading] = useState(false);
 
   const handleClaim = async (e: React.MouseEvent) => {
@@ -44,35 +49,59 @@ export function ClaimDealButton({
 
     if (!isLoaded) return;
 
-    // 1. If not authenticated, redirect to sign-in with return path preserving deal
+    const originalPriceCents =
+      product?.originalPriceCents || product?.mrpCents || (product?.dealPriceCents ? Math.round(product.dealPriceCents / 0.85) : 0);
+    const dealPriceCents = product?.dealPriceCents || 0;
+    const savingsCents = Math.max(0, originalPriceCents - dealPriceCents);
+    const discountPercent =
+      product?.discountPercent ||
+      (originalPriceCents > 0 ? Math.round((savingsCents / originalPriceCents) * 100) : 15);
+
+    // 1. Immediately record active deal in store
+    const dealRecord = {
+      dealId,
+      variantId,
+      productId: product?.id,
+      couponCode,
+      originalPriceCents,
+      dealPriceCents,
+      discountPercent,
+      savingsCents,
+      isBumper,
+    };
+    setActiveDeal(dealRecord);
+
+    // 2. Add product to client store at catalog price with discount info so subtotal & savings calculate cleanly
+    if (product) {
+      const productForStore = {
+        id: product.id,
+        _id: String(product.id),
+        name: product.name,
+        slug: product.slug,
+        price: originalPriceCents / 100,
+        originalPrice: originalPriceCents / 100,
+        dealPrice: dealPriceCents / 100,
+        discount: discountPercent,
+        image: product.imageUrl,
+        images: [product.imageUrl],
+        variantId,
+      };
+      addItem(productForStore);
+    }
+
+    // 3. If not authenticated, redirect to sign-in with return path targeting /checkout
     if (!isSignedIn) {
       toast("Please sign in to unlock your VIP exclusive deal pricing", {
         icon: "🔒",
       });
-      const redirectUrl = `/checkout?apply_deal=${encodeURIComponent(couponCode)}&variant_id=${variantId}`;
-      router.push(`/sign-in?redirect=${encodeURIComponent(redirectUrl)}`);
+      const returnUrl = `/checkout?coupon=${encodeURIComponent(couponCode)}&variant_id=${variantId}&deal_id=${dealId || ''}&apply_deal=${encodeURIComponent(couponCode)}`;
+      router.push(`/sign-in?redirect=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
     setLoading(true);
 
     try {
-      // 2. Add product to client store immediately for instantaneous checkout hydration
-      if (product) {
-        const productForStore = {
-          id: product.id,
-          _id: String(product.id),
-          name: product.name,
-          slug: product.slug,
-          price: product.dealPriceCents / 100,
-          discount: Math.round(((product.mrpCents - product.dealPriceCents) / product.mrpCents) * 100),
-          image: product.imageUrl,
-          images: [product.imageUrl],
-          variantId,
-        };
-        addItem(productForStore);
-      }
-
       toast.success(
         isBumper
           ? "🔥 Festival Bumper Deal Applied! Heading to Checkout..."
@@ -80,18 +109,17 @@ export function ClaimDealButton({
         { duration: 2500 }
       );
 
-      // 3. Trigger server action to register cart & redirect to checkout
-      await claimVipDeal(variantId, couponCode);
+      // 4. Trigger server action to register cart & redirect directly to /checkout
+      await claimVipDeal(variantId, dealId, couponCode);
     } catch (err: any) {
       // Note: Next.js redirect throws a NEXT_REDIRECT digest which is normal
       if (err?.message?.includes("NEXT_REDIRECT")) {
         return;
       }
       console.error("[ClaimDealButton] Error claiming deal:", err);
-      // Fallback client navigation
-      router.push(`/checkout?coupon=${encodeURIComponent(couponCode)}&variant_id=${variantId}`);
+      // Fallback client navigation directly to /checkout
+      router.push(`/checkout?coupon=${encodeURIComponent(couponCode)}&variant_id=${variantId}&deal_id=${dealId || ''}`);
     } finally {
-      // Keep loading spinner until navigation completes
       setTimeout(() => setLoading(false), 2000);
     }
   };

@@ -15,7 +15,7 @@ export const metadata = {
 
 export const revalidate = 3600; // Refresh every hour
 
-async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; couponCode: string; weekNumber: number }> {
+async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; dealId?: number; couponCode: string; weekNumber: number }> {
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const pastDaysOfYear = (now.getTime() - startOfYear.getTime()) / 86400000;
@@ -44,6 +44,7 @@ async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; c
         if (Array.isArray(row.products) && row.products.length > 0) {
           return {
             deals: row.products,
+            dealId: row.id,
             couponCode: row.coupon_code || currentCouponCode,
             weekNumber,
           };
@@ -64,7 +65,7 @@ async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; c
 }
 
 export default async function DealsPage() {
-  const { deals, couponCode, weekNumber } = await getActiveWeeklyDeals();
+  const { deals, dealId, couponCode, weekNumber } = await getActiveWeeklyDeals();
 
   const formatINR = (cents: number) => {
     return "₹" + Math.round(cents / 100).toLocaleString("en-IN");
@@ -170,14 +171,18 @@ export default async function DealsPage() {
                 <div className="pt-2">
                   <ClaimDealButton
                     variantId={bumperDeal.variantId}
+                    dealId={dealId}
                     couponCode={couponCode}
                     isBumper={true}
                     product={{
                       id: bumperDeal.id,
                       name: bumperDeal.name,
                       slug: bumperDeal.slug,
+                      originalPriceCents: bumperDeal.originalPriceCents,
                       dealPriceCents: bumperDeal.dealPriceCents,
                       mrpCents: bumperDeal.anchorPriceCents || bumperDeal.mrpCents,
+                      savingsCents: bumperDeal.savingsCents,
+                      discountPercent: bumperDeal.discountPercent,
                       imageUrl: bumperDeal.imageUrl,
                     }}
                     className="w-full sm:w-auto"
@@ -281,13 +286,17 @@ export default async function DealsPage() {
                 {/* 1-Click Claim Action */}
                 <ClaimDealButton
                   variantId={deal.variantId}
+                  dealId={dealId}
                   couponCode={couponCode}
                   product={{
                     id: deal.id,
                     name: deal.name,
                     slug: deal.slug,
+                    originalPriceCents: deal.originalPriceCents,
                     dealPriceCents: deal.dealPriceCents,
                     mrpCents: deal.mrpCents,
+                    savingsCents: deal.savingsCents,
+                    discountPercent: deal.discountPercent,
                     imageUrl: deal.imageUrl,
                   }}
                   className="w-full"

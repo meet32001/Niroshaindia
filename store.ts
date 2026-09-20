@@ -7,10 +7,24 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface ActiveDealInfo {
+  dealId?: number;
+  variantId: number;
+  productId?: number;
+  couponCode: string;
+  originalPriceCents: number;
+  dealPriceCents: number;
+  discountPercent: number;
+  savingsCents: number;
+  isBumper?: boolean;
+}
+
 interface StoreState {
   items: CartItem[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   favoriteProduct: any[];
+  activeDeal: ActiveDealInfo | null;
+  setActiveDeal: (deal: ActiveDealInfo | null) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   addItem: (product: any) => void;
   removeItem: (productId: string) => void;
@@ -36,6 +50,8 @@ export const useStore = create<StoreState>()(
     (set, get) => ({
       items: [],
       favoriteProduct: [],
+      activeDeal: null,
+      setActiveDeal: (deal: ActiveDealInfo | null) => set({ activeDeal: deal }),
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       addItem: (product: any) => {
@@ -50,7 +66,7 @@ export const useStore = create<StoreState>()(
           set({
             items: currentItems.map((item) =>
               getProductId(item.product) === id
-                ? { ...item, quantity: item.quantity + 1 }
+                ? { ...item, product: { ...item.product, ...product }, quantity: item.quantity + 1 }
                 : item
             ),
           });

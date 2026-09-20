@@ -18,7 +18,7 @@ import { urlFor } from "@/lib/image";
 
 export default function CartPage() {
   const { isLoaded, isSignedIn } = useUser();
-  const { items, deleteCartProduct, resetCart, getTotalPrice, getSubtotalPrice } = useStore();
+  const { items, deleteCartProduct, resetCart, getTotalPrice, getSubtotalPrice, activeDeal } = useStore();
   const isMounted = useIsMounted();
 
   if (!isLoaded || !isMounted) {
@@ -38,9 +38,15 @@ export default function CartPage() {
     return <EmptyCart />;
   }
 
-  const totalPrice = getTotalPrice();
+  const rawTotalPrice = getTotalPrice();
   const subtotalPrice = getSubtotalPrice();
+  const dealDiscount = activeDeal ? activeDeal.savingsCents / 100 : 0;
+  const totalPrice = Math.max(0, rawTotalPrice - dealDiscount);
   const totalSavings = Math.max(0, subtotalPrice - totalPrice);
+
+  const checkoutHref = activeDeal
+    ? `/checkout?coupon=${encodeURIComponent(activeDeal.couponCode)}&variant_id=${activeDeal.variantId}&deal_id=${activeDeal.dealId || ""}`
+    : "/checkout";
 
   const handleResetCart = () => {
     if (window.confirm("Are you sure you want to reset your shopping cart?")) {
@@ -172,12 +178,17 @@ export default function CartPage() {
                   <PriceFormatter amount={subtotalPrice} className="font-bold text-slate-900 dark:text-slate-100" />
                 </div>
 
-                {totalSavings > 0 && (
+                {activeDeal && dealDiscount > 0 ? (
+                  <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                    <span>VIP Discount ({activeDeal.discountPercent}% OFF)</span>
+                    <span>-<PriceFormatter amount={dealDiscount} /></span>
+                  </div>
+                ) : totalSavings > 0 ? (
                   <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-bold">
                     <span>Discount Savings</span>
                     <span>-<PriceFormatter amount={totalSavings} /></span>
                   </div>
-                )}
+                ) : null}
 
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                   <span>Delivery Charges</span>
@@ -196,7 +207,7 @@ export default function CartPage() {
               </div>
 
               {/* Checkout CTA */}
-              <Link href="/checkout" className="block w-full">
+              <Link href={checkoutHref} className="block w-full">
                 <button
                   type="button"
                   className="w-full bg-shop-orange hover:bg-amber-600 text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-md cursor-pointer"
@@ -227,7 +238,7 @@ export default function CartPage() {
           <PriceFormatter amount={totalPrice} className="text-lg font-extrabold text-shop-orange" />
         </div>
 
-        <Link href="/checkout">
+        <Link href={checkoutHref}>
           <button
             type="button"
             className="bg-shop-orange hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer"

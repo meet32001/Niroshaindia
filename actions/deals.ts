@@ -11,16 +11,39 @@ import { supabaseServer } from '@/lib/supabase/server';
  * 3. If authenticated: adds variant to customer's active cart in Supabase (if available)
  *    and redirects straight to /checkout with coupon auto-applied.
  */
-export async function claimVipDeal(variantId: number, couponCode: string) {
+export async function claimVipDeal(variantId: number, dealId?: number, couponCode?: string) {
   const { userId } = await auth();
 
-  // 1. If not signed in, redirect to Clerk sign-in with deep return path
+  // 1. Fetch exact deal details from weekly_deals
+  let resolvedCoupon = couponCode || '';
+  let resolvedDealId = dealId;
+
+  try {
+    let query = supabaseServer.from('weekly_deals').select('id, coupon_code, products');
+    if (dealId) {
+      query = query.eq('id', dealId);
+    } else {
+      query = query.eq('is_active', true).order('id', { ascending: false }).limit(1);
+    }
+    const { data: dealRows } = await query;
+    const dealRow = dealRows?.[0];
+    if (dealRow) {
+      resolvedDealId = dealRow.id;
+      if (!resolvedCoupon) resolvedCoupon = dealRow.coupon_code;
+    }
+  } catch (err) {
+    console.warn('[claimVipDeal] Error querying weekly_deals:', err);
+  }
+
+  const finalCoupon = resolvedCoupon || 'VIP-DEAL';
+
+  // 2. Unauthenticated check: Redirect to sign-in with return path targeting /checkout
   if (!userId) {
-    const returnUrl = `/checkout?apply_deal=${encodeURIComponent(couponCode)}&variant_id=${variantId}`;
+    const returnUrl = `/checkout?coupon=${encodeURIComponent(finalCoupon)}&variant_id=${variantId}&deal_id=${resolvedDealId || ''}&apply_deal=${encodeURIComponent(finalCoupon)}`;
     redirect(`/sign-in?redirect=${encodeURIComponent(returnUrl)}`);
   }
 
-  // 2. Add product variant to active cart in Supabase
+  // 3. Resolve customer
   try {
     const { data: customer } = await supabaseServer
       .from('customers')
@@ -29,6 +52,7 @@ export async function claimVipDeal(variantId: number, couponCode: string) {
       .maybeSingle();
 
     if (customer?.id) {
+      // 4. Ensure customer cart exists
       let { data: activeCart } = await supabaseServer
         .from('carts')
         .select('id')
@@ -46,6 +70,7 @@ export async function claimVipDeal(variantId: number, couponCode: string) {
       }
 
       if (activeCart?.id) {
+        // 5. Add or update variant in cart_items
         const { data: existingItem } = await supabaseServer
           .from('cart_items')
           .select('id, quantity')
@@ -56,7 +81,7 @@ export async function claimVipDeal(variantId: number, couponCode: string) {
         if (existingItem) {
           await supabaseServer
             .from('cart_items')
-            .update({ quantity: existingItem.quantity + 1, updated_at: new Date().toISOString() })
+            .update({ quantity: 1, updated_at: new Date().toISOString() })
             .eq('id', existingItem.id);
         } else {
           await supabaseServer
@@ -69,8 +94,77 @@ export async function claimVipDeal(variantId: number, couponCode: string) {
     console.warn('[claimVipDeal] Background cart sync non-fatal warning:', err);
   }
 
-  // 3. Route directly to checkout with auto-applied coupon & variant parameters
-  redirect(`/checkout?coupon=${encodeURIComponent(couponCode)}&variant_id=${variantId}`);
+  // 6. Redirect DIRECTLY to /checkout with deal parameters
+  redirect(`/checkout?coupon=${encodeURIComponent(finalCoupon)}&variant_id=${variantId}&deal_id=${resolvedDealId || ''}`);
+}
+
+export interface ResolvedDealDetails {
+  found: boolean;
+  dealId?: number;
+  variantId: number;
+  productId: number;
+  name: string;
+  slug: string;
+  imageUrl: string;
+  originalPriceCents: number;
+  dealPriceCents: number;
+  savingsCents: number;
+  discountPercent: number;
+  couponCode: string;
+  isBumper: boolean;
+}
+
+/**
+ * Fetch deal details for a specific variant or dealId from weekly_deals table
+ */
+export async function getDealDetailsAction(
+  variantId: number,
+  dealId?: number,
+  couponCode?: string
+): Promise<ResolvedDealDetails | null> {
+  try {
+    let query = supabaseServer.from('weekly_deals').select('id, coupon_code, products');
+    if (dealId) {
+      query = query.eq('id', dealId);
+    } else {
+      query = query.eq('is_active', true).order('id', { ascending: false }).limit(1);
+    }
+    const { data: dealRows } = await query;
+    const dealRow = dealRows?.[0];
+    if (!dealRow || !Array.isArray(dealRow.products)) return null;
+
+    const matchedProduct = dealRow.products.find(
+      (p: any) => Number(p.variantId) === Number(variantId) || Number(p.id) === Number(variantId)
+    );
+
+    if (!matchedProduct) return null;
+
+    const originalPriceCents = matchedProduct.originalPriceCents || matchedProduct.mrpCents;
+    const dealPriceCents = matchedProduct.dealPriceCents;
+    const savingsCents = Math.max(0, originalPriceCents - dealPriceCents);
+    const discountPercent =
+      matchedProduct.discountPercent ||
+      Math.round((savingsCents / originalPriceCents) * 100);
+
+    return {
+      found: true,
+      dealId: dealRow.id,
+      variantId: matchedProduct.variantId,
+      productId: matchedProduct.id,
+      name: matchedProduct.name,
+      slug: matchedProduct.slug,
+      imageUrl: matchedProduct.imageUrl,
+      originalPriceCents,
+      dealPriceCents,
+      savingsCents,
+      discountPercent,
+      couponCode: dealRow.coupon_code || couponCode || 'VIP-DEAL',
+      isBumper: !!matchedProduct.isBumperDeal,
+    };
+  } catch (err) {
+    console.warn('[getDealDetailsAction] Error resolving deal:', err);
+    return null;
+  }
 }
 
 /**
@@ -114,16 +208,44 @@ export async function getVariantForCheckout(variantId: number) {
       return { success: false, error: 'Product not found for variant' };
     }
 
+    // Check if this variant is in weekly_deals
+    let dealInfo: any = null;
+    try {
+      const { data: dealRows } = await supabaseServer
+        .from('weekly_deals')
+        .select('id, coupon_code, products')
+        .eq('is_active', true)
+        .order('id', { ascending: false })
+        .limit(1);
+
+      if (dealRows && dealRows[0] && Array.isArray(dealRows[0].products)) {
+        dealInfo = dealRows[0].products.find(
+          (p: any) => Number(p.variantId) === Number(variant.id) || Number(p.id) === Number(productData.id)
+        );
+      }
+    } catch {
+      // ignore
+    }
+
     const productPayload = {
       id: productData.id,
       _id: String(productData.id),
       name: productData.name,
       slug: productData.slug,
       price,
-      discount,
+      discount: dealInfo ? dealInfo.discountPercent : discount,
       image: featuredImg,
       images: [featuredImg],
       variantId: variant.id,
+      dealInfo: dealInfo
+        ? {
+            originalPriceCents: dealInfo.originalPriceCents || variant.price_cents,
+            dealPriceCents: dealInfo.dealPriceCents,
+            savingsCents: dealInfo.savingsCents,
+            discountPercent: dealInfo.discountPercent,
+            couponCode: dealInfo.couponCode,
+          }
+        : undefined,
     };
 
     return { success: true, product: productPayload };
@@ -150,6 +272,34 @@ export async function validateCouponAction(
   const code = (rawCode || '').trim().toUpperCase();
   if (!code) {
     return { valid: false, code: '', discountCents: 0, message: 'Please enter a coupon code' };
+  }
+
+  // 1. VIP Weekly Drop Coupon Handling (Percentage discount on deal item/cart)
+  if (code.startsWith('VIP-DROP-') || code.startsWith('VIP-DEAL')) {
+    let discountPercent = 15;
+    try {
+      const { data: weeklyRow } = await supabaseServer
+        .from('weekly_deals')
+        .select('discount_percent, discount_pct')
+        .eq('is_active', true)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (weeklyRow) {
+        discountPercent = weeklyRow.discount_percent || weeklyRow.discount_pct || 15;
+      }
+    } catch {
+      // default 15%
+    }
+
+    const discountCents = Math.round(subtotalCents * (discountPercent / 100));
+    return {
+      valid: true,
+      code,
+      discountCents,
+      discountPercent,
+      message: `VIP Deal Applied (${discountPercent}% OFF)!`,
+    };
   }
 
   try {
