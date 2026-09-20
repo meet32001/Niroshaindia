@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import {
-  ShieldCheck,
   ArrowLeft,
   ArrowRight,
   Plus,
@@ -940,11 +939,6 @@ function CheckoutContent() {
                   </>
                 )}
               </Button>
-
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span>Encrypted 256-Bit SSL Payment Security</span>
-              </div>
             </Card>
           </div>
         </div>

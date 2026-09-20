@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { ShoppingBag, Trash2, RotateCcw, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import { ShoppingBag, Trash2, RotateCcw, ArrowRight, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Container } from "@/components/layout/Container";
 import { Title } from "@/components/ui/text";
@@ -216,14 +216,6 @@ export default function CartPage() {
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </Link>
-
-              {/* Trust Features */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2 text-[11px] text-slate-500">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>Encrypted 256-Bit SSL Payment Protection</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
