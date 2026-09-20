@@ -42,6 +42,8 @@ interface StoreState {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getProductId(product: any): string {
   if (!product) return "";
+  if (product.variant_id) return String(product.variant_id);
+  if (product.selectedVariant?.id) return String(product.selectedVariant.id);
   return String(product._id || product.id || "");
 }
 

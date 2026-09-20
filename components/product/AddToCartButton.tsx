@@ -16,7 +16,7 @@ export interface AddToCartButtonProps {
 export function AddToCartButton({ product, className }: AddToCartButtonProps) {
   const { addItem, getItemCount } = useStore();
 
-  const id = String(product?._id || product?.id || "");
+  const id = String(product?.variant_id || product?.selectedVariant?.id || product?._id || product?.id || "");
   const itemCount = getItemCount(id);
   const isOutOfStock = product?.stock !== undefined && product.stock <= 0;
 

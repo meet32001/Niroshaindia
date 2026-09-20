@@ -14,7 +14,7 @@ export interface QuantityButtonsProps {
 export function QuantityButtons({ product, className }: QuantityButtonsProps) {
   const { addItem, removeItem, getItemCount } = useStore();
 
-  const id = String(product?._id || product?.id || "");
+  const id = String(product?.variant_id || product?.selectedVariant?.id || product?._id || product?.id || "");
   const itemCount = getItemCount(id);
   const maxStock = product?.stock !== undefined ? product.stock : 10;
 

@@ -107,7 +107,7 @@ export default function CartPage() {
           <div className="lg:col-span-2 space-y-4">
             {items.map((cartItem) => {
               const product = cartItem.product;
-              const productId = product?._id || product?.id || "";
+              const productId = product?.variant_id ? String(product.variant_id) : String(product?._id || product?.id || "");
               const name = product?.name || "Product Name";
               const price = product?.price || 0;
               const discount = product?.discount || 0;

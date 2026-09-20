@@ -118,6 +118,7 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
   const cartProductPayload = {
     ...product,
     variant_id: activeVariant.id,
+    variant_name: activeVariant.name,
     selectedVariant: activeVariant,
     price: activeVariant.price,
     discountPrice: activeVariant.comparePrice,

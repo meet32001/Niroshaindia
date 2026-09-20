@@ -21,9 +21,17 @@ export function ProductCard(product: any) {
   const primaryVariant = variants[0] || {};
   
   // Starting price (lowest variant price)
-  const price = product.lowestPrice ?? (primaryVariant?.price_cents
+  const price = product.lowestPrice ?? (product.min_price_cents
+    ? product.min_price_cents / 100
+    : primaryVariant?.price_cents
     ? primaryVariant.price_cents / 100
     : product.price || 0);
+
+  const hasVariants =
+    variants.length > 1 ||
+    (product.min_price_cents &&
+      product.max_price_cents &&
+      product.min_price_cents < product.max_price_cents);
 
   const discount = primaryVariant?.compare_at_price_cents
     ? primaryVariant.compare_at_price_cents / 100
@@ -128,7 +136,7 @@ export function ProductCard(product: any) {
 
         {/* Price & Cart Action */}
         <div className="pt-2 space-y-2 border-t border-slate-100 dark:border-slate-800 mt-2">
-          <PriceView price={price} discount={discount} />
+          <PriceView price={price} discount={discount} isFrom={Boolean(hasVariants)} />
           <AddToCartButton product={product} />
         </div>
       </div>
