@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Star, ArrowLeftRight, HelpCircle, Share2, Truck, RotateCcw, Package } from "lucide-react";
+import { Star, Share2, Truck, RotateCcw, Package } from "lucide-react";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { PriceDisplay } from "@/components/product/PriceDisplay";
 import { VariantSelector, Variant } from "@/components/product/VariantSelector";
 import { ProductSpecsTable } from "@/components/product/ProductSpecsTable";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
-import { Badge } from "@/components/ui/badge";
+import { ShareModal } from "@/components/product/ShareModal";
 
 export interface ProductDetailViewProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,6 +77,7 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
   }, [variants, querySku]);
 
   const [activeVariant, setActiveVariant] = useState<Variant>(initialVariant);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Sync state if URL search params change externally
   useEffect(() => {
@@ -146,9 +147,6 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
             <span className="inline-block text-xs font-bold text-shop-orange uppercase tracking-wider bg-shop-orange/10 px-3 py-1 rounded-full">
               {categories}
             </span>
-            <Badge variant="outline" className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-              SKU: {activeVariant.sku}
-            </Badge>
           </div>
 
           <h1 className="text-2xl md:text-3xl font-extrabold text-shop-dark dark:text-slate-100 leading-tight">
@@ -167,9 +165,6 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
                   <Star key={i} className="h-3.5 w-3.5 fill-amber-400" />
                 ))}
               </div>
-              <span className="text-slate-500 font-medium ml-1">
-                ({product.reviewsCount || 48} Customer Reviews)
-              </span>
             </div>
           </div>
         </div>
@@ -245,23 +240,10 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
         )}
 
         {/* Secondary Utilities Strip */}
-        <div className="flex items-center justify-between py-3 border-y border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-400">
+        <div className="flex items-center justify-end py-3 border-y border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-400">
           <button
             type="button"
-            className="flex items-center gap-1.5 hover:text-shop-orange transition-colors cursor-pointer"
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-            <span>Compare Models</span>
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 hover:text-shop-orange transition-colors cursor-pointer"
-          >
-            <HelpCircle className="h-4 w-4" />
-            <span>Ask a Question</span>
-          </button>
-          <button
-            type="button"
+            onClick={() => setIsShareModalOpen(true)}
             className="flex items-center gap-1.5 hover:text-shop-orange transition-colors cursor-pointer"
           >
             <Share2 className="h-4 w-4" />
@@ -306,6 +288,13 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
           brand={brand}
           category={categories}
           sku={activeVariant.sku}
+        />
+
+        {/* Share Product Modal Dialog */}
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          productName={name}
         />
       </div>
     </div>

@@ -117,9 +117,6 @@ export function ProductCard(product: any) {
                 <Star key={i} className="h-3 w-3 fill-emerald-600 text-emerald-600" />
               ))}
             </div>
-            <span className="text-xs text-slate-400 ml-1 font-medium">
-              ({product.reviewsCount || 42})
-            </span>
           </div>
 
           {/* Stock Indicator */}
