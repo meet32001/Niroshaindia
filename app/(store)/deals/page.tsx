@@ -70,7 +70,10 @@ export default async function DealsPage() {
     return "₹" + Math.round(cents / 100).toLocaleString("en-IN");
   };
 
-  const bumperDeal = deals.find((d) => d.isBumperDeal);
+  // In the 6+1 architecture, bumper weeks have 7 total deals (1 hero bumper + 6 standard category deals).
+  // If deals array has 6 or fewer items, all 6 belong to the category grid.
+  const hasDedicatedBumper = deals.length >= 7 && deals.some((d) => d.isBumperDeal);
+  const bumperDeal = hasDedicatedBumper ? deals.find((d) => d.isBumperDeal) : null;
   const regularDeals = bumperDeal ? deals.filter((d) => d.id !== bumperDeal.id) : deals;
 
   return (

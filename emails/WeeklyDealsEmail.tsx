@@ -45,7 +45,10 @@ export function WeeklyDealsEmail({
   deals = [],
   dealsUrl = "https://niroshaindia.com/deals",
 }: WeeklyDealsEmailProps) {
-  const bumperDeal = deals.find((d) => d.isBumperDeal);
+  // In the 6+1 architecture, bumper weeks have 7 total deals (1 hero bumper + 6 standard category deals).
+  // If deals array has 6 or fewer items, all 6 belong to the standard category section.
+  const hasDedicatedBumper = deals.length >= 7 && deals.some((d) => d.isBumperDeal);
+  const bumperDeal = hasDedicatedBumper ? deals.find((d) => d.isBumperDeal) : null;
   const regularDeals = bumperDeal ? deals.filter((d) => d.id !== bumperDeal.id) : deals;
 
   return (
