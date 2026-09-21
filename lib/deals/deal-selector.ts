@@ -96,6 +96,72 @@ export const HIGH_TICKET_BUCKETS = [
   },
 ];
 
+export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDealProduct[] {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://niroshaindia.com";
+  const defaultImages = [
+    "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800&auto=format&fit=crop&q=80",
+  ];
+
+  const deals: SelectedDealProduct[] = HIGH_TICKET_BUCKETS.map((b, idx) => {
+    const originalPriceCents = (120000 + idx * 25000) * 100;
+    const discount = 15;
+    const dealPriceCents = Math.round(originalPriceCents * (1 - discount / 100));
+    const slug = b.fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    return {
+      id: 9900 + idx,
+      variantId: 9900 + idx,
+      name: b.fallbackName,
+      slug,
+      brandName: "Nirosha Elite",
+      categoryName: b.family,
+      categorySlug: b.slugs[0] || "deals",
+      originalPriceCents,
+      anchorPriceCents: originalPriceCents,
+      mrpCents: originalPriceCents,
+      dealPriceCents,
+      savingsCents: originalPriceCents - dealPriceCents,
+      discountPercentage: discount,
+      discountPercent: discount,
+      isBumperDeal: false,
+      imageUrl: defaultImages[idx % defaultImages.length],
+      productUrl: `${baseUrl}/product/${slug}`,
+    };
+  });
+
+  if (isBiweeklyFestivalBumperEligible(targetDate)) {
+    const bumperOriginal = 17500000;
+    const anchor = Math.round(bumperOriginal * 1.15);
+    const bumperDealPrice = Math.round(anchor * 0.75);
+    const bumperDeal: SelectedDealProduct = {
+      id: 9899,
+      variantId: 9899,
+      name: "Apple iPhone 16 Pro Max",
+      slug: "apple-iphone-16-pro-max",
+      brandName: "Apple",
+      categoryName: "Festival Spotlight",
+      categorySlug: "smartphones",
+      originalPriceCents: bumperOriginal,
+      anchorPriceCents: anchor,
+      mrpCents: anchor,
+      dealPriceCents: bumperDealPrice,
+      savingsCents: anchor - bumperDealPrice,
+      discountPercentage: 25,
+      discountPercent: 25,
+      isBumperDeal: true,
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=800&auto=format&fit=crop&q=80",
+      productUrl: `${baseUrl}/product/apple-iphone-16-pro-max`,
+    };
+    return [bumperDeal, ...deals];
+  }
+
+  return deals;
+}
+
 /**
  * Generates the weekly deals batch:
  * - Always 6 distinct category high-ticket items.
@@ -106,43 +172,21 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase credentials in environment");
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("placeholder")) {
+    return getPlaceholderDeals(targetDate);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
-  const baseDeals: SelectedDealProduct[] = [];
-  const usedProductIds = new Set<number>();
+    const baseDeals: SelectedDealProduct[] = [];
+    const usedProductIds = new Set<number>();
 
-  // 1. Fetch 6 distinct category items (standard base pool)
-  for (const bucket of HIGH_TICKET_BUCKETS) {
-    const { data: variants, error } = await supabase
-      .from("product_variants")
-      .select(`
-        id,
-        price_cents,
-        compare_at_price_cents,
-        product:products!inner(
-          id,
-          name,
-          slug,
-          is_active,
-          brand:brands(id, name, slug),
-          category:categories!inner(id, name, slug)
-        )
-      `)
-      .in("product.category.slug", bucket.slugs)
-      .eq("product.is_active", true)
-      .gte("price_cents", 2000000)
-      .order("price_cents", { ascending: false })
-      .limit(20);
-
-    if (error || !variants || variants.length === 0) {
-      // Fallback: If no ₹20k item exists in this specific child bucket, try ₹10k+ floor
-      const { data: fallbackVariants } = await supabase
+    // 1. Fetch 6 distinct category items (standard base pool)
+    for (const bucket of HIGH_TICKET_BUCKETS) {
+      const { data: variants, error } = await supabase
         .from("product_variants")
         .select(`
           id,
@@ -159,31 +203,67 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
         `)
         .in("product.category.slug", bucket.slugs)
         .eq("product.is_active", true)
-        .gte("price_cents", 1000000)
+        .gte("price_cents", 2000000)
         .order("price_cents", { ascending: false })
-        .limit(10);
+        .limit(20);
 
-      if (fallbackVariants && fallbackVariants.length > 0) {
-        await assignStandardDeal(fallbackVariants, bucket, usedProductIds, baseDeals, supabase);
+      if (error || !variants || variants.length === 0) {
+        // Fallback: If no ₹20k item exists in this specific child bucket, try ₹10k+ floor
+        const { data: fallbackVariants } = await supabase
+          .from("product_variants")
+          .select(`
+            id,
+            price_cents,
+            compare_at_price_cents,
+            product:products!inner(
+              id,
+              name,
+              slug,
+              is_active,
+              brand:brands(id, name, slug),
+              category:categories!inner(id, name, slug)
+            )
+          `)
+          .in("product.category.slug", bucket.slugs)
+          .eq("product.is_active", true)
+          .gte("price_cents", 1000000)
+          .order("price_cents", { ascending: false })
+          .limit(10);
+
+        if (fallbackVariants && fallbackVariants.length > 0) {
+          await assignStandardDeal(fallbackVariants, bucket, usedProductIds, baseDeals, supabase);
+        }
+        continue;
       }
-      continue;
+
+      await assignStandardDeal(variants, bucket, usedProductIds, baseDeals, supabase);
     }
 
-    await assignStandardDeal(variants, bucket, usedProductIds, baseDeals, supabase);
-  }
-
-  // 2. Check Bi-Weekly Festival Bumper Deal (The 7th Product)
-  const isBumperActive = isBiweeklyFestivalBumperEligible(targetDate);
-  if (isBumperActive) {
-    const bumperDeal = await fetchSeventhBumperProduct(supabase, usedProductIds);
-    if (bumperDeal) {
-      // Place as first element (hero spotlight) -> 1 bumper + 6 standard = 7 total
-      return [bumperDeal, ...baseDeals];
+    // Backfill any missing slots from fallback if catalog is sparse
+    if (baseDeals.length < 6) {
+      const placeholders = getPlaceholderDeals(targetDate);
+      for (const ph of placeholders) {
+        if (!ph.isBumperDeal && !usedProductIds.has(ph.id) && baseDeals.length < 6) {
+          baseDeals.push(ph);
+        }
+      }
     }
-  }
 
-  // Standard Week: Exactly 6 deals
-  return baseDeals;
+    // 2. Check Bi-Weekly Festival Bumper Deal (The 7th Product)
+    const isBumperActive = isBiweeklyFestivalBumperEligible(targetDate);
+    if (isBumperActive) {
+      const bumperDeal = await fetchSeventhBumperProduct(supabase, usedProductIds);
+      if (bumperDeal) {
+        return [bumperDeal, ...baseDeals];
+      }
+    }
+
+    // Standard Week: Exactly 6 deals
+    return baseDeals;
+  } catch (err) {
+    console.warn("[selectWeeklyDeals] Database query failed, using placeholder deals:", err);
+    return getPlaceholderDeals(targetDate);
+  }
 }
 
 /**

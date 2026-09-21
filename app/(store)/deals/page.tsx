@@ -13,7 +13,7 @@ export const metadata = {
   description: "Exclusive hand-curated high-ticket electronics drops for Nirosha VIP Club members with up to 25% festival savings.",
 };
 
-export const revalidate = 3600; // Refresh every hour
+export const dynamic = "force-dynamic";
 
 async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; dealId?: number; couponCode: string; weekNumber: number }> {
   const now = new Date();
@@ -25,7 +25,7 @@ async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; d
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (supabaseUrl && supabaseKey) {
+  if (supabaseUrl && supabaseKey && !supabaseUrl.includes("placeholder")) {
     try {
       const supabase = createClient(supabaseUrl, supabaseKey, {
         auth: { autoRefreshToken: false, persistSession: false },
