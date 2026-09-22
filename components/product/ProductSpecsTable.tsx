@@ -9,7 +9,6 @@ export interface ProductSpecsTableProps {
   specs?: Record<string, any> | null;
   brand?: string;
   category?: string;
-  sku?: string;
   className?: string;
 }
 
@@ -17,7 +16,6 @@ export function ProductSpecsTable({
   specs = {},
   brand = "Nirosha",
   category = "Electronics",
-  sku,
   className,
 }: ProductSpecsTableProps) {
   const [isOpen, setIsOpen] = useState(true);
@@ -32,7 +30,6 @@ export function ProductSpecsTable({
   const defaultSpecs: { key: string; value: string }[] = [
     { key: "Brand", value: brand },
     { key: "Category", value: category },
-    ...(sku ? [{ key: "Model / SKU", value: sku }] : []),
     { key: "Warranty", value: "1 Year Official Domestic Brand Warranty" },
     { key: "Shipping", value: "Express Delivery within 24–48 Hours across India" },
     { key: "Return Policy", value: "7 Days Replacement for Technical Defects" },

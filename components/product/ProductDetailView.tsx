@@ -287,7 +287,6 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
           specs={activeVariant.specs}
           brand={brand}
           category={categories}
-          sku={activeVariant.sku}
         />
 
         {/* Share Product Modal Dialog */}
