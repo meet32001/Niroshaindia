@@ -1,6 +1,6 @@
 /**
  * Variant attribute extraction and multi-variant resolution utilities.
- * Handles phones, tablets, laptops, TVs, and home appliances dynamically.
+ * Handles phones, tablets, laptops, TVs, home appliances, heating gear, and security lockers.
  */
 
 export interface ParsedAttributes {
@@ -9,6 +9,8 @@ export interface ParsedAttributes {
   ram?: string;
   displaySize?: string;
   capacityOrTon?: string;
+  fins?: string;
+  lockType?: string;
   glassOrFinish?: string;
   [key: string]: string | undefined;
 }
@@ -36,16 +38,52 @@ export interface ParsedVariantOption {
 /**
  * Universal category-agnostic parser that automatically extracts configuration
  * pills and color options from any product variant title across consumer electronics,
- * home appliances, laptops, audio, etc.
+ * home appliances, laptops, audio, heating gear, and security lockers.
  */
 export function parseVariantName(name: string): ParsedAttributes {
-  // 1. Display Size (e.g., 11 Inch, 13 Inch, 55 Inch, 65 Inch, 55", 65")
+  // 1. Fin Count for Oil Filled Radiators (e.g. 9 Fins, 11 Fins, 13 Fins, 15 Fins, 9F, 11F, 4209 F, 4309 FSE)
+  let fins: string | undefined;
+  const modelFinMatch = name.match(/\b\d{2}(09|11|13|15)\s*F(?:SE)?\b/i);
+  if (modelFinMatch) {
+    fins = `${parseInt(modelFinMatch[1], 10)} Fins`;
+  } else {
+    const finMatch = name.match(/\b(\d{1,2})\s*(?:-?\s*M?-?\s*Fins?|F\b)/i);
+    if (finMatch) {
+      fins = `${finMatch[1]} Fins`;
+    }
+  }
+
+  // 2. Safe Locking Mechanism (Key Lock, Digital Keypad, Biometric & PIN, Dual Lock)
+  let lockType: string | undefined;
+  if (/biometric|fingerprint|digi\s*\+\s*bio|\bbio\s+nx\b|smart\s*door\s*lock/i.test(name)) {
+    lockType = "Biometric & PIN";
+  } else if (/\b(?:el\+kl|dual\s*lock)\b/i.test(name)) {
+    lockType = "Dual Lock";
+  } else if (/\b(?:digital\s*(?:safe|locker|home|lock|locking|keypad|nx)|electronic\s*(?:safe|locker|home|lock)|with\s*digital\s*locking)\b/i.test(name)) {
+    lockType = "Digital Keypad";
+  } else if (/\b(?:key\s*lock|keylock|mechanical(?:\s*key|\s*override|\s*home\s*safe)?|6\s*lever\s*lock)\b/i.test(name) && /safe|locker|lock\b/i.test(name)) {
+    lockType = "Key Lock";
+  }
+
+  // 3. Appliance Capacity / Volume (e.g. 7 Kg, 8.5 Kg, 12 Kg, 50L, 78 Litres, 112L, 1.5 Ton)
+  const capacityMatch = name.match(/(\d+(?:\.\d+)?)\s*(Kg|Litres|Ltr|L\b|Tons?)/i);
+  let capacityOrTon: string | undefined;
+  if (capacityMatch) {
+    const val = capacityMatch[1];
+    let unit = capacityMatch[2].toUpperCase();
+    if (unit === "LITRES" || unit === "LTR") unit = "L";
+    if (unit === "TONS") unit = "Ton";
+    if (unit === "KG") unit = "Kg";
+    capacityOrTon = `${val} ${unit}`;
+  }
+
+  // 4. Display Size (e.g. 11 Inch, 13 Inch, 55 Inch, 65 Inch, 55", 65")
   const displayMatch = name.match(/(\d+(?:\.\d+)?\s*(?:Inch|cm|"))/i);
 
-  // 2. RAM (e.g., 8GB RAM, 12GB RAM, 16GB RAM)
+  // 5. RAM (e.g. 8GB RAM, 12GB RAM, 16GB RAM)
   const ramMatch = name.match(/(\d+\s*GB\s*RAM)/i);
 
-  // 3. Storage (e.g., 128GB, 256GB, 512GB, 1TB, 2TB) - prioritizes explicit storage/SSD/ROM
+  // 6. Storage (e.g. 128GB, 256GB, 512GB, 1TB, 2TB) - prioritizes explicit storage/SSD/ROM
   const explicitStorageMatch = name.match(/(\d+\s*(?:GB|TB))\s*(?:Storage|SSD|ROM)\b/i);
   let storage: string | undefined = explicitStorageMatch ? explicitStorageMatch[1] : undefined;
   if (!storage) {
@@ -58,13 +96,10 @@ export function parseVariantName(name: string): ParsedAttributes {
     storage = storage.replace(/\s+/g, "").toUpperCase();
   }
 
-  // 4. Capacity / Tonnage (e.g., 1 Ton, 1.5 Ton, 2 Ton, 4.1L, 9 Litres, 7 Kg, 11 Kg)
-  const capacityMatch = name.match(/(\d+(?:\.\d+)?\s*(?:Ton|Litres|Ltr|L\b|Kg))/i);
-
-  // 5. Special Glass / Tech Finish
+  // 7. Special Glass / Tech Finish
   const glassMatch = name.match(/(Nano-texture Glass|Standard Glass|OLED evo|Super AMOLED)/i);
 
-  // 6. Color extraction (Matches known colors, pipe segments, or parenthesized segments)
+  // 8. Color extraction (Matches known colors, pipe segments, or parenthesized segments)
   let color: string | undefined;
   const knownColors = [
     "Natural Titanium", "Black Titanium", "White Titanium", "Desert Titanium",
@@ -72,7 +107,9 @@ export function parseVariantName(name: string): ParsedAttributes {
     "Glacier White", "Aurora Blue", "Twilight Blue", "Mint Breeze", "Electric Violet",
     "Silver", "Gold", "Rose Gold", "Midnight", "Starlight", "Dark Jade Silver",
     "Shiny Steel", "Stainless Steel", "Inox", "White", "Black", "Blue", "Green", "Red",
-    "Purple", "Yellow", "Pink", "Indigo", "Platinum", "Grey", "Gray"
+    "Purple", "Yellow", "Pink", "Indigo", "Platinum", "Grey", "Gray", "Navy", "Navy Blue",
+    "Onyx Black", "Middle Black", "Dark Grey", "Platinum Silver", "Burgundy",
+    "Graphite Grey", "Mocha", "Coffee Brown", "Brown"
   ];
 
   for (const kc of knownColors) {
@@ -101,10 +138,12 @@ export function parseVariantName(name: string): ParsedAttributes {
   }
 
   return {
+    fins,
+    lockType,
+    capacityOrTon,
     displaySize: displayMatch ? displayMatch[1].trim() : undefined,
     ram: ramMatch ? ramMatch[1].trim() : undefined,
     storage: storage || undefined,
-    capacityOrTon: capacityMatch ? capacityMatch[1].trim() : undefined,
     glassOrFinish: glassMatch ? glassMatch[1].trim() : undefined,
     color: color || undefined,
   };
@@ -136,8 +175,14 @@ export function parseVariantAttributes(
   if (!parsed.displaySize && (specs?.screen_size || specs?.display_size)) {
     parsed.displaySize = String(specs.screen_size || specs.display_size).trim();
   }
-  if (!parsed.capacityOrTon && (specs?.capacity || specs?.tonnage)) {
-    parsed.capacityOrTon = String(specs.capacity || specs.tonnage).trim();
+  if (!parsed.capacityOrTon && (specs?.capacity || specs?.tonnage || specs?.volume)) {
+    parsed.capacityOrTon = String(specs.capacity || specs.tonnage || specs.volume).trim();
+  }
+  if (!parsed.fins && specs?.fins) {
+    parsed.fins = `${specs.fins} Fins`;
+  }
+  if (!parsed.lockType && specs?.lock_type) {
+    parsed.lockType = String(specs.lock_type).trim();
   }
 
   return parsed;
@@ -178,6 +223,8 @@ export function getColorSwatch(colorName?: string): ColorSwatchMeta {
     return { bg: "#F8FAFC", border: "#CBD5E1", isLight: true };
   }
   if (
+    lower.includes("onyx black") ||
+    lower.includes("middle black") ||
     lower.includes("night sky") ||
     lower.includes("midnight") ||
     lower.includes("space black") ||
@@ -186,13 +233,27 @@ export function getColorSwatch(colorName?: string): ColorSwatchMeta {
   ) {
     return { bg: "#0F172A", border: "#334155", isLight: false };
   }
-  if (lower.includes("space gray") || lower.includes("space grey") || lower.includes("graphite") || lower.includes("charcoal")) {
+  if (
+    lower.includes("dark grey") ||
+    lower.includes("dark gray") ||
+    lower.includes("graphite grey") ||
+    lower.includes("graphite gray")
+  ) {
+    return { bg: "#3F3F46", border: "#52525B", isLight: false };
+  }
+  if (
+    lower.includes("space gray") ||
+    lower.includes("space grey") ||
+    lower.includes("graphite") ||
+    lower.includes("charcoal")
+  ) {
     return { bg: "#374151", border: "#4B5563", isLight: false };
   }
   if (lower.includes("natural titanium") || lower.includes("titanium")) {
     return { bg: "#9E9893", border: "#B5AFA9", isLight: false };
   }
   if (
+    lower.includes("platinum silver") ||
     lower.includes("silver") ||
     lower.includes("platinum") ||
     lower.includes("dark jade silver") ||
@@ -202,6 +263,12 @@ export function getColorSwatch(colorName?: string): ColorSwatchMeta {
   ) {
     return { bg: "#E2E8F0", border: "#CBD5E1", isLight: true };
   }
+  if (lower.includes("coffee brown") || lower.includes("brown") || lower.includes("mocha")) {
+    return { bg: "#5C4033", border: "#3D2B1F", isLight: false };
+  }
+  if (lower.includes("burgundy")) {
+    return { bg: "#800020", border: "#580016", isLight: false };
+  }
   if (lower.includes("gold") || lower.includes("champagne") || lower.includes("desert titanium")) {
     return { bg: "#FDE047", border: "#EAB308", isLight: true };
   }
@@ -209,6 +276,7 @@ export function getColorSwatch(colorName?: string): ColorSwatchMeta {
     return { bg: "#F472B6", border: "#EC4899", isLight: true };
   }
   if (
+    lower.includes("navy") ||
     lower.includes("aurora blue") ||
     lower.includes("twilight blue") ||
     lower.includes("blue") ||
@@ -216,7 +284,7 @@ export function getColorSwatch(colorName?: string): ColorSwatchMeta {
     lower.includes("sierra blue") ||
     lower.includes("indigo")
   ) {
-    return { bg: "#2563EB", border: "#1D4ED8", isLight: false };
+    return { bg: "#1E3A8A", border: "#172554", isLight: false };
   }
   if (
     lower.includes("green") ||

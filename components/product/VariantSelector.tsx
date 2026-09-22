@@ -3,7 +3,19 @@
 import React, { useMemo, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Check, Layers, Monitor, HardDrive, Cpu, AirVent, Sparkles } from "lucide-react";
+import {
+  Check,
+  Layers,
+  Monitor,
+  HardDrive,
+  Cpu,
+  Sparkles,
+  Flame,
+  Key,
+  Lock,
+  Fingerprint,
+  Scale,
+} from "lucide-react";
 import { formatINR } from "@/components/product/PriceDisplay";
 import {
   parseVariantAttributes,
@@ -57,6 +69,8 @@ export function VariantSelector({
         parsedRam: attrs.ram,
         parsedDisplaySize: attrs.displaySize,
         parsedCapacityOrTon: attrs.capacityOrTon,
+        parsedFins: attrs.fins,
+        parsedLockType: attrs.lockType,
         parsedGlassOrFinish: attrs.glassOrFinish,
       };
     });
@@ -69,6 +83,8 @@ export function VariantSelector({
     availableRams,
     availableDisplaySizes,
     availableCapacities,
+    availableFins,
+    availableLockTypes,
     availableFinishes,
     hasStructuredAttributes,
   } = useMemo(() => {
@@ -77,6 +93,8 @@ export function VariantSelector({
     const ramSet = new Set<string>();
     const displaySizeSet = new Set<string>();
     const capacitySet = new Set<string>();
+    const finSet = new Set<string>();
+    const lockTypeSet = new Set<string>();
     const finishSet = new Set<string>();
 
     parsedVariants.forEach((v) => {
@@ -85,6 +103,8 @@ export function VariantSelector({
       if (v.parsedRam) ramSet.add(v.parsedRam);
       if (v.parsedDisplaySize) displaySizeSet.add(v.parsedDisplaySize);
       if (v.parsedCapacityOrTon) capacitySet.add(v.parsedCapacityOrTon);
+      if (v.parsedFins) finSet.add(v.parsedFins);
+      if (v.parsedLockType) lockTypeSet.add(v.parsedLockType);
       if (v.parsedGlassOrFinish) finishSet.add(v.parsedGlassOrFinish);
     });
 
@@ -102,7 +122,17 @@ export function VariantSelector({
       const numB = parseFloat(b.replace(/[^0-9.]/g, "") || "0");
       return numA - numB;
     });
-    const capacities = Array.from(capacitySet);
+    const capacities = Array.from(capacitySet).sort((a, b) => {
+      const numA = parseFloat(a.replace(/[^0-9.]/g, "") || "0");
+      const numB = parseFloat(b.replace(/[^0-9.]/g, "") || "0");
+      return numA - numB;
+    });
+    const fins = Array.from(finSet).sort((a, b) => {
+      const numA = parseInt(a.replace(/[^0-9]/g, "") || "0", 10);
+      const numB = parseInt(b.replace(/[^0-9]/g, "") || "0", 10);
+      return numA - numB;
+    });
+    const lockTypes = Array.from(lockTypeSet);
     const finishes = Array.from(finishSet);
 
     const hasStructured =
@@ -111,6 +141,8 @@ export function VariantSelector({
       rams.length > 0 ||
       displaySizes.length > 0 ||
       capacities.length > 0 ||
+      fins.length > 0 ||
+      lockTypes.length > 0 ||
       finishes.length > 0;
 
     return {
@@ -119,6 +151,8 @@ export function VariantSelector({
       availableRams: rams,
       availableDisplaySizes: displaySizes,
       availableCapacities: capacities,
+      availableFins: fins,
+      availableLockTypes: lockTypes,
       availableFinishes: finishes,
       hasStructuredAttributes: hasStructured,
     };
@@ -136,6 +170,8 @@ export function VariantSelector({
   const selectedRam = activeVariant.parsedRam;
   const selectedDisplaySize = activeVariant.parsedDisplaySize;
   const selectedCapacity = activeVariant.parsedCapacityOrTon;
+  const selectedFins = activeVariant.parsedFins;
+  const selectedLockType = activeVariant.parsedLockType;
   const selectedFinish = activeVariant.parsedGlassOrFinish;
 
   const selectVariantAndUpdateUrl = (targetVariant: Variant) => {
@@ -154,7 +190,15 @@ export function VariantSelector({
    * Intelligently selects the closest matching variant when an attribute changes.
    */
   const handleAttributeChange = (
-    attributeKey: "color" | "storage" | "ram" | "displaySize" | "capacityOrTon" | "glassOrFinish",
+    attributeKey:
+      | "color"
+      | "storage"
+      | "ram"
+      | "displaySize"
+      | "capacityOrTon"
+      | "fins"
+      | "lockType"
+      | "glassOrFinish",
     newValue: string
   ) => {
     // Current preferred state
@@ -164,6 +208,8 @@ export function VariantSelector({
       ram: selectedRam,
       displaySize: selectedDisplaySize,
       capacityOrTon: selectedCapacity,
+      fins: selectedFins,
+      lockType: selectedLockType,
       glassOrFinish: selectedFinish,
       [attributeKey]: newValue,
     };
@@ -181,6 +227,10 @@ export function VariantSelector({
           return v.parsedDisplaySize === newValue;
         case "capacityOrTon":
           return v.parsedCapacityOrTon === newValue;
+        case "fins":
+          return v.parsedFins === newValue;
+        case "lockType":
+          return v.parsedLockType === newValue;
         case "glassOrFinish":
           return v.parsedGlassOrFinish === newValue;
       }
@@ -191,11 +241,13 @@ export function VariantSelector({
     // Score candidates by how many other attributes match the current state
     const scored = candidates.map((candidate) => {
       let score = 0;
+      if (candidate.parsedFins === desired.fins) score += 3;
+      if (candidate.parsedLockType === desired.lockType) score += 3;
+      if (candidate.parsedCapacityOrTon === desired.capacityOrTon) score += 3;
       if (candidate.parsedColor === desired.color) score += 3;
       if (candidate.parsedStorage === desired.storage) score += 3;
       if (candidate.parsedRam === desired.ram) score += 2;
       if (candidate.parsedDisplaySize === desired.displaySize) score += 2;
-      if (candidate.parsedCapacityOrTon === desired.capacityOrTon) score += 2;
       if (candidate.parsedGlassOrFinish === desired.glassOrFinish) score += 1;
       return { candidate, score };
     });
@@ -212,7 +264,126 @@ export function VariantSelector({
         className
       )}
     >
-      {/* 1. Display Size Selector Strip (Tablets, TVs, Laptops) */}
+      {/* 1. Fin Count Selector Strip (Oil Filled Radiator Room Heaters) */}
+      {availableFins.length > 1 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 text-shop-orange" />
+              <span>
+                Radiator Fins:{" "}
+                <strong className="text-slate-900 dark:text-slate-100 font-bold">
+                  {selectedFins || "Select Fins"}
+                </strong>
+              </span>
+            </span>
+            <span className="text-[11px] text-slate-400">
+              {availableFins.length} Options
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {availableFins.map((finOption) => {
+              const isSelected = selectedFins === finOption;
+              const matchVariant =
+                parsedVariants.find((v) => v.parsedFins === finOption) ||
+                parsedVariants[0];
+
+              const priceNum =
+                matchVariant?.price !== undefined
+                  ? matchVariant.price
+                  : matchVariant?.price_cents
+                  ? matchVariant.price_cents / 100
+                  : undefined;
+
+              return (
+                <button
+                  key={finOption}
+                  type="button"
+                  onClick={() => handleAttributeChange("fins", finOption)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs flex items-center gap-2",
+                    isSelected
+                      ? "border-shop-orange bg-orange-50/80 dark:bg-orange-950/40 text-shop-orange ring-2 ring-shop-orange/30 font-bold"
+                      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700"
+                  )}
+                  aria-pressed={isSelected}
+                >
+                  <span>{finOption}</span>
+                  {priceNum !== undefined && (
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      ({formatINR(priceNum)})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. Lock Type Selector Strip (Home Safes & Security Lockers) */}
+      {availableLockTypes.length > 1 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-shop-orange" />
+              <span>
+                Lock Mechanism:{" "}
+                <strong className="text-slate-900 dark:text-slate-100 font-bold">
+                  {selectedLockType || "Select Lock"}
+                </strong>
+              </span>
+            </span>
+            <span className="text-[11px] text-slate-400">
+              {availableLockTypes.length} Types
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {availableLockTypes.map((lockOption) => {
+              const isSelected = selectedLockType === lockOption;
+              const matchVariant =
+                parsedVariants.find((v) => v.parsedLockType === lockOption) ||
+                parsedVariants[0];
+
+              const priceNum =
+                matchVariant?.price !== undefined
+                  ? matchVariant.price
+                  : matchVariant?.price_cents
+                  ? matchVariant.price_cents / 100
+                  : undefined;
+
+              return (
+                <button
+                  key={lockOption}
+                  type="button"
+                  onClick={() => handleAttributeChange("lockType", lockOption)}
+                  className={cn(
+                    "px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs flex items-center gap-1.5",
+                    isSelected
+                      ? "border-shop-orange bg-orange-50/80 dark:bg-orange-950/40 text-shop-orange ring-2 ring-shop-orange/30 font-bold"
+                      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700"
+                  )}
+                  aria-pressed={isSelected}
+                >
+                  {lockOption === "Key Lock" && <Key className="w-3.5 h-3.5 text-amber-500" />}
+                  {lockOption === "Digital Keypad" && <Lock className="w-3.5 h-3.5 text-blue-500" />}
+                  {lockOption === "Biometric & PIN" && <Fingerprint className="w-3.5 h-3.5 text-emerald-500" />}
+                  <span>{lockOption}</span>
+                  {priceNum !== undefined && (
+                    <span className="text-[10px] text-slate-400 font-normal ml-1">
+                      {formatINR(priceNum)}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Display Size Selector Strip (Tablets, TVs, Laptops) */}
       {availableDisplaySizes.length > 1 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs">
@@ -254,7 +425,7 @@ export function VariantSelector({
         </div>
       )}
 
-      {/* 2. Color Swatch Selector Strip */}
+      {/* 4. Color Swatch Selector Strip */}
       {availableColors.length > 0 && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between text-xs">
@@ -275,11 +446,14 @@ export function VariantSelector({
               const swatch = getColorSwatch(color);
 
               // Find variant for stock status
-              const variantForColor = parsedVariants.find(
-                (v) =>
-                  v.parsedColor === color &&
-                  v.parsedStorage === selectedStorage
-              ) || parsedVariants.find((v) => v.parsedColor === color);
+              const variantForColor =
+                parsedVariants.find(
+                  (v) =>
+                    v.parsedColor === color &&
+                    (v.parsedStorage === selectedStorage ||
+                      v.parsedCapacityOrTon === selectedCapacity ||
+                      v.parsedFins === selectedFins)
+                ) || parsedVariants.find((v) => v.parsedColor === color);
 
               const isInStock =
                 variantForColor?.isStock ??
@@ -326,7 +500,7 @@ export function VariantSelector({
         </div>
       )}
 
-      {/* 3. Storage Capacity Selector Strip */}
+      {/* 5. Storage Capacity Selector Strip */}
       {availableStorages.length > 0 && (
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between text-xs">
@@ -396,7 +570,7 @@ export function VariantSelector({
         </div>
       )}
 
-      {/* 4. RAM / Memory Selector Strip */}
+      {/* 6. RAM / Memory Selector Strip */}
       {availableRams.length > 1 && (
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between text-xs">
@@ -438,14 +612,14 @@ export function VariantSelector({
         </div>
       )}
 
-      {/* 5. Capacity / Tonnage Strip (Air Conditioners, Appliances, Washing Machines) */}
+      {/* 7. Capacity / Tonnage / Drum Load Strip (Washing Machines, Air Conditioners, Safes) */}
       {availableCapacities.length > 1 && (
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-              <AirVent className="w-3.5 h-3.5 text-shop-orange" />
+              <Scale className="w-3.5 h-3.5 text-shop-orange" />
               <span>
-                Capacity / Tonnage:{" "}
+                Capacity / Load:{" "}
                 <strong className="text-slate-900 dark:text-slate-100 font-bold">
                   {selectedCapacity || "Select Capacity"}
                 </strong>
@@ -459,20 +633,39 @@ export function VariantSelector({
           <div className="flex flex-wrap items-center gap-2">
             {availableCapacities.map((cap) => {
               const isSelected = selectedCapacity === cap;
+              const matchVariant =
+                parsedVariants.find(
+                  (v) =>
+                    v.parsedCapacityOrTon === cap &&
+                    v.parsedColor === selectedColor
+                ) || parsedVariants.find((v) => v.parsedCapacityOrTon === cap);
+
+              const priceNum =
+                matchVariant?.price !== undefined
+                  ? matchVariant.price
+                  : matchVariant?.price_cents
+                  ? matchVariant.price_cents / 100
+                  : undefined;
+
               return (
                 <button
                   key={cap}
                   type="button"
                   onClick={() => handleAttributeChange("capacityOrTon", cap)}
                   className={cn(
-                    "px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs",
+                    "px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs flex items-center gap-1.5",
                     isSelected
                       ? "border-shop-orange bg-orange-50/80 dark:bg-orange-950/40 text-shop-orange ring-2 ring-shop-orange/30 font-bold"
                       : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700"
                   )}
                   aria-pressed={isSelected}
                 >
-                  {cap}
+                  <span>{cap}</span>
+                  {priceNum !== undefined && (
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      ({formatINR(priceNum)})
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -480,7 +673,7 @@ export function VariantSelector({
         </div>
       )}
 
-      {/* 6. Special Glass / Tech Finish Strip */}
+      {/* 8. Special Glass / Tech Finish Strip */}
       {availableFinishes.length > 1 && (
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between text-xs">
@@ -522,7 +715,7 @@ export function VariantSelector({
         </div>
       )}
 
-      {/* 7. Fallback: Generic Options List (for unclassified multi-variants) */}
+      {/* 9. Fallback: Generic Options List (for unclassified multi-variants) */}
       {!hasStructuredAttributes && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between text-xs">

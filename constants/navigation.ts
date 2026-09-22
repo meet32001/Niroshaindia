@@ -102,7 +102,16 @@ export const PREVIEW_TABS: PreviewTab[] = [
     id: "home-appliances",
     label: "Home Appliances",
     icon: "Home",
-    categorySlugs: ["refrigerators", "washing-machines", "air-conditioners"],
+    categorySlugs: [
+      "refrigerators",
+      "washing-machines",
+      "air-conditioners",
+      "room-heaters",
+      "safes-lockers",
+      "water-dispensers",
+      "voltage-stabilizers",
+      "cleaning-tools",
+    ],
     title: "Home Appliances",
     value: "home-appliances",
     iconName: "Home",
@@ -119,6 +128,24 @@ export const PREVIEW_TABS: PreviewTab[] = [
 ];
 
 export const VIJAY_SALES_CATEGORIES = PREVIEW_TABS;
+
+export interface NavCategoryItem {
+  name: string;
+  slug: string;
+  parentId?: number;
+}
+
+export const HOME_APPLIANCE_SUBCATEGORIES: NavCategoryItem[] = [
+  { name: "Washing Machines", slug: "washing-machines" },
+  { name: "Room Heaters", slug: "room-heaters" },
+  { name: "Safes & Security Lockers", slug: "safes-lockers" },
+  { name: "Water Dispensers", slug: "water-dispensers" },
+  { name: "Voltage Stabilizers", slug: "voltage-stabilizers" },
+  { name: "Cleaning Tools", slug: "cleaning-tools" },
+  { name: "Dishwashers", slug: "dishwashers" },
+  { name: "Vacuum Cleaners", slug: "vacuum-cleaners" },
+  { name: "Air Purifiers", slug: "air-purifiers" },
+];
 
 
 export const HEADER_NAV_LINKS: NavigationItem[] = [
