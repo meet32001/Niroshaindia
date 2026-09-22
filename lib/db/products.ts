@@ -375,7 +375,13 @@ export async function getCategories(quantity?: number): Promise<Category[]> {
               image: (child as { image?: string }).image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
             }))
             .filter((child) => (child.productCount || 0) > 0)
-            .sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
+            .sort((a, b) =>
+              (a.name || a.title || "").localeCompare(
+                b.name || b.title || "",
+                undefined,
+                { sensitivity: "base" }
+              )
+            );
 
           const childTotal = children.reduce((sum, ch) => sum + (ch.productCount || 0), 0);
           const totalProductCount = (counts[parent.id] || 0) + childTotal;

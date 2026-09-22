@@ -163,7 +163,15 @@ export function CategoryList({
               {/* Subcategories Accordion Content */}
               {hasChildren && isExpanded && (
                 <div className="ml-3.5 pl-2.5 my-1.5 border-l-2 border-slate-200/80 dark:border-slate-800 space-y-1 animate-in fade-in-50 duration-150">
-                  {cat.children.map((child: CategoryItem, cIdx: number) => {
+                  {[...cat.children]
+                    .sort((a: CategoryItem, b: CategoryItem) =>
+                      (a.name || a.title || "").localeCompare(
+                        b.name || b.title || "",
+                        undefined,
+                        { sensitivity: "base" }
+                      )
+                    )
+                    .map((child: CategoryItem, cIdx: number) => {
                     const rawChildSlug =
                       typeof child.slug === "string" ? child.slug : child.slug?.current;
                     const childSlug = rawChildSlug || "subcategory";

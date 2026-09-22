@@ -136,15 +136,15 @@ export interface NavCategoryItem {
 }
 
 export const HOME_APPLIANCE_SUBCATEGORIES: NavCategoryItem[] = [
-  { name: "Washing Machines", slug: "washing-machines" },
-  { name: "Room Heaters", slug: "room-heaters" },
-  { name: "Safes & Security Lockers", slug: "safes-lockers" },
-  { name: "Water Dispensers", slug: "water-dispensers" },
-  { name: "Voltage Stabilizers", slug: "voltage-stabilizers" },
+  { name: "Air Purifiers", slug: "air-purifiers" },
   { name: "Cleaning Tools", slug: "cleaning-tools" },
   { name: "Dishwashers", slug: "dishwashers" },
+  { name: "Room Heaters", slug: "room-heaters" },
+  { name: "Safes & Security Lockers", slug: "safes-lockers" },
   { name: "Vacuum Cleaners", slug: "vacuum-cleaners" },
-  { name: "Air Purifiers", slug: "air-purifiers" },
+  { name: "Voltage Stabilizers", slug: "voltage-stabilizers" },
+  { name: "Washing Machines", slug: "washing-machines" },
+  { name: "Water Dispensers", slug: "water-dispensers" },
 ];
 
 
