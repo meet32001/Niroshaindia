@@ -19,18 +19,14 @@ export async function getUserOrders() {
         order_number,
         status,
         payment_status,
-        total_cents,
-        shipping_cents,
-        tax_cents,
-        discount_cents,
+        total_amount_cents,
+        shipping_amount_cents,
         created_at,
-        shipping_address,
         order_items (
           id,
           variant_id,
           quantity,
           unit_price_cents,
-          total_price_cents,
           product_variants (
             id,
             sku,
@@ -49,7 +45,15 @@ export async function getUserOrders() {
       return { success: false, error: error.message, orders: [] };
     }
 
-    return { success: true, orders: orders || [] };
+    const formattedOrders = (orders || []).map((o) => ({
+      ...o,
+      total_cents: o.total_amount_cents,
+      shipping_cents: o.shipping_amount_cents,
+      tax_cents: 0,
+      discount_cents: 0,
+    }));
+
+    return { success: true, orders: formattedOrders };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to fetch orders';
     return { success: false, error: errorMessage, orders: [] };
@@ -79,21 +83,14 @@ export async function getOrderById(orderId: string) {
         order_number,
         status,
         payment_status,
-        total_cents,
-        shipping_cents,
-        tax_cents,
-        discount_cents,
+        total_amount_cents,
+        shipping_amount_cents,
         created_at,
-        shipping_address,
-        billing_address,
-        tracking_number,
-        carrier,
         order_items (
           id,
           variant_id,
           quantity,
           unit_price_cents,
-          total_price_cents,
           product_variants (
             id,
             sku,
@@ -114,7 +111,15 @@ export async function getOrderById(orderId: string) {
       return { success: false, error: error?.message || 'Order not found', order: null };
     }
 
-    return { success: true, order };
+    const formattedOrder = {
+      ...order,
+      total_cents: order.total_amount_cents,
+      shipping_cents: order.shipping_amount_cents,
+      tax_cents: 0,
+      discount_cents: 0,
+    };
+
+    return { success: true, order: formattedOrder };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order details';
     return { success: false, error: errorMessage, order: null };
