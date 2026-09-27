@@ -187,7 +187,7 @@ export default function ContactPage() {
                     <strong className="text-slate-800 dark:text-slate-200 block text-xs">
                       Response Timeline
                     </strong>
-                    <span>Standard inquiries answered within 12–24 business hours.</span>
+                    <span>Standard inquiries answered within 24 to 48 business hours.</span>
                   </div>
                 </div>
               </div>

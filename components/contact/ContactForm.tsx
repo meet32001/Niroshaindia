@@ -149,8 +149,7 @@ export function ContactForm() {
         </h3>
 
         <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base mt-2 max-w-md mx-auto leading-relaxed">
-          Your inquiry has been assigned to our live triage desk. You will receive email notifications and updates directly at{" "}
-          <strong className="text-slate-800 dark:text-slate-200">{formData.email}</strong>.
+          Our support team is reviewing your inquiry. You will receive a response at your email address within 24 to 48 business hours.
         </p>
 
         {/* Ticket Reference Box */}
@@ -181,7 +180,7 @@ export function ContactForm() {
               </p>
             )}
             <p>
-              <strong>Expected Response:</strong> 12–24 business hours (Mon – Sat, 09:00 AM – 08:00 PM IST)
+              <strong>Expected Response:</strong> 24 to 48 business hours (Mon – Sat, 09:00 AM – 08:00 PM IST)
             </p>
           </div>
         </div>
