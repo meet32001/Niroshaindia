@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Star, Flame } from "lucide-react";
-import { PriceView } from "@/components/product/PriceView";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 
@@ -18,14 +17,21 @@ export function ProductCard(product: any) {
     "Electronics";
 
   const variants = product.variants || product.product_variants || [];
-  const primaryVariant = variants[0] || {};
   
-  // Starting price (lowest variant price)
-  const price = product.lowestPrice ?? (product.min_price_cents
-    ? product.min_price_cents / 100
-    : primaryVariant?.price_cents
-    ? primaryVariant.price_cents / 100
-    : product.price || 0);
+  // Find base variant with the lowest price
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const baseVariant = variants.reduce((prev: any, curr: any) => {
+    const prevPrice = prev.price_cents ?? (prev.price ? prev.price * 100 : Infinity);
+    const currPrice = curr.price_cents ?? (curr.price ? curr.price * 100 : Infinity);
+    return currPrice < prevPrice ? curr : prev;
+  }, variants[0] || {});
+  
+  // Starting price directly consuming cached min_price_cents with robust fallbacks
+  const minPriceCents =
+    product.min_price_cents ||
+    baseVariant?.price_cents ||
+    (product.price ? Math.round(product.price * 100) : 0);
+  const minPrice = minPriceCents > 0 ? minPriceCents / 100 : product.lowestPrice ?? product.price ?? 0;
 
   const hasVariants =
     variants.length > 1 ||
@@ -33,16 +39,21 @@ export function ProductCard(product: any) {
       product.max_price_cents &&
       product.min_price_cents < product.max_price_cents);
 
-  const discount = primaryVariant?.compare_at_price_cents
-    ? primaryVariant.compare_at_price_cents / 100
-    : product.discountPrice || product.discount || 0;
+  // Strictly follow e-commerce conventions: only show strikethrough if baseVariant has genuine compare_at_price_cents > price_cents
+  const basePriceCents = baseVariant?.price_cents ?? minPriceCents;
+  const hasGenuineDiscount = Boolean(
+    baseVariant?.compare_at_price_cents &&
+    baseVariant.compare_at_price_cents > basePriceCents
+  );
 
-  const stock = product.stock !== undefined ? product.stock : (primaryVariant?.stock ?? 10);
+  const formatPrice = (amount: number) => Math.round(amount).toLocaleString("en-IN");
+
+  const stock = product.stock !== undefined ? product.stock : (baseVariant?.stock ?? 10);
   const status = product.status || product.tag?.toLowerCase();
 
   let imageUrl = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
 
-  const variantImg = primaryVariant?.images?.[0] || primaryVariant?.product_images?.[0]?.image_url;
+  const variantImg = baseVariant?.images?.[0] || baseVariant?.product_images?.[0]?.image_url;
   const directImg = product.product_images?.[0]?.image_url || (Array.isArray(product.images) ? product.images[0] : product.image);
 
   if (variantImg && typeof variantImg === "string") {
@@ -133,7 +144,19 @@ export function ProductCard(product: any) {
 
         {/* Price & Cart Action */}
         <div className="pt-2 space-y-2 border-t border-slate-100 dark:border-slate-800 mt-2">
-          <PriceView price={price} discount={discount} isFrom={Boolean(hasVariants)} />
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            {hasVariants && (
+              <span className="text-xs text-muted-foreground font-medium">From</span>
+            )}
+            <span className="text-base md:text-lg font-bold text-foreground">
+              ₹{formatPrice(minPrice)}
+            </span>
+            {hasGenuineDiscount && baseVariant.compare_at_price_cents && (
+              <span className="text-xs text-muted-foreground line-through">
+                ₹{formatPrice(baseVariant.compare_at_price_cents / 100)}
+              </span>
+            )}
+          </div>
           <AddToCartButton product={product} />
         </div>
       </div>

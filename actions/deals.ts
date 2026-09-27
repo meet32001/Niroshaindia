@@ -3,6 +3,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase/server';
+import { selectWeeklyDeals } from '@/lib/deals/deal-selector';
 
 /**
  * 1-Click VIP Deal Claim Flow
@@ -254,6 +255,15 @@ export async function getVariantForCheckout(variantId: number) {
   }
 }
 
+export interface CartItemForCouponValidation {
+  productId?: string | number;
+  variantId?: string | number;
+  price_cents?: number;
+  price?: number; // price in rupees
+  quantity?: number;
+  isDeal?: boolean;
+}
+
 export interface CouponValidationResult {
   valid: boolean;
   code: string;
@@ -263,45 +273,159 @@ export interface CouponValidationResult {
 }
 
 /**
- * Validate coupon code against database or VIP deals rules
+ * Validate coupon code against database or VIP deals rules.
+ * Scopes VIP coupons exclusively to qualifying deal line items.
  */
 export async function validateCouponAction(
   rawCode: string,
-  subtotalCents: number
+  subtotalCents: number,
+  cartItems?: CartItemForCouponValidation[]
 ): Promise<CouponValidationResult> {
   const code = (rawCode || '').trim().toUpperCase();
   if (!code) {
     return { valid: false, code: '', discountCents: 0, message: 'Please enter a coupon code' };
   }
 
-  // 1. VIP Weekly Drop Coupon Handling (Percentage discount on deal item/cart)
+  // 1. VIP Weekly Drop Coupon Handling (Percentage discount EXCLUSIVELY on eligible deal items)
   if (code.startsWith('VIP-DROP-') || code.startsWith('VIP-DEAL')) {
+    // Current IST time calculations for week and intermission checks
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istTime = new Date(now.getTime() + istOffset);
+    const startOfYear = new Date(istTime.getUTCFullYear(), 0, 1);
+    const pastDaysOfYear = (istTime.getTime() - startOfYear.getTime()) / 86400000;
+    const currentWeekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+
+    // Verify if coupon code week number matches or is from a previous expired drop
+    const matchWk = code.match(/VIP-DROP-(?:(?:[0-9]{4}-W)|WK)?([0-9]+)/i);
+    if (matchWk && matchWk[1]) {
+      const codeWeek = parseInt(matchWk[1], 10);
+      if (codeWeek < currentWeekNumber) {
+        return {
+          valid: false,
+          code,
+          discountCents: 0,
+          message: 'This VIP coupon belongs to a previous expired drop.',
+        };
+      }
+    }
+
+    // Check Monday morning intermission window (before 09:00 AM IST)
+    const dayOfWeekIST = istTime.getUTCDay(); // 0 is Sunday, 1 is Monday
+    const hoursIST = istTime.getUTCHours();
+    const isIntermission = dayOfWeekIST === 1 && hoursIST < 9;
+
     let discountPercent = 15;
+    const dealProductIds = new Set<string>();
+    const dealVariantIds = new Set<string>();
+
     try {
       const { data: weeklyRow } = await supabaseServer
         .from('weekly_deals')
-        .select('discount_percent, discount_pct')
+        .select('id, discount_percent, discount_pct, products, expires_at')
         .eq('is_active', true)
         .order('id', { ascending: false })
         .limit(1)
         .maybeSingle();
+
       if (weeklyRow) {
-        discountPercent = weeklyRow.discount_percent || weeklyRow.discount_pct || 15;
+        // Enforce expiration timestamp check
+        const isExpired = weeklyRow.expires_at
+          ? new Date(weeklyRow.expires_at).getTime() <= Date.now()
+          : false;
+
+        if (isExpired) {
+          return {
+            valid: false,
+            code,
+            discountCents: 0,
+            message: 'This VIP deal drop has expired. Please check back for the next Monday drop!',
+          };
+        }
+
+        if (weeklyRow.discount_percent || weeklyRow.discount_pct) {
+          discountPercent = weeklyRow.discount_percent || weeklyRow.discount_pct;
+        }
+        if (Array.isArray(weeklyRow.products)) {
+          for (const p of weeklyRow.products) {
+            if (p.id) dealProductIds.add(String(p.id));
+            if (p.productId) dealProductIds.add(String(p.productId));
+            if (p.variantId) dealVariantIds.add(String(p.variantId));
+          }
+        }
       }
-    } catch {
-      // default 15%
+    } catch (err) {
+      console.warn('[validateCouponAction] Error querying active weekly deals:', err);
     }
 
-    const discountCents = Math.round(subtotalCents * (discountPercent / 100));
+    // Intermission check for fallback PRNG
+    if (isIntermission) {
+      return {
+        valid: false,
+        code,
+        discountCents: 0,
+        message: 'This VIP deal drop has expired. Please check back for the next Monday drop!',
+      };
+    }
+
+    // Fallback: If weekly_deals table has no active products, query deterministic weekly deals
+    if (dealProductIds.size === 0 && dealVariantIds.size === 0) {
+      try {
+        const fallbackDeals = await selectWeeklyDeals();
+        for (const p of fallbackDeals) {
+          if (p.id) dealProductIds.add(String(p.id));
+          if (p.variantId) dealVariantIds.add(String(p.variantId));
+        }
+      } catch (err) {
+        console.warn('[validateCouponAction] Error generating fallback deals:', err);
+      }
+    }
+
+    // Compute eligible deal items subtotal
+    let dealItemsSubtotalCents = 0;
+    if (Array.isArray(cartItems) && cartItems.length > 0) {
+      for (const item of cartItems) {
+        const isExplicitDeal = !!item.isDeal;
+        const vId = item.variantId ? String(item.variantId) : '';
+        const pId = item.productId ? String(item.productId) : '';
+        const isMatchingDeal =
+          isExplicitDeal ||
+          (vId && dealVariantIds.has(vId)) ||
+          (pId && dealProductIds.has(pId));
+
+        if (isMatchingDeal) {
+          const itemPriceCents =
+            item.price_cents && item.price_cents > 0
+              ? item.price_cents
+              : item.price && item.price > 0
+              ? Math.round(item.price * 100)
+              : 0;
+          const qty = item.quantity && item.quantity > 0 ? item.quantity : 1;
+          dealItemsSubtotalCents += itemPriceCents * qty;
+        }
+      }
+    }
+
+    if (dealItemsSubtotalCents <= 0) {
+      return {
+        valid: false,
+        code,
+        discountCents: 0,
+        message: 'This VIP coupon code applies only to active Weekly Deal items.',
+      };
+    }
+
+    const discountCents = Math.round(dealItemsSubtotalCents * (discountPercent / 100));
     return {
       valid: true,
       code,
       discountCents,
       discountPercent,
-      message: `VIP Deal Applied (${discountPercent}% OFF)!`,
+      message: `VIP Weekly Deal discount applied (${discountPercent}% OFF on deal items)!`,
     };
   }
 
+  // 2. Regular Coupons from database
   try {
     const { data: coupon, error } = await supabaseServer
       .from('coupons')
@@ -357,20 +481,7 @@ export async function validateCouponAction(
     console.warn('[validateCouponAction] Database check error:', err);
   }
 
-  // Fallback matching for VIP Drop Coupons or Welcome Coupons
-  if (code.startsWith('VIP-DROP-')) {
-    // Default VIP discount 15% (or between 10%-25%)
-    const discountPercent = 15;
-    const discountCents = Math.round(subtotalCents * 0.15);
-    return {
-      valid: true,
-      code,
-      discountCents,
-      discountPercent,
-      message: `VIP Weekly Deal Coupon ${code} applied (15% OFF)!`,
-    };
-  }
-
+  // 3. Fallback Welcome Coupon
   if (code === 'WELCOME-NIROSHA-500') {
     if (subtotalCents < 1000000) {
       return {

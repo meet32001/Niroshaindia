@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
-import { Maximize2, ZoomIn } from "lucide-react";
+import { ZoomIn } from "lucide-react";
 
 export interface ProductGalleryProps {
   images?: string[];
@@ -29,12 +29,15 @@ export function ProductGallery({
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // When variant changes and new images arrive, reset to first thumbnail
-  useEffect(() => {
+  // If switching variants leaves the active thumbnail index out of bounds, automatically reset to 0
+  const [prevImages, setPrevImages] = useState(images);
+  if (prevImages !== images) {
+    setPrevImages(images);
     setActiveIndex(0);
-  }, [images]);
+  }
 
-  const activeImage = imageList[activeIndex] || fallbackImage;
+  const safeIndex = activeIndex < imageList.length ? activeIndex : 0;
+  const activeImage = imageList[safeIndex] || fallbackImage;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;

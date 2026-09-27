@@ -15,12 +15,43 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; dealId?: number; couponCode: string; weekNumber: number }> {
+interface ActiveWeeklyDealsResult {
+  deals: SelectedDealProduct[];
+  dealId?: number;
+  couponCode: string;
+  weekNumber: number;
+  expiresAt: string;
+  isConcluded: boolean;
+}
+
+function getDeterministicEndOfWeekSundayIST(): string {
   const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const pastDaysOfYear = (now.getTime() - startOfYear.getTime()) / 86400000;
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(now.getTime() + istOffset);
+  const dayOfWeek = istTime.getUTCDay(); // 0 is Sunday
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+
+  const targetYear = istTime.getUTCFullYear();
+  const targetMonth = istTime.getUTCMonth();
+  const targetDate = istTime.getUTCDate() + daysUntilSunday;
+  // 23:59:59.999 IST = 18:29:59.999 UTC
+  return new Date(Date.UTC(targetYear, targetMonth, targetDate, 18, 29, 59, 999)).toISOString();
+}
+
+async function getActiveWeeklyDeals(): Promise<ActiveWeeklyDealsResult> {
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(now.getTime() + istOffset);
+  const startOfYear = new Date(istTime.getUTCFullYear(), 0, 1);
+  const pastDaysOfYear = (istTime.getTime() - startOfYear.getTime()) / 86400000;
   const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
   const currentCouponCode = `VIP-DROP-WK${weekNumber}`;
+  const fallbackExpiresAt = getDeterministicEndOfWeekSundayIST();
+
+  const dayOfWeekIST = istTime.getUTCDay(); // 0 is Sunday, 1 is Monday
+  const hoursIST = istTime.getUTCHours();
+  // Intermission window: Sunday 23:59:59 IST until Monday 08:59:59 AM IST
+  const isIntermission = dayOfWeekIST === 1 && hoursIST < 9;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -41,12 +72,54 @@ async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; d
 
       if (!error && dbDeals && dbDeals.length > 0) {
         const row = dbDeals[0];
-        if (Array.isArray(row.products) && row.products.length > 0) {
+        const rowExpiresAt = row.expires_at ? new Date(row.expires_at).getTime() : 0;
+        const isRowExpired = rowExpiresAt > 0 && rowExpiresAt <= now.getTime();
+
+        // If the database row has expired and we have reached or passed Monday 09:00 AM IST,
+        // bypass the stale row so the new week drop automatically unlocks via deterministic generator.
+        const shouldBypassStaleRow = isRowExpired && !isIntermission;
+
+        if (!shouldBypassStaleRow && Array.isArray(row.products) && row.products.length > 0) {
+          const expiresAt = row.expires_at ? new Date(row.expires_at).toISOString() : fallbackExpiresAt;
+          const isConcluded = isIntermission || (expiresAt ? new Date(expiresAt).getTime() <= now.getTime() : false);
+
+          let normalizedDeals = row.products;
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const variantIds = row.products.map((p: any) => p.variantId).filter(Boolean);
+            if (variantIds.length > 0) {
+              const { data: vData } = await supabase
+                .from("product_variants")
+                .select("id, product:products(id, slug, name)")
+                .in("id", variantIds);
+              if (vData && vData.length > 0) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const vMap = new Map();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                vData.forEach((v: any) => {
+                  if (v.product) vMap.set(v.id, v.product);
+                });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                normalizedDeals = row.products.map((p: any) => {
+                  const parent = vMap.get(p.variantId);
+                  if (parent && parent.slug) {
+                    return { ...p, id: parent.id, slug: parent.slug };
+                  }
+                  return p;
+                });
+              }
+            }
+          } catch {
+            // Keep default products array if query fails
+          }
+
           return {
-            deals: row.products,
+            deals: normalizedDeals,
             dealId: row.id,
             couponCode: row.coupon_code || currentCouponCode,
             weekNumber,
+            expiresAt,
+            isConcluded,
           };
         }
       }
@@ -55,17 +128,20 @@ async function getActiveWeeklyDeals(): Promise<{ deals: SelectedDealProduct[]; d
     }
   }
 
-  // Fallback: Run selection algorithm directly
+  // Fallback: Run deterministic selection algorithm directly
   const dynamicDeals = await selectWeeklyDeals();
+  const isConcluded = isIntermission;
   return {
     deals: dynamicDeals,
     couponCode: currentCouponCode,
     weekNumber,
+    expiresAt: fallbackExpiresAt,
+    isConcluded,
   };
 }
 
 export default async function DealsPage() {
-  const { deals, dealId, couponCode, weekNumber } = await getActiveWeeklyDeals();
+  const { deals, dealId, couponCode, weekNumber, expiresAt, isConcluded } = await getActiveWeeklyDeals();
 
   const formatINR = (cents: number) => {
     return "₹" + Math.round(cents / 100).toLocaleString("en-IN");
@@ -112,8 +188,8 @@ export default async function DealsPage() {
 
             {/* Countdown & Coupon Module */}
             <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
-              <DealsCountdown />
-              <DealsCouponBar couponCode={couponCode} />
+              <DealsCountdown expiresAt={expiresAt} />
+              <DealsCouponBar couponCode={couponCode} isConcluded={isConcluded} />
             </div>
           </div>
         </div>
@@ -125,47 +201,76 @@ export default async function DealsPage() {
               {/* Left Column: Bumper Badges, Title & Savings */}
               <div className="space-y-5 flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md">
-                    <Flame className="w-4 h-4 fill-slate-950 text-slate-950 animate-bounce" />
-                    <span>🔥 FESTIVAL BUMPER OFFER — 25% OFF</span>
-                  </div>
+                  {isConcluded ? (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-stone-800/80 text-stone-300 border border-stone-700 shadow-xs">
+                      <span>Deal Concluded</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md">
+                      <Flame className="w-4 h-4 fill-slate-950 text-slate-950 animate-bounce" />
+                      <span>🔥 FESTIVAL BUMPER OFFER — 25% OFF</span>
+                    </div>
+                  )}
                   <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-amber-200/80 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border border-amber-300">
                     {bumperDeal.categoryName}
                   </span>
                   <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
                     {bumperDeal.brandName}
                   </span>
+                  {bumperDeal.variantName && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-slate-200 border border-amber-300 dark:border-amber-500/50 shadow-xs">
+                      <Tag className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Spec / Model: {bumperDeal.variantName}</span>
+                    </div>
+                  )}
                 </div>
 
-                <Link href={bumperDeal.productUrl}>
+                <Link href={`/product/${bumperDeal.slug}${bumperDeal.variantId ? `?variant=${bumperDeal.variantId}` : ""}`}>
                   <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-950 dark:text-white hover:text-amber-600 dark:hover:text-amber-400 transition-colors leading-tight">
                     {bumperDeal.name}
                   </h2>
                 </Link>
 
                 {/* Price Display Grid */}
-                <div className="flex flex-wrap items-baseline gap-4 pt-1">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 block">VIP Bumper Deal Price:</span>
-                    <span className="text-3xl sm:text-4xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-                      {formatINR(bumperDeal.dealPriceCents)}
-                    </span>
+                {isConcluded ? (
+                  <div className="flex flex-wrap items-baseline gap-4 pt-1">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 block">Catalog Price:</span>
+                      <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                        {formatINR(bumperDeal.originalPriceCents)}
+                      </span>
+                    </div>
+                    <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
+                      <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold block">VIP Deal Status:</span>
+                      <span className="text-sm font-medium text-slate-500">
+                        Flash 25% VIP savings concluded
+                      </span>
+                    </div>
                   </div>
+                ) : (
+                  <div className="flex flex-wrap items-baseline gap-4 pt-1">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 block">VIP Bumper Deal Price:</span>
+                      <span className="text-3xl sm:text-4xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
+                        {formatINR(bumperDeal.dealPriceCents)}
+                      </span>
+                    </div>
 
-                  <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
-                    <span className="text-xs text-slate-500 block">Anchor Price:</span>
-                    <span className="text-base font-semibold line-through text-slate-400">
-                      WAS {formatINR(bumperDeal.anchorPriceCents || bumperDeal.mrpCents)}
-                    </span>
-                  </div>
+                    <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
+                      <span className="text-xs text-slate-500 block">Anchor Price:</span>
+                      <span className="text-base font-semibold line-through text-slate-400">
+                        WAS {formatINR(bumperDeal.anchorPriceCents || bumperDeal.mrpCents)}
+                      </span>
+                    </div>
 
-                  <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
-                    <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold block">Instant Savings:</span>
-                    <span className="text-base font-extrabold text-emerald-700 dark:text-emerald-400">
-                      Save {formatINR(bumperDeal.savingsCents)} (FLAT 25% OFF)
-                    </span>
+                    <div className="border-l border-slate-300 dark:border-slate-700 pl-4 space-y-0.5">
+                      <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold block">Instant Savings:</span>
+                      <span className="text-base font-extrabold text-emerald-700 dark:text-emerald-400">
+                        Save {formatINR(bumperDeal.savingsCents)} (FLAT 25% OFF)
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* 1-Click Claim Action */}
                 <div className="pt-2">
@@ -174,6 +279,8 @@ export default async function DealsPage() {
                     dealId={dealId}
                     couponCode={couponCode}
                     isBumper={true}
+                    isConcluded={isConcluded}
+                    slug={bumperDeal.slug}
                     product={{
                       id: bumperDeal.id,
                       name: bumperDeal.name,
@@ -193,7 +300,7 @@ export default async function DealsPage() {
               {/* Right Column: Product Featured Image */}
               <div className="w-full lg:w-96 shrink-0 flex items-center justify-center">
                 <Link
-                  href={bumperDeal.productUrl}
+                  href={`/product/${bumperDeal.slug}${bumperDeal.variantId ? `?variant=${bumperDeal.variantId}` : ""}`}
                   className="relative w-full h-64 sm:h-80 bg-white rounded-2xl overflow-hidden p-6 border-2 border-amber-300/80 dark:border-amber-500/40 shadow-xl hover:scale-[1.02] transition-transform flex items-center justify-center"
                 >
                   <Image
@@ -204,9 +311,15 @@ export default async function DealsPage() {
                     className="object-contain p-4"
                     priority
                   />
-                  <div className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black px-3 py-1 rounded-full shadow-md">
-                    25% OFF
-                  </div>
+                  {isConcluded ? (
+                    <div className="absolute top-3 right-3 bg-stone-800/90 text-stone-300 border border-stone-700 text-xs font-semibold px-3 py-1 rounded-full shadow-md">
+                      Concluded
+                    </div>
+                  ) : (
+                    <div className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black px-3 py-1 rounded-full shadow-md">
+                      25% OFF
+                    </div>
+                  )}
                 </Link>
               </div>
             </div>
@@ -219,7 +332,7 @@ export default async function DealsPage() {
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
               <Sparkles className="w-4 h-4 text-emerald-600" />
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                Weekly Curated Category Drops (10% to 20% OFF)
+                {isConcluded ? "Weekly Curated Category Drops" : "Weekly Curated Category Drops (10% to 20% OFF)"}
               </h3>
             </div>
           )}
@@ -242,7 +355,7 @@ export default async function DealsPage() {
                   </div>
 
                   {/* Product Image */}
-                  <Link href={deal.productUrl} className="block relative w-full h-52 mb-4 bg-[#F8FAFC] dark:bg-slate-800/50 rounded-xl overflow-hidden p-4 group-hover:scale-[1.02] transition-transform">
+                  <Link href={`/product/${deal.slug}${deal.variantId ? `?variant=${deal.variantId}` : ""}`} className="block relative w-full h-52 mb-4 bg-[#F8FAFC] dark:bg-slate-800/50 rounded-xl overflow-hidden p-4 group-hover:scale-[1.02] transition-transform">
                     <Image
                       src={deal.imageUrl}
                       alt={deal.name}
@@ -250,37 +363,68 @@ export default async function DealsPage() {
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-contain p-2"
                     />
-                    <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[11px] font-black px-2 py-0.5 rounded-full shadow-xs">
-                      {deal.discountPercent}% VIP OFF
-                    </div>
+                    {isConcluded ? (
+                      <div className="absolute top-2 right-2 bg-stone-800/80 text-stone-300 border border-stone-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full shadow-xs">
+                        Concluded
+                      </div>
+                    ) : (
+                      <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[11px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                        {deal.discountPercent}% VIP OFF
+                      </div>
+                    )}
                   </Link>
 
                   {/* Title */}
-                  <Link href={deal.productUrl}>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug mb-3">
+                  <Link href={`/product/${deal.slug}${deal.variantId ? `?variant=${deal.variantId}` : ""}`}>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug mb-2">
                       {deal.name}
                     </h3>
                   </Link>
 
-                  {/* Price Display */}
-                  <div className="bg-[#F8FAFC] dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 mb-4 space-y-1.5">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">VIP Deal Price:</span>
-                      <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
-                        {formatINR(deal.dealPriceCents)}
+                  {/* Variant Spec Badge */}
+                  {deal.variantName && (
+                    <div className="mb-3">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <Tag className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="truncate max-w-[210px]">{deal.variantName}</span>
                       </span>
                     </div>
+                  )}
 
-                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-800">
-                      <span>Store MRP:</span>
-                      <span className="line-through text-slate-400">{formatINR(deal.mrpCents)}</span>
+                  {/* Price Display */}
+                  {isConcluded ? (
+                    <div className="bg-[#F8FAFC] dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 mb-4 space-y-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Regular Price:</span>
+                        <span className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                          {formatINR(deal.originalPriceCents)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-800">
+                        <span>VIP Deal Status:</span>
+                        <span className="text-stone-500 font-medium">Flash discount concluded</span>
+                      </div>
                     </div>
+                  ) : (
+                    <div className="bg-[#F8FAFC] dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 mb-4 space-y-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">VIP Deal Price:</span>
+                        <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
+                          {formatINR(deal.dealPriceCents)}
+                        </span>
+                      </div>
 
-                    <div className="flex items-center justify-between text-xs pt-0.5 font-bold text-emerald-700 dark:text-emerald-400">
-                      <span>Total Savings:</span>
-                      <span>{formatINR(deal.savingsCents)}</span>
+                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-800">
+                        <span>Store MRP:</span>
+                        <span className="line-through text-slate-400">{formatINR(deal.mrpCents)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-0.5 font-bold text-emerald-700 dark:text-emerald-400">
+                        <span>Total Savings:</span>
+                        <span>{formatINR(deal.savingsCents)}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* 1-Click Claim Action */}
@@ -288,6 +432,8 @@ export default async function DealsPage() {
                   variantId={deal.variantId}
                   dealId={dealId}
                   couponCode={couponCode}
+                  isConcluded={isConcluded}
+                  slug={deal.slug}
                   product={{
                     id: deal.id,
                     name: deal.name,

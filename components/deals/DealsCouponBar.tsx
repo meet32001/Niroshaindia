@@ -1,15 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, Ticket } from "lucide-react";
+import { Copy, Check, Ticket, CalendarClock } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface DealsCouponBarProps {
   couponCode: string;
+  isConcluded?: boolean;
 }
 
-export function DealsCouponBar({ couponCode }: DealsCouponBarProps) {
+export function DealsCouponBar({ couponCode, isConcluded = false }: DealsCouponBarProps) {
   const [copied, setCopied] = useState(false);
+
+  // If the weekly drop is concluded, mute the coupon bar and display next drop info
+  if (isConcluded) {
+    return (
+      <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-900 border border-stone-300 dark:border-stone-800 text-stone-600 dark:text-stone-400 text-xs font-mono font-bold shadow-xs">
+        <CalendarClock className="w-4 h-4 text-stone-500 shrink-0" />
+        <span>NEXT DROP: MON 09:00 AM IST</span>
+      </div>
+    );
+  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(couponCode);

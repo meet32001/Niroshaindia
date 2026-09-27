@@ -42,8 +42,15 @@ export async function liveSearch(rawQuery: string): Promise<SearchResponse> {
     return { products: [], totalCount: 0, suggestedCategories: [], isFallback: false };
   }
 
-  const trimmed = parseResult.data;
-  if (!trimmed || trimmed.length < 2) {
+  // 1. Clean up search query: trim punctuation, excess spaces, and sanitize for Supabase
+  const cleaned = parseResult.data
+    .trim()
+    .replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '')
+    .replace(/[^\w\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned || cleaned.length < 2) {
     return { products: [], totalCount: 0, suggestedCategories: [], isFallback: false };
   }
 
@@ -56,7 +63,7 @@ export async function liveSearch(rawQuery: string): Promise<SearchResponse> {
     const { data: matchedCategories } = await supabase
       .from('categories')
       .select('name, slug')
-      .ilike('name', `%${trimmed}%`)
+      .ilike('name', `%${cleaned}%`)
       .limit(3);
 
     // 2. Search products matching name or description
@@ -80,7 +87,7 @@ export async function liveSearch(rawQuery: string): Promise<SearchResponse> {
         { count: 'exact' }
       )
       .eq('is_active', true)
-      .or(`name.ilike.%${trimmed}%,description.ilike.%${trimmed}%`)
+      .or(`name.ilike.%${cleaned}%,description.ilike.%${cleaned}%`)
       .limit(4);
 
     if (products && products.length > 0) {
@@ -122,58 +129,12 @@ export async function liveSearch(rawQuery: string): Promise<SearchResponse> {
       };
     }
 
-    // 3. Fallback: No direct matches -> fetch active/popular products
-    const { data: fallbackProducts } = await supabase
-      .from('products')
-      .select(
-        `
-        id,
-        name,
-        slug,
-        category:categories(name, slug),
-        brand:brands(name),
-        variants:product_variants(
-          id,
-          price_cents,
-          compare_at_price_cents,
-          images:product_images(image_url, is_featured, sort_order),
-          inventory:warehouse_inventory(quantity_on_hand, quantity_reserved)
-        )
-      `
-      )
-      .eq('is_active', true)
-      .limit(3);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const formattedFallback: SearchResultItem[] = (fallbackProducts || []).map((p: any) => {
-      const rawVariants = p.variants || [];
-      const v = rawVariants[0] || {};
-      const rawImgs = v.images || [];
-      const featuredImg = rawImgs.find((i: { is_featured?: boolean }) => i.is_featured);
-      const imageUrl = featuredImg?.image_url || rawImgs[0]?.image_url || defaultFallbackImg;
-
-      const categoryObj = Array.isArray(p.category) ? p.category[0] : p.category;
-      const brandObj = Array.isArray(p.brand) ? p.brand[0] : p.brand;
-
-      return {
-        id: p.id,
-        name: p.name || 'Product',
-        slug: typeof p.slug === 'string' ? p.slug : p.slug?.current || 'product',
-        categoryName: categoryObj?.name || 'Electronics',
-        categorySlug: categoryObj?.slug || '',
-        brandName: brandObj?.name || 'Nirosha',
-        priceCents: v.price_cents || 0,
-        compareAtPriceCents: v.compare_at_price_cents || null,
-        imageUrl,
-        inStock: true,
-      };
-    });
-
+    // 3. Zero-state: strictly return empty array [] with NO fallback query
     return {
-      products: formattedFallback,
+      products: [],
       totalCount: 0,
       suggestedCategories: matchedCategories || [],
-      isFallback: true,
+      isFallback: false,
     };
   } catch (error) {
     console.error('[LIVE SEARCH EXCEPTION]:', error);

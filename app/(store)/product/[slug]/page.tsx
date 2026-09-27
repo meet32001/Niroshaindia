@@ -35,11 +35,22 @@ export async function generateMetadata({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const variants = (product.variants || product.product_variants || []) as any[];
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lowestVariant = variants.reduce((prev: any, curr: any) => {
+    const prevPrice = prev.price_cents ?? (prev.price ? prev.price * 100 : Infinity);
+    const currPrice = curr.price_cents ?? (curr.price ? curr.price * 100 : Infinity);
+    return currPrice < prevPrice ? curr : prev;
+  }, variants[0] || product);
+
   const activeVariant = querySku
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? variants.find((v: any) => v.sku?.toLowerCase() === querySku.toLowerCase()) || variants[0]
-    : variants[0] || product;
+    ? variants.find(
+        (v: any) =>
+          String(v.id) === querySku ||
+          v.sku?.toLowerCase() === querySku.toLowerCase()
+      ) || lowestVariant
+    : lowestVariant;
 
   const title = activeVariant?.name
     ? `${activeVariant.name} | Nirosha India`

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { ArrowRight, Loader2, Sparkles, Flame } from "lucide-react";
@@ -14,6 +15,8 @@ interface ClaimDealButtonProps {
   dealId?: number;
   couponCode: string;
   isBumper?: boolean;
+  isConcluded?: boolean;
+  slug?: string;
   product?: {
     id: number;
     name: string;
@@ -34,6 +37,8 @@ export function ClaimDealButton({
   dealId,
   couponCode,
   isBumper = false,
+  isConcluded = false,
+  slug,
   product,
   className,
   children,
@@ -43,9 +48,42 @@ export function ClaimDealButton({
   const { addItem, setActiveDeal } = useStore();
   const [loading, setLoading] = useState(false);
 
+  const productSlug = slug || product?.slug;
+
+  // Intermission / Concluded Safeguard: Replace claim CTA with PDP link
+  if (isConcluded) {
+    if (productSlug) {
+      return (
+        <Link
+          href={`/product/${productSlug}${variantId ? `?variant=${variantId}` : ""}`}
+          className={cn(
+            "w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-100/90 hover:bg-stone-200 dark:bg-stone-900/60 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 font-bold text-sm transition-all shadow-xs",
+            className
+          )}
+        >
+          <span>View Product</span>
+          <ArrowRight className="w-4 h-4 text-stone-500" />
+        </Link>
+      );
+    }
+    return (
+      <button
+        disabled
+        className={cn(
+          "w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-stone-300 dark:border-stone-800 bg-stone-100 dark:bg-stone-900/40 text-stone-400 font-bold text-sm cursor-not-allowed opacity-75",
+          className
+        )}
+      >
+        <span>Deal Concluded</span>
+      </button>
+    );
+  }
+
   const handleClaim = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isConcluded) return;
 
     if (!isLoaded) return;
 
@@ -85,6 +123,7 @@ export function ClaimDealButton({
         image: product.imageUrl,
         images: [product.imageUrl],
         variantId,
+        isDeal: true,
       };
       addItem(productForStore);
     }

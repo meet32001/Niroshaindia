@@ -18,6 +18,8 @@ import {
   AlertCircle,
   Ticket,
   Flame,
+  X,
+  Tag,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -62,6 +64,47 @@ function CheckoutContent() {
 
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
   const [isAutoAddingVariant, setIsAutoAddingVariant] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const handleApplyManualCoupon = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const code = couponInput.trim();
+    if (!code) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+    const baseTotal = getTotalPrice();
+    const cartItemsPayload = items.map((item) => ({
+      productId: item.product?.id || item.product?._id,
+      variantId: item.product?.variantId || item.product?.variant_id || item.product?.selectedVariant?.id,
+      price_cents: item.product?.price_cents || (item.product?.price ? Math.round(item.product.price * 100) : 0),
+      price: item.product?.price,
+      quantity: item.quantity,
+      isDeal: item.product?.isDeal || (activeDeal && (activeDeal.variantId === item.product?.variantId || activeDeal.productId === item.product?.id)),
+    }));
+
+    setIsValidatingCoupon(true);
+    try {
+      const res = await validateCouponAction(code, Math.round(baseTotal * 100), cartItemsPayload);
+      if (res.valid) {
+        setAppliedCoupon(res);
+        toast.success(res.message);
+        setCouponInput("");
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Error validating coupon code");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    toast.success("Coupon removed");
+  };
 
   const dealIdParam = searchParams.get("deal_id") || searchParams.get("deal");
   const variantIdParam = searchParams.get("variant_id");
@@ -112,10 +155,20 @@ function CheckoutContent() {
         } else if (couponParam) {
           const baseTotal = getTotalPrice();
           if (baseTotal > 0) {
-            validateCouponAction(couponParam, Math.round(baseTotal * 100)).then((res) => {
+            const cartItemsPayload = items.map((item) => ({
+              productId: item.product?.id || item.product?._id,
+              variantId: item.product?.variantId || item.product?.variant_id || item.product?.selectedVariant?.id,
+              price_cents: item.product?.price_cents || (item.product?.price ? Math.round(item.product.price * 100) : 0),
+              price: item.product?.price,
+              quantity: item.quantity,
+              isDeal: !!item.product?.isDeal,
+            }));
+            validateCouponAction(couponParam, Math.round(baseTotal * 100), cartItemsPayload).then((res) => {
               if (res.valid) {
                 setAppliedCoupon(res);
                 toast.success(`VIP Deal Applied: ${res.code}`, { id: "vip-coupon-applied" });
+              } else {
+                toast.error(res.message, { id: "vip-coupon-error" });
               }
             });
           }
@@ -876,6 +929,54 @@ function CheckoutContent() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Promo / VIP Coupon Code Entry */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Ticket className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <div>
+                        <span className="font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">
+                          {appliedCoupon.code}
+                        </span>
+                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium">
+                          {appliedCoupon.message}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="p-1 text-slate-400 hover:text-red-500 rounded-md transition-colors"
+                      title="Remove coupon"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleApplyManualCoupon} className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                        placeholder="VIP or Promo Code"
+                        className="h-9 text-xs uppercase font-mono tracking-wider rounded-xl pl-8"
+                      />
+                      <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      disabled={isValidatingCoupon || !couponInput.trim()}
+                      className="h-9 px-3 text-xs font-bold rounded-xl shrink-0 border-slate-200 dark:border-slate-700 hover:border-shop-orange hover:text-shop-orange"
+                    >
+                      {isValidatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Apply"}
+                    </Button>
+                  </form>
+                )}
               </div>
 
               {/* Financial Calculation */}

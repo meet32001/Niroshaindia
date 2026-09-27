@@ -24,6 +24,10 @@ const LEGACY_SLUG_MAP: Record<string, string> = {
   'laptops-accessories': 'laptops-pcs',
   tv: 'tv-vision',
   'headphones-speakers': 'audio-headphones',
+  'air-fryers-deep-fryers': 'air-fryers',
+  'electric-kettles-coffee-makers': 'kettles-coffee-makers',
+  'induction-cooktops-stoves': 'cooktops-stoves',
+  'mixer-grinders-juicers-blenders': 'mixers-juicers-blenders',
 };
 
 export async function getCategoryGridProducts(categorySlug: string) {
@@ -49,6 +53,8 @@ export async function getCategoryGridProducts(categorySlug: string) {
           slug,
           description,
           is_active,
+          min_price_cents,
+          max_price_cents,
           brand:brands ( id, name, slug, logo_url ),
           category:categories!inner ( id, name, slug, description ),
           variants:product_variants!inner (
@@ -100,6 +106,8 @@ export async function getCategoryGridProducts(categorySlug: string) {
           slug,
           description,
           is_active,
+          min_price_cents,
+          max_price_cents,
           brand:brands ( id, name, slug, logo_url ),
           category:categories!inner ( id, name, slug, description ),
           variants:product_variants!inner (

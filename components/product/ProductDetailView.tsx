@@ -10,10 +10,10 @@ import { ProductSpecsTable } from "@/components/product/ProductSpecsTable";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 import { AddToWishlistButton } from "@/components/product/AddToWishlistButton";
 import { ShareModal } from "@/components/product/ShareModal";
+import { Product, ProductVariant } from "@/types";
 
 export interface ProductDetailViewProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  product: any;
+  product: Product;
   initialSku?: string;
 }
 
@@ -22,8 +22,7 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
 
   // Extract variants safely
   const rawVariants = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (product.variants || product.product_variants || []) as any[];
+    return (product.variants || product.product_variants || []) as ProductVariant[];
   }, [product]);
 
   // Normalized variants array
@@ -46,8 +45,7 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
       ];
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return rawVariants.map((v: any, index: number) => ({
+    return rawVariants.map((v: ProductVariant, index: number) => ({
       id: v.id || `var-${index}`,
       sku: v.sku || `SKU-${index}`,
       name: v.name || `${product.name} (Option ${index + 1})`,
@@ -57,39 +55,54 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
       compare_at_price_cents: v.compare_at_price_cents ?? (v.comparePrice ? v.comparePrice * 100 : 0),
       stock: v.stock !== undefined ? v.stock : 10,
       isStock: v.isStock ?? (v.stock !== undefined ? v.stock > 0 : true),
-      images: v.images && v.images.length > 0 ? v.images : product.images || [],
+      images: Array.isArray(v.images) ? v.images : [],
       specs: v.specs || product.specs || {},
       weight_grams: v.weight_grams || null,
       dimensions_mm_l_w_h: v.dimensions_mm_l_w_h || null,
     }));
   }, [rawVariants, product]);
 
-  // Determine initial active variant from URL or props
-  const querySku = searchParams.get("sku") || searchParams.get("variant") || initialSku;
+  // Find variant with the lowest price_cents (matching min_price_cents advertised on /shop)
+  const lowestPriceVariant = useMemo(() => {
+    return variants.reduce((prev, curr) => {
+      const prevPrice = prev.price_cents ?? (prev.price ? prev.price * 100 : Infinity);
+      const currPrice = curr.price_cents ?? (curr.price ? curr.price * 100 : Infinity);
+      return currPrice < prevPrice ? curr : prev;
+    }, variants[0]);
+  }, [variants]);
+
+  // Determine initial active variant: first check ?variant=[id] or ?sku, otherwise default to lowest price
+  const queryParam = searchParams.get("variant") || searchParams.get("sku") || initialSku;
   const initialVariant = useMemo(() => {
-    if (querySku) {
+    if (queryParam) {
       const match = variants.find(
-        (v) => v.sku.toLowerCase() === querySku.toLowerCase()
+        (v) =>
+          String(v.id) === queryParam ||
+          v.sku.toLowerCase() === queryParam.toLowerCase()
       );
       if (match) return match;
     }
-    return variants[0];
-  }, [variants, querySku]);
+    return lowestPriceVariant;
+  }, [variants, queryParam, lowestPriceVariant]);
 
   const [activeVariant, setActiveVariant] = useState<Variant>(initialVariant);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Sync state if URL search params change externally
-  useEffect(() => {
-    if (querySku) {
+  // Sync state if URL query param changes externally without effect cascade warning
+  const [prevQueryParam, setPrevQueryParam] = useState(queryParam);
+  if (prevQueryParam !== queryParam) {
+    setPrevQueryParam(queryParam);
+    if (queryParam) {
       const match = variants.find(
-        (v) => v.sku.toLowerCase() === querySku.toLowerCase()
+        (v) =>
+          String(v.id) === queryParam ||
+          v.sku.toLowerCase() === queryParam.toLowerCase()
       );
-      if (match && match.sku !== activeVariant.sku) {
+      if (match && match.id !== activeVariant.id) {
         setActiveVariant(match);
       }
     }
-  }, [querySku, variants, activeVariant.sku]);
+  }
 
   const name = product.name || product.title || "Electronics Product";
   const description =
@@ -109,11 +122,21 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
   const isStock = activeVariant.isStock ?? (activeVariant.stock ? activeVariant.stock > 0 : true);
   const activeStock = activeVariant.stock ?? 10;
 
-  // Active Images tied directly to selected variant
-  const galleryImages =
-    activeVariant.images && activeVariant.images.length > 0
+  // Derive active gallery images with safe parent fallback to prevent blank flashing
+  const variantImages =
+    activeVariant?.images && activeVariant.images.length > 0
       ? activeVariant.images
-      : product.images || [];
+      : [];
+
+  const displayImages =
+    variantImages.length > 0
+      ? variantImages
+      : product.images && product.images.length > 0
+      ? product.images
+      : [
+          (product as unknown as { primary_image_url?: string }).primary_image_url ||
+          "/placeholder.png",
+        ];
 
   // Selected Variant Item payload for Cart & Wishlist
   const cartProductPayload = {
@@ -124,7 +147,7 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
     price: activeVariant.price,
     discountPrice: activeVariant.comparePrice,
     sku: activeVariant.sku,
-    images: galleryImages,
+    images: displayImages,
     stock: activeStock,
   };
 
@@ -133,7 +156,7 @@ export function ProductDetailView({ product, initialSku }: ProductDetailViewProp
       {/* Left Column: Variant Image Switcher Gallery with Zoom */}
       <div className="lg:sticky lg:top-24">
         <ProductGallery
-          images={galleryImages}
+          images={displayImages}
           isStock={isStock}
           productName={name}
         />

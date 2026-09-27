@@ -120,7 +120,20 @@ export const PREVIEW_TABS: PreviewTab[] = [
     id: "kitchen-appliances",
     label: "Kitchen Appliances",
     icon: "UtensilsCrossed",
-    categorySlugs: ["microwaves-otgs", "mixers-juicers-blenders", "air-fryers"],
+    categorySlugs: [
+      "air-fryers-deep-fryers",
+      "air-fryers",
+      "electric-kettles-coffee-makers",
+      "kettles-coffee-makers",
+      "induction-cooktops-stoves",
+      "cooktops-stoves",
+      "kitchen-chimneys",
+      "microwaves-otgs",
+      "mixer-grinders-juicers-blenders",
+      "mixers-juicers-blenders",
+      "toasters-sandwich-makers",
+      "water-purifiers",
+    ],
     title: "Kitchen Appliances",
     value: "kitchen-appliances",
     iconName: "UtensilsCrossed",
@@ -132,26 +145,74 @@ export const VIJAY_SALES_CATEGORIES = PREVIEW_TABS;
 export interface NavCategoryItem {
   name: string;
   slug: string;
+  href?: string;
   parentId?: number;
 }
 
 export const HOME_APPLIANCE_SUBCATEGORIES: NavCategoryItem[] = [
-  { name: "Air Purifiers", slug: "air-purifiers" },
-  { name: "Cleaning Tools", slug: "cleaning-tools" },
-  { name: "Dishwashers", slug: "dishwashers" },
-  { name: "Room Heaters", slug: "room-heaters" },
-  { name: "Safes & Security Lockers", slug: "safes-lockers" },
-  { name: "Vacuum Cleaners", slug: "vacuum-cleaners" },
-  { name: "Voltage Stabilizers", slug: "voltage-stabilizers" },
-  { name: "Washing Machines", slug: "washing-machines" },
-  { name: "Water Dispensers", slug: "water-dispensers" },
+  { name: "Air Purifiers", slug: "air-purifiers", href: "/category/air-purifiers" },
+  { name: "Cleaning Tools", slug: "cleaning-tools", href: "/category/cleaning-tools" },
+  { name: "Dishwashers", slug: "dishwashers", href: "/category/dishwashers" },
+  { name: "Room Heaters", slug: "room-heaters", href: "/category/room-heaters" },
+  { name: "Safes & Security Lockers", slug: "safes-lockers", href: "/category/safes-lockers" },
+  { name: "Vacuum Cleaners", slug: "vacuum-cleaners", href: "/category/vacuum-cleaners" },
+  { name: "Voltage Stabilizers", slug: "voltage-stabilizers", href: "/category/voltage-stabilizers" },
+  { name: "Washing Machines", slug: "washing-machines", href: "/category/washing-machines" },
+  { name: "Water Dispensers", slug: "water-dispensers", href: "/category/water-dispensers" },
 ];
 
+export const KITCHEN_APPLIANCE_SUBCATEGORIES: NavCategoryItem[] = [
+  { name: "Air Fryers & Deep Fryers", slug: "air-fryers-deep-fryers", href: "/category/air-fryers-deep-fryers" },
+  { name: "Electric Kettles & Coffee Makers", slug: "electric-kettles-coffee-makers", href: "/category/electric-kettles-coffee-makers" },
+  { name: "Induction Cooktops & Stoves", slug: "induction-cooktops-stoves", href: "/category/induction-cooktops-stoves" },
+  { name: "Kitchen Chimneys", slug: "kitchen-chimneys", href: "/category/kitchen-chimneys" },
+  { name: "Microwaves & OTGs", slug: "microwaves-otgs", href: "/category/microwaves-otgs" },
+  { name: "Mixer Grinders, Juicers & Blenders", slug: "mixer-grinders-juicers-blenders", href: "/category/mixer-grinders-juicers-blenders" },
+  { name: "Toasters & Sandwich Makers", slug: "toasters-sandwich-makers", href: "/category/toasters-sandwich-makers" },
+  { name: "Water Purifiers", slug: "water-purifiers", href: "/category/water-purifiers" },
+];
+
+export interface NavItem {
+  title: string;
+  href: string;
+  badge?: string;
+  subcategories?: NavCategoryItem[];
+  categories?: {
+    name: string;
+    slug: string;
+    href: string;
+    subcategories: NavCategoryItem[];
+  }[];
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  { title: "Home", href: "/" },
+  {
+    title: "Shop",
+    href: "/shop",
+    categories: [
+      {
+        name: "Home Appliances",
+        slug: "home-appliances",
+        href: "/category/home-appliances",
+        subcategories: HOME_APPLIANCE_SUBCATEGORIES,
+      },
+      {
+        name: "Kitchen Appliances",
+        slug: "kitchen-appliances",
+        href: "/category/kitchen-appliances",
+        subcategories: KITCHEN_APPLIANCE_SUBCATEGORIES,
+      },
+    ],
+  },
+  { title: "Deals", href: "/deals" },
+  { title: "Contact", href: "/contact" },
+];
 
 export const HEADER_NAV_LINKS: NavigationItem[] = [
   { title: "Home", href: "/" },
   { title: "Shop", href: "/shop" },
-  { title: "Deals", href: "/deal" },
+  { title: "Deals", href: "/deals" },
   { title: "Contact", href: "/contact" },
 ];
 

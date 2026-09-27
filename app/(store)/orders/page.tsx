@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { Package, ArrowRight, Loader2, Calendar } from "lucide-react";
 import Image from "next/image";
+import { Order, OrderItem } from "@/types";
 
 export default function OrdersPage() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -83,8 +83,7 @@ export default function OrdersPage() {
         <div className="space-y-4">
           {orders.map((order) => {
             const itemCount = order.order_items?.reduce(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (sum: number, item: any) => sum + (item.quantity || 1),
+              (sum: number, item: OrderItem) => sum + (item.quantity || 1),
               0
             ) || 0;
 
@@ -102,7 +101,7 @@ export default function OrdersPage() {
                     </div>
                     <div>
                       <CardTitle className="text-base font-bold">
-                        Order #{order.order_number || order.id.slice(0, 8)}
+                        Order #{order.order_number || String(order.id).slice(0, 8)}
                       </CardTitle>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                         <Calendar className="w-3.5 h-3.5" />
@@ -135,8 +134,7 @@ export default function OrdersPage() {
                 <CardContent className="p-4 space-y-4">
                   {/* Thumbnails */}
                   <div className="flex items-center gap-3 overflow-x-auto pb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {order.order_items?.slice(0, 4).map((item: any) => {
+                    {order.order_items?.slice(0, 4).map((item: OrderItem) => {
                       const image =
                         item.product_variants?.product_images?.[0]?.image_url ||
                         "/images/product-placeholder.png";
@@ -155,9 +153,9 @@ export default function OrdersPage() {
                         </div>
                       );
                     })}
-                    {order.order_items?.length > 4 && (
+                    {(order.order_items?.length || 0) > 4 && (
                       <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
-                        +{order.order_items.length - 4} more
+                        +{(order.order_items?.length || 0) - 4} more
                       </div>
                     )}
                   </div>

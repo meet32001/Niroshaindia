@@ -2,6 +2,13 @@ import { supabase } from "@/lib/supabase/client";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Product, Category, Brand } from "@/types";
 
+export const CATEGORY_SLUG_ALIASES: Record<string, string> = {
+  "air-fryers-deep-fryers": "air-fryers",
+  "electric-kettles-coffee-makers": "kettles-coffee-makers",
+  "induction-cooktops-stoves": "cooktops-stoves",
+  "mixer-grinders-juicers-blenders": "mixers-juicers-blenders",
+};
+
 export const MOCK_CATEGORIES: Category[] = [
   {
     id: "cat-1",
@@ -195,11 +202,22 @@ export function normalizeProduct(item: any) {
     dimensions_mm_l_w_h: null,
   };
 
-  // Find lowest price among all variants for catalog card starting price
-  const lowestPrice = variants.length > 0 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? Math.min(...variants.map((v: any) => v.price))
-    : primaryVariant.price;
+  // Pre-calculated cached database prices (min_price_cents, max_price_cents)
+  const minPriceCents = item.min_price_cents != null && Number(item.min_price_cents) > 0
+    ? Number(item.min_price_cents)
+    : (primaryVariant.price_cents || (item.price ? Math.round(item.price * 100) : 0));
+
+  const maxPriceCents = item.max_price_cents != null && Number(item.max_price_cents) > 0
+    ? Number(item.max_price_cents)
+    : (variants.length > 0 ? Math.max(...variants.map((v: any) => v.price_cents || 0)) : minPriceCents);
+
+  // Directly utilize cached min_price_cents for starting catalog price
+  const lowestPrice = minPriceCents > 0
+    ? minPriceCents / 100
+    : (variants.length > 0 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? Math.min(...variants.map((v: any) => v.price))
+      : primaryVariant.price);
 
   let productImages: string[] = primaryVariant.images;
   if (Array.isArray(item.images) && item.images.length > 0) {
@@ -227,7 +245,9 @@ export function normalizeProduct(item: any) {
     brands: typeof brandObj === "object" ? brandObj : { name: brandName },
     category: categoryName,
     categories: typeof catObj === "object" ? catObj : { name: categoryName },
-    price: primaryVariant.price,
+    min_price_cents: minPriceCents,
+    max_price_cents: maxPriceCents,
+    price: minPriceCents > 0 ? minPriceCents / 100 : primaryVariant.price,
     discountPrice: primaryVariant.comparePrice,
     lowestPrice,
     images: productImages,
@@ -260,6 +280,8 @@ export async function getAllProducts(filters: ProductFilterOptions = {}) {
         slug,
         description,
         is_active,
+        min_price_cents,
+        max_price_cents,
         brand:brands ( id, name, slug, logo_url ),
         category:categories ( id, name, slug, description ),
         variants:product_variants (
@@ -299,6 +321,8 @@ export async function getProductBySlug(slug: string) {
         slug,
         description,
         is_active,
+        min_price_cents,
+        max_price_cents,
         brand:brands ( id, name, slug, logo_url ),
         category:categories ( id, name, slug, description ),
         variants:product_variants (
@@ -323,10 +347,10 @@ export async function getProductBySlug(slug: string) {
     }
 
     const match = MOCK_PRODUCTS.find((p) => p.slug === slug);
-    return normalizeProduct(match || MOCK_PRODUCTS[0]);
+    return match ? normalizeProduct(match) : null;
   } catch {
     const match = MOCK_PRODUCTS.find((p) => p.slug === slug);
-    return normalizeProduct(match || MOCK_PRODUCTS[0]);
+    return match ? normalizeProduct(match) : null;
   }
 }
 
@@ -473,10 +497,12 @@ export async function getContextualBrands(categorySlug?: string | null) {
     let targetCatIds: number[] | null = null;
     if (categorySlug && categorySlug !== "all") {
       const cleanSlug = categorySlug.trim().toLowerCase();
+      const resolvedSlug = CATEGORY_SLUG_ALIASES[cleanSlug] || cleanSlug;
       const { data: cat } = await supabase
         .from("categories")
         .select("id, parent_id")
-        .eq("slug", cleanSlug)
+        .in("slug", [resolvedSlug, cleanSlug])
+        .limit(1)
         .maybeSingle();
 
       if (cat) {
@@ -612,6 +638,8 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         name,
         slug,
         description,
+        min_price_cents,
+        max_price_cents,
         brand_id,
         category_id,
         brands ( id, name, slug, logo_url ),
@@ -634,10 +662,12 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     // 1. Resolve Category Filter (supports root departments and child subcategories)
     if (category) {
       const cleanCatSlug = category.trim().toLowerCase();
+      const targetSlug = CATEGORY_SLUG_ALIASES[cleanCatSlug] || cleanCatSlug;
       const { data: matchedCat } = await supabase
         .from("categories")
         .select("id, parent_id")
-        .eq("slug", cleanCatSlug)
+        .in("slug", [targetSlug, cleanCatSlug])
+        .limit(1)
         .maybeSingle();
 
       if (matchedCat) {
@@ -701,191 +731,100 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
     const from = (currentPage - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    // 5. Price Sorting (Native min_price_cents with robust Variant Price fallback)
+    // 5. High-Speed Two-Step Price Sorting (Eliminates PostgREST Join Timeout)
     if (sort === "price_asc" || sort === "price_desc") {
       const isAsc = sort === "price_asc";
       const sortColumn = isAsc ? "min_price_cents" : "max_price_cents";
 
-      // 5a. Check if products table has min_price_cents column populated
-      let hasNativePrice = false;
-      try {
-        const { data: testData, error: testErr } = await supabase
-          .from("products")
-          .select("id, min_price_cents")
-          .gt("min_price_cents", 0)
-          .limit(1);
+      // 1. High-speed query directly on products table for IDs and exact count
+      let idQuery = supabase
+        .from("products")
+        .select("id", { count: "exact" })
+        .eq("is_active", true)
+        .gt("min_price_cents", 0);
 
-        if (!testErr && Array.isArray(testData) && testData.length > 0) {
-          hasNativePrice = true;
-        }
-      } catch {
-        hasNativePrice = false;
-      }
+      // Resolve Category Filter
+      if (category) {
+        const cleanCatSlug = category.trim().toLowerCase();
+        const targetSlug = CATEGORY_SLUG_ALIASES[cleanCatSlug] || cleanCatSlug;
+        const { data: matchedCat } = await supabase
+          .from("categories")
+          .select("id, parent_id")
+          .in("slug", [targetSlug, cleanCatSlug])
+          .limit(1)
+          .maybeSingle();
 
-      if (hasNativePrice) {
-        try {
-          const nativeQuery = query
-            .gt("min_price_cents", 0)
-            .order(sortColumn, { ascending: isAsc })
-            .range(from, to);
-
-          const { data: nativeData, count: nativeCount, error: nativeErr } = await nativeQuery;
-
-          if (!nativeErr && Array.isArray(nativeData) && nativeData.length > 0) {
-            const normalized = nativeData.map(normalizeProduct).filter(Boolean);
-            const total = nativeCount ?? nativeData.length;
-            return {
-              products: normalized,
-              totalCount: total,
-              page: currentPage,
-              pageSize,
-              totalPages: Math.ceil(total / pageSize) || 1,
-            };
-          } else if (nativeErr) {
-            console.error("Native price sorting query error:", nativeErr);
-          }
-        } catch (nativeExc) {
-          console.warn("Native price sorting exception, falling back:", nativeExc);
-        }
-      }
-
-      // 5b. High-Speed Variant Price Sorting Fallback
-      // If filtering by category, brand, search, or price, resolve the filtered product IDs
-      const hasFilters = Boolean(
-        category ||
-        brand ||
-        search ||
-        (effectiveMinPaise !== null && effectiveMinPaise > 0) ||
-        (effectiveMaxPaise !== null && effectiveMaxPaise > 0)
-      );
-
-      let targetProductIds: number[] | null = null;
-      let totalFilteredCount = 0;
-
-      if (hasFilters) {
-        let filterIdQuery = supabase
-          .from("products")
-          .select("id, product_variants!inner(price_cents)", { count: "exact" })
-          .eq("is_active", true)
-          .gt("product_variants.price_cents", 0);
-
-        if (category) {
-          const cleanCatSlug = category.trim().toLowerCase();
-          const { data: matchedCat } = await supabase
-            .from("categories")
-            .select("id, parent_id")
-            .eq("slug", cleanCatSlug)
-            .maybeSingle();
-
-          if (matchedCat) {
-            if (matchedCat.parent_id === null) {
-              const { data: childCats } = await supabase
-                .from("categories")
-                .select("id")
-                .eq("parent_id", matchedCat.id);
-              const catIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
-              filterIdQuery = filterIdQuery.in("category_id", catIds);
-            } else {
-              filterIdQuery = filterIdQuery.eq("category_id", matchedCat.id);
-            }
+        if (matchedCat) {
+          if (matchedCat.parent_id === null) {
+            const { data: childCats } = await supabase
+              .from("categories")
+              .select("id")
+              .eq("parent_id", matchedCat.id);
+            const catIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
+            idQuery = idQuery.in("category_id", catIds);
           } else {
-            filterIdQuery = filterIdQuery.eq("category_id", -1);
+            idQuery = idQuery.eq("category_id", matchedCat.id);
           }
+        } else {
+          idQuery = idQuery.eq("category_id", -1);
         }
+      }
 
-        if (brand) {
-          const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
-          const { data: matchedBrands } = await supabase
+      // Resolve Brand Filter
+      if (brand) {
+        const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
+        let { data: matchedBrands } = await supabase
+          .from("brands")
+          .select("id, slug")
+          .in("slug", brandList);
+
+        if (!matchedBrands || matchedBrands.length === 0) {
+          const orClauses = brandList.map((b) => `slug.ilike.${b},name.ilike.${b}`).join(",");
+          const { data: ilikeBrands } = await supabase
             .from("brands")
-            .select("id")
-            .in("slug", brandList);
-          if (matchedBrands && matchedBrands.length > 0) {
-            filterIdQuery = filterIdQuery.in("brand_id", matchedBrands.map((b) => b.id));
-          } else {
-            filterIdQuery = filterIdQuery.eq("brand_id", -1);
-          }
+            .select("id, slug")
+            .or(orClauses);
+          matchedBrands = ilikeBrands;
         }
 
-        if (search) {
-          filterIdQuery = filterIdQuery.ilike("name", `%${search}%`);
+        if (matchedBrands && matchedBrands.length > 0) {
+          idQuery = idQuery.in("brand_id", matchedBrands.map((b) => b.id));
+        } else {
+          idQuery = idQuery.eq("brand_id", -1);
         }
-        if (effectiveMinPaise !== null && effectiveMinPaise > 0) {
-          filterIdQuery = filterIdQuery.gte("product_variants.price_cents", effectiveMinPaise);
-        }
-        if (effectiveMaxPaise !== null && effectiveMaxPaise > 0) {
-          filterIdQuery = filterIdQuery.lte("product_variants.price_cents", effectiveMaxPaise);
-        }
-
-        const { data: matchedProds, count: filterCount, error: fErr } = await filterIdQuery;
-        if (fErr) {
-          console.error("Filter ID query error:", fErr);
-          return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
-        }
-        if (!matchedProds || matchedProds.length === 0) {
-          return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
-        }
-
-        targetProductIds = matchedProds.map((p) => p.id);
-        totalFilteredCount = filterCount ?? targetProductIds.length;
-      } else {
-        const { count: catalogCount } = await supabase
-          .from("products")
-          .select("id, product_variants!inner(price_cents)", { count: "exact", head: true })
-          .eq("is_active", true)
-          .gt("product_variants.price_cents", 0);
-        totalFilteredCount = catalogCount ?? 5562;
       }
 
-      // Query product_variants for ordered product IDs
-      let variantQuery = supabase
-        .from("product_variants")
-        .select("product_id, price_cents")
-        .gt("price_cents", 0)
-        .order("price_cents", { ascending: isAsc });
-
-      if (targetProductIds && targetProductIds.length > 0) {
-        variantQuery = variantQuery.in("product_id", targetProductIds);
+      // Resolve Search Filter
+      if (search) {
+        idQuery = idQuery.ilike("name", `%${search}%`);
       }
+
+      // Resolve Price Boundaries directly on products min_price_cents
       if (effectiveMinPaise !== null && effectiveMinPaise > 0) {
-        variantQuery = variantQuery.gte("price_cents", effectiveMinPaise);
+        idQuery = idQuery.gte("min_price_cents", effectiveMinPaise);
       }
       if (effectiveMaxPaise !== null && effectiveMaxPaise > 0) {
-        variantQuery = variantQuery.lte("price_cents", effectiveMaxPaise);
+        idQuery = idQuery.lte("min_price_cents", effectiveMaxPaise);
       }
 
-      if (!targetProductIds) {
-        const fetchBuffer = from + pageSize + 100;
-        variantQuery = variantQuery.range(0, fetchBuffer * 2);
-      }
+      idQuery = idQuery.order(sortColumn, { ascending: isAsc }).range(from, to);
 
-      const { data: sortedVariants, error: varErr } = await variantQuery;
-      if (varErr) {
-        console.error("Variant sort error:", varErr);
-        return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
-      }
+      const { data: idRows, count: totalRows, error: idErr } = await idQuery;
 
-      // Deduplicate to preserve unique product order
-      const seenProdIds = new Set<number>();
-      const orderedProductIds: number[] = [];
-      sortedVariants?.forEach((v) => {
-        if (!seenProdIds.has(v.product_id)) {
-          seenProdIds.add(v.product_id);
-          orderedProductIds.push(v.product_id);
-        }
-      });
-
-      const pageProductIds = orderedProductIds.slice(from, to + 1);
-      if (pageProductIds.length === 0) {
+      if (idErr || !idRows || idRows.length === 0) {
+        if (idErr) console.error("Fast price sorting ID query error:", idErr);
         return {
           products: [],
-          totalCount: totalFilteredCount,
+          totalCount: totalRows ?? 0,
           page: currentPage,
           pageSize,
-          totalPages: Math.ceil(totalFilteredCount / pageSize) || 1,
+          totalPages: Math.ceil((totalRows ?? 0) / pageSize) || 1,
         };
       }
 
-      // Fetch full product details for the page
+      const pageProductIds = idRows.map((r) => r.id);
+
+      // Step 2: Fetch full product details only for the current page's products (indexed by PK id)
       const { data: pageProducts, error: pErr } = await supabase
         .from("products")
         .select(`
@@ -893,11 +832,13 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
           name,
           slug,
           description,
+          min_price_cents,
+          max_price_cents,
           brand_id,
           category_id,
           brands ( id, name, slug, logo_url ),
           categories ( id, name, slug, description, parent_id ),
-          product_variants!inner (
+          product_variants (
             id,
             sku,
             name,
@@ -907,32 +848,40 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
             product_images ( id, image_url, sort_order, is_featured )
           )
         `)
-        .in("id", pageProductIds)
-        .gt("product_variants.price_cents", 0);
+        .in("id", pageProductIds);
 
       if (pErr) {
-        console.error("Error fetching page products:", pErr);
-        return { products: [], totalCount: 0, page: currentPage, pageSize, totalPages: 1 };
+        console.error("Fast price sorting product fetch error:", pErr);
+        return {
+          products: [],
+          totalCount: totalRows ?? 0,
+          page: currentPage,
+          pageSize,
+          totalPages: Math.ceil((totalRows ?? 0) / pageSize) || 1,
+        };
       }
 
-      // Restore exact sorted order
-      const prodMap = new Map(pageProducts?.map((p) => [p.id, p]));
+      // Restore exact sorted order from pageProductIds
+      const prodMap = new Map((pageProducts || []).map((p) => [p.id, p]));
       const ordered = pageProductIds.map((id) => prodMap.get(id)).filter(Boolean);
       let normalized = ordered.map(normalizeProduct).filter(Boolean);
 
       if (rating) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         normalized = normalized.filter((p: any) => (p.rating ?? 4.5) >= rating);
       }
       if (inStockOnly) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         normalized = normalized.filter((p: any) => (p.stock ?? 10) > 0);
       }
 
+      const total = totalRows ?? normalized.length;
       return {
         products: normalized,
-        totalCount: totalFilteredCount,
+        totalCount: total,
         page: currentPage,
         pageSize,
-        totalPages: Math.ceil(totalFilteredCount / pageSize) || 1,
+        totalPages: Math.ceil(total / pageSize) || 1,
       };
     }
 
@@ -994,7 +943,31 @@ export async function getDealProducts() {
 // Fetch products by category slug
 export async function getProductsByCategory(categorySlug: string) {
   try {
-    const { data, error } = await supabase
+    const cleanSlug = categorySlug.trim().toLowerCase();
+    const resolvedSlug = CATEGORY_SLUG_ALIASES[cleanSlug] || cleanSlug;
+
+    // Check if category exists in database
+    const { data: matchedCat } = await supabase
+      .from("categories")
+      .select("id, parent_id")
+      .in("slug", [resolvedSlug, cleanSlug])
+      .limit(1)
+      .maybeSingle();
+
+    let targetCatIds: number[] = [];
+    if (matchedCat) {
+      if (matchedCat.parent_id === null) {
+        const { data: childCats } = await supabase
+          .from("categories")
+          .select("id")
+          .eq("parent_id", matchedCat.id);
+        targetCatIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
+      } else {
+        targetCatIds = [matchedCat.id];
+      }
+    }
+
+    let prodQuery = supabase
       .from("products")
       .select(`
         id,
@@ -1002,6 +975,8 @@ export async function getProductsByCategory(categorySlug: string) {
         slug,
         description,
         is_active,
+        min_price_cents,
+        max_price_cents,
         brand:brands ( id, name, slug, logo_url ),
         category:categories!inner ( id, name, slug, description ),
         variants:product_variants (
@@ -1018,8 +993,15 @@ export async function getProductsByCategory(categorySlug: string) {
           inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
         )
       `)
-      .eq("category.slug", categorySlug)
       .eq("is_active", true);
+
+    if (targetCatIds.length > 0) {
+      prodQuery = prodQuery.in("category_id", targetCatIds);
+    } else {
+      prodQuery = prodQuery.in("category.slug", [resolvedSlug, cleanSlug]);
+    }
+
+    const { data, error } = await prodQuery.order("id", { ascending: false });
 
     if (!error && Array.isArray(data) && data.length > 0) {
       return data.map(normalizeProduct);
@@ -1027,7 +1009,8 @@ export async function getProductsByCategory(categorySlug: string) {
     const all = await getAllProducts();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return all.filter((p: any) =>
-      (p.category || "").toLowerCase().includes(categorySlug.toLowerCase())
+      (p.category || "").toLowerCase().includes(resolvedSlug.toLowerCase()) ||
+      (p.category || "").toLowerCase().includes(cleanSlug.toLowerCase())
     );
   } catch {
     const all = await getAllProducts();

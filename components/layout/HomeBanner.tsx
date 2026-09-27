@@ -116,7 +116,7 @@ export function HomeBanner() {
               </Button>
             </Link>
 
-            <Link href="/deal">
+            <Link href="/deals">
               <Button size="lg" variant="outline" className="border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 font-semibold rounded-xl cursor-pointer">
                 View Deals
               </Button>

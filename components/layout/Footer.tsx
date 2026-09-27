@@ -48,7 +48,7 @@ export function Footer() {
   const QUICK_LINKS = [
     { title: "About Nirosha", href: "/about" },
     { title: "Shop All Products", href: "/shop" },
-    { title: "Featured Deals", href: "/deal" },
+    { title: "Featured Deals", href: "/deals" },
     { title: "Discover Top Brands", href: "/brands" },
     { title: "My Account", href: "/account" },
     { title: "Wishlist", href: "/wishlist" },

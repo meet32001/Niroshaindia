@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
 import { ArrowLeft, Package, Truck, MapPin, Calendar, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { Order, OrderItem } from "@/types";
 
 export default function OrderDetailPage({
   params,
@@ -17,8 +18,7 @@ export default function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +83,7 @@ export default function OrderDetailPage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              Order #{order.order_number || order.id.slice(0, 8)}
+              Order #{order.order_number || String(order.id).slice(0, 8)}
             </h1>
             <Badge className="bg-emerald-600 text-white">
               {order.status || "Processing"}
@@ -114,9 +114,8 @@ export default function OrderDetailPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 divide-y">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {order.order_items?.map((item: any) => {
-                const variant = item.product_variants || {};
+              {order.order_items?.map((item: OrderItem) => {
+                const variant = item.product_variants || ({} as any);
                 const product = variant.products || {};
                 const image =
                   variant.product_images?.[0]?.image_url ||
@@ -172,7 +171,7 @@ export default function OrderDetailPage({
               </p>
               <p className="flex justify-between">
                 <span className="text-slate-500">Tracking Number:</span>
-                <span className="font-mono font-semibold">{order.tracking_number || "TRK-" + order.id.slice(0, 10).toUpperCase()}</span>
+                <span className="font-mono font-semibold">{order.tracking_number || "TRK-" + String(order.id).slice(0, 10).toUpperCase()}</span>
               </p>
             </CardContent>
           </Card>

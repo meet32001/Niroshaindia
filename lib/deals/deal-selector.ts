@@ -13,6 +13,7 @@ export interface DealRecord {
 export interface SelectedDealProduct {
   id: number;
   variantId: number;
+  variantName?: string;
   name: string;
   slug: string;
   brandName: string;
@@ -31,6 +32,43 @@ export interface SelectedDealProduct {
 }
 
 /**
+ * Mulberry32 32-bit deterministic Pseudo-Random Number Generator.
+ * Given a seed, generates reproducible pseudo-random floats in [0, 1).
+ */
+export function createMulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return function next(): number {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t >>> 0) / 4294967296);
+  };
+}
+
+/**
+ * Computes the ISO calendar week number (1-53)
+ */
+export function getCalendarWeekNumber(date: Date = new Date()): number {
+  const target = new Date(date.valueOf());
+  const dayNumber = (date.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayNumber + 3);
+  const firstThursday = target.valueOf();
+  target.setUTCMonth(0, 1);
+  if (target.getUTCDay() !== 4) {
+    target.setUTCMonth(0, 1 + ((4 - target.getUTCDay() + 7) % 7));
+  }
+  return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+}
+
+/**
+ * Returns a stable 32-bit seed based on calendar year and week (e.g. 202639)
+ */
+export function getWeeklyDealSeed(date: Date = new Date()): number {
+  const weekNumber = getCalendarWeekNumber(date);
+  return date.getUTCFullYear() * 100 + weekNumber;
+}
+
+/**
  * Determines whether the current calendar week qualifies for the Bi-Weekly Festival Bumper Deal:
  * - Active ONLY between September 1 and December 31 (months 8 to 11 in 0-indexed JS Date).
  * - Triggers on alternate weeks (even week numbers of the year).
@@ -40,26 +78,24 @@ export function isBiweeklyFestivalBumperEligible(date: Date = new Date()): boole
   const isFestivalMonths = month >= 8 && month <= 11;
   if (!isFestivalMonths) return false;
 
-  // Determine week of year
-  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-  const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
-  const currentWeek = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  const currentWeek = getCalendarWeekNumber(date);
 
   // Bi-weekly: triggers on even weeks (e.g. Week 38, 40, 42, etc.)
   return currentWeek % 2 === 0;
 }
 
 /**
- * Standard discount logic:
+ * Deterministic discount logic using weekly PRNG:
  * - Products > ₹2,00,000: strictly 10% to 15% (margin safety)
  * - Products <= ₹2,00,000: strictly 15% to 20%
  */
-export function calculateStandardDealDiscount(priceCents: number): number {
+export function calculateStandardDealDiscount(priceCents: number, prng?: () => number): number {
+  const rand = prng ? prng() : 0.5;
   const TWO_LAKHS_CENTS = 20000000;
   if (priceCents > TWO_LAKHS_CENTS) {
-    return Math.floor(Math.random() * (15 - 10 + 1)) + 10; // 10% to 15%
+    return Math.floor(rand * (15 - 10 + 1)) + 10; // 10% to 15%
   }
-  return Math.floor(Math.random() * (20 - 15 + 1)) + 15; // 15% to 20%
+  return Math.floor(rand * (20 - 15 + 1)) + 15; // 15% to 20%
 }
 
 // 6 Target High-Ticket Category Buckets (Always 6 base distinct items)
@@ -107,6 +143,15 @@ export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDeal
     "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800&auto=format&fit=crop&q=80",
   ];
 
+  const placeholderSpecs = [
+    "12GB RAM / 256GB - Phantom Black",
+    "16GB Unified / 1TB SSD - Space Black",
+    "55-inch 4K OLED / 120Hz Pro Gaming",
+    "1.5 Ton 5-Star Dual Inverter Copper",
+    "340L Double Door Frost-Free Convertible",
+    "5.1 Ch Dolby Atmos Wireless Subwoofer",
+  ];
+
   const deals: SelectedDealProduct[] = HIGH_TICKET_BUCKETS.map((b, idx) => {
     const originalPriceCents = (120000 + idx * 25000) * 100;
     const discount = 15;
@@ -115,6 +160,7 @@ export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDeal
     return {
       id: 9900 + idx,
       variantId: 9900 + idx,
+      variantName: placeholderSpecs[idx % placeholderSpecs.length],
       name: b.fallbackName,
       slug,
       brandName: "Nirosha Elite",
@@ -140,6 +186,7 @@ export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDeal
     const bumperDeal: SelectedDealProduct = {
       id: 9899,
       variantId: 9899,
+      variantName: "256GB - Desert Titanium",
       name: "Apple iPhone 16 Pro Max",
       slug: "apple-iphone-16-pro-max",
       brandName: "Apple",
@@ -164,11 +211,15 @@ export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDeal
 
 /**
  * Generates the weekly deals batch:
+ * - Deterministic: Same 6 products & discount prices across entire calendar week.
  * - Always 6 distinct category high-ticket items.
  * - If isBiweeklyFestivalBumperEligible(date) is true: adds a 7th Bumper item (< ₹2 Lakhs)
  *   with +15% anchor markup and 25% promo discount (yielding ~13.75% real markdown).
  */
 export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<SelectedDealProduct[]> {
+  const seed = getWeeklyDealSeed(targetDate);
+  const prng = createMulberry32(seed);
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -190,6 +241,8 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
         .from("product_variants")
         .select(`
           id,
+          name,
+          sku,
           price_cents,
           compare_at_price_cents,
           product:products!inner(
@@ -213,6 +266,8 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
           .from("product_variants")
           .select(`
             id,
+            name,
+            sku,
             price_cents,
             compare_at_price_cents,
             product:products!inner(
@@ -231,12 +286,12 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
           .limit(10);
 
         if (fallbackVariants && fallbackVariants.length > 0) {
-          await assignStandardDeal(fallbackVariants, bucket, usedProductIds, baseDeals, supabase);
+          await assignStandardDeal(fallbackVariants, bucket, usedProductIds, baseDeals, supabase, prng);
         }
         continue;
       }
 
-      await assignStandardDeal(variants, bucket, usedProductIds, baseDeals, supabase);
+      await assignStandardDeal(variants, bucket, usedProductIds, baseDeals, supabase, prng);
     }
 
     // Backfill any missing slots from fallback if catalog is sparse
@@ -252,7 +307,7 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
     // 2. Check Bi-Weekly Festival Bumper Deal (The 7th Product)
     const isBumperActive = isBiweeklyFestivalBumperEligible(targetDate);
     if (isBumperActive) {
-      const bumperDeal = await fetchSeventhBumperProduct(supabase, usedProductIds);
+      const bumperDeal = await fetchSeventhBumperProduct(supabase, usedProductIds, prng);
       if (bumperDeal) {
         return [bumperDeal, ...baseDeals];
       }
@@ -267,14 +322,15 @@ export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<
 }
 
 /**
- * Assigns one standard deal from candidate variants
+ * Assigns one standard deal from candidate variants using deterministic PRNG
  */
 async function assignStandardDeal(
   variants: any[],
   bucket: (typeof HIGH_TICKET_BUCKETS)[0],
   usedProductIds: Set<number>,
   selectedDeals: SelectedDealProduct[],
-  supabase: any
+  supabase: any,
+  prng: () => number
 ) {
   const candidateVariants = variants.filter(
     (v) => v.product && !usedProductIds.has(v.product.id)
@@ -282,7 +338,7 @@ async function assignStandardDeal(
 
   if (candidateVariants.length === 0) return;
 
-  const randomIndex = Math.floor(Math.random() * Math.min(candidateVariants.length, 5));
+  const randomIndex = Math.floor(prng() * Math.min(candidateVariants.length, 5));
   const chosenVariant = candidateVariants[randomIndex];
   const product = chosenVariant.product;
 
@@ -308,16 +364,18 @@ async function assignStandardDeal(
       ? chosenVariant.compare_at_price_cents
       : Math.round(originalPriceCents * 1.15);
 
-  const discountPercent = calculateStandardDealDiscount(originalPriceCents);
+  const discountPercent = calculateStandardDealDiscount(originalPriceCents, prng);
   const dealPriceCents = Math.round(originalPriceCents * (1 - discountPercent / 100));
   const totalSavingsCents = mrpCents - dealPriceCents;
   const discountPercentage = Math.round((totalSavingsCents / mrpCents) * 100);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://niroshaindia.com";
+  const variantName = chosenVariant.name || chosenVariant.sku || "";
 
   selectedDeals.push({
     id: product.id,
     variantId: chosenVariant.id,
+    variantName: variantName || undefined,
     name: product.name,
     slug: product.slug,
     brandName: product.brand?.name || "Official Brand",
@@ -337,7 +395,7 @@ async function assignStandardDeal(
 }
 
 /**
- * Fetches the 7th Bumper Product:
+ * Fetches the 7th Bumper Product using deterministic PRNG:
  * - Constraint: price strictly < ₹2,00,000 (20,000,000 cents) and >= ₹20,000.
  * - Markup Formula:
  *   * Anchor Price = P * 1.15 (+15% markup)
@@ -346,7 +404,8 @@ async function assignStandardDeal(
  */
 async function fetchSeventhBumperProduct(
   supabase: any,
-  usedProductIds: Set<number>
+  usedProductIds: Set<number>,
+  prng: () => number
 ): Promise<SelectedDealProduct | null> {
   const TWO_LAKHS_CENTS = 20000000;
   const TWENTY_THOUSAND_CENTS = 2000000;
@@ -355,6 +414,8 @@ async function fetchSeventhBumperProduct(
     .from("product_variants")
     .select(`
       id,
+      name,
+      sku,
       price_cents,
       compare_at_price_cents,
       product:products!inner(
@@ -383,8 +444,8 @@ async function fetchSeventhBumperProduct(
 
   if (eligibleCandidates.length === 0) return null;
 
-  // Pick a candidate
-  const randomIndex = Math.floor(Math.random() * Math.min(eligibleCandidates.length, 10));
+  // Pick a candidate deterministically
+  const randomIndex = Math.floor(prng() * Math.min(eligibleCandidates.length, 10));
   const chosenVariant = eligibleCandidates[randomIndex];
   const product = chosenVariant.product;
 
@@ -415,10 +476,12 @@ async function fetchSeventhBumperProduct(
   const totalSavingsCents = inflatedAnchorCents - bumperDealPriceCents;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://niroshaindia.com";
+  const variantName = chosenVariant.name || chosenVariant.sku || "";
 
   return {
     id: product.id,
     variantId: chosenVariant.id,
+    variantName: variantName || undefined,
     name: product.name,
     slug: product.slug,
     brandName: product.brand?.name || "Official Brand",

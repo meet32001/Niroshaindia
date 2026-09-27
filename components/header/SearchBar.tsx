@@ -29,8 +29,6 @@ export function SearchBar() {
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length < 2) {
-      setResults(null);
-      setIsLoading(false);
       return;
     }
 
@@ -140,6 +138,16 @@ export function SearchBar() {
     }
 
     if (!results) return null;
+
+    if (results.products.length === 0) {
+      return (
+        <div className="py-10 px-4 text-center">
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            No products found for &quot;{trimmed}&quot;
+          </p>
+        </div>
+      );
+    }
 
     return (
       <div className="divide-y divide-slate-100 dark:divide-slate-800">
