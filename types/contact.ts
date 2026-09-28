@@ -65,3 +65,11 @@ export interface ContactActionResult {
   message: string;
   errors?: Record<string, string>;
 }
+
+export interface CustomerOrderOption {
+  order_number: string;
+  created_at: string;
+  status: string;
+  total_amount_cents: number;
+}
+

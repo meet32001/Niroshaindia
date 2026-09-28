@@ -20,7 +20,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { submitContactInquiryAction } from "@/actions/contact";
-import { INQUIRY_TYPE_LABELS, type InquiryType } from "@/types/contact";
+import { getCustomerOrdersForSelectAction } from "@/actions/orders";
+import {
+  INQUIRY_TYPE_LABELS,
+  type InquiryType,
+  type CustomerOrderOption,
+} from "@/types/contact";
 
 export function ContactForm() {
   const { user, isLoaded } = useUser();
@@ -35,6 +40,11 @@ export function ContactForm() {
     honeypot: "",
   });
 
+  const [customerOrders, setCustomerOrders] = useState<CustomerOrderOption[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [isManualOrderEntry, setIsManualOrderEntry] = useState(false);
+  const [hasFetchedOrders, setHasFetchedOrders] = useState(false);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -44,6 +54,10 @@ export function ContactForm() {
     submittedType: InquiryType;
     orderNumber?: string;
   } | null>(null);
+
+  const isOrderRequired =
+    formData.inquiry_type === "order_tracking" ||
+    formData.inquiry_type === "returns_replacements";
 
   // Pre-fill Clerk user name & email when available
   useEffect(() => {
@@ -56,8 +70,31 @@ export function ContactForm() {
     }
   }, [isLoaded, user]);
 
+  // Load authenticated customer orders when order-related inquiry type is active
+  useEffect(() => {
+    if (isOrderRequired && isLoaded && user && !hasFetchedOrders && !isLoadingOrders) {
+      setIsLoadingOrders(true);
+      const email = user.primaryEmailAddress?.emailAddress;
+      getCustomerOrdersForSelectAction(email)
+        .then((res) => {
+          setHasFetchedOrders(true);
+          if (res.success && res.orders) {
+            setCustomerOrders(res.orders);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load customer orders:", err);
+          setHasFetchedOrders(true);
+        })
+        .finally(() => {
+          setIsLoadingOrders(false);
+        });
+    }
+  }, [isOrderRequired, isLoaded, user, hasFetchedOrders, isLoadingOrders]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -127,11 +164,9 @@ export function ContactForm() {
       honeypot: "",
     });
     setErrors({});
+    setIsManualOrderEntry(false);
   };
 
-  const isOrderRequired =
-    formData.inquiry_type === "order_tracking" ||
-    formData.inquiry_type === "returns_replacements";
 
   if (successResult) {
     return (
@@ -320,24 +355,133 @@ export function ContactForm() {
 
         {/* Conditional Order Number Field */}
         {isOrderRequired && (
-          <div className="animate-in fade-in-50 duration-200 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/60 p-3.5 rounded-xl">
-            <label className="block text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300 mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5" /> Order Number <span className="text-rose-500">*</span>
-              </span>
-              <span className="text-[11px] font-normal text-emerald-700 dark:text-emerald-400">
-                Found in your confirmation email
-              </span>
-            </label>
-            <Input
-              type="text"
-              name="order_number"
-              required={isOrderRequired}
-              placeholder="e.g. ORD-98214 or Clerk Order ID"
-              value={formData.order_number}
-              onChange={handleChange}
-              className={`h-10 text-sm bg-white dark:bg-slate-900 rounded-lg ${errors.order_number ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-            />
+          <div className="animate-in fade-in-50 duration-200 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/60 p-3.5 sm:p-4 rounded-xl space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5" /> Order Reference <span className="text-rose-500">*</span>
+              </label>
+              {user && customerOrders.length > 0 && !isManualOrderEntry && (
+                <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                  {customerOrders.length} order{customerOrders.length > 1 ? "s" : ""} on file
+                </span>
+              )}
+            </div>
+
+            {isLoadingOrders ? (
+              <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300 bg-white/80 dark:bg-slate-900/80 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800/80">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600 shrink-0" />
+                <span>Loading your verified orders...</span>
+              </div>
+            ) : user && customerOrders.length > 0 && !isManualOrderEntry ? (
+              /* Scenario A: Logged-in customer with authentic orders in database */
+              <div className="space-y-1.5">
+                <select
+                  name="order_number"
+                  required={isOrderRequired}
+                  value={formData.order_number}
+                  onChange={handleChange}
+                  className={`w-full rounded-lg border bg-white dark:bg-slate-900 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-colors cursor-pointer ${
+                    errors.order_number
+                      ? "border-rose-500 focus-visible:ring-rose-500"
+                      : "border-slate-300 dark:border-slate-700"
+                  }`}
+                >
+                  <option value="">-- Select an Order --</option>
+                  {customerOrders.map((ord) => (
+                    <option key={ord.order_number} value={ord.order_number}>
+                      {ord.order_number} • ₹{(ord.total_amount_cents / 100).toLocaleString("en-IN")} ({ord.status.toUpperCase()} - {new Date(ord.created_at).toLocaleDateString("en-IN")})
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualOrderEntry(true);
+                      setFormData((prev) => ({ ...prev, order_number: "" }));
+                    }}
+                    className="text-xs text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 underline cursor-pointer"
+                  >
+                    Don&apos;t see your order? Enter manually
+                  </button>
+                </div>
+              </div>
+            ) : user && hasFetchedOrders && customerOrders.length === 0 && !isManualOrderEntry ? (
+              /* Scenario B: Logged-in customer with 0 past orders */
+              <div className="space-y-2">
+                <div className="text-xs text-slate-600 dark:text-slate-400 bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                  No previous orders found under this account.
+                </div>
+                <Input
+                  type="text"
+                  name="order_number"
+                  required={isOrderRequired}
+                  placeholder="Enter order number placed under another email"
+                  value={formData.order_number}
+                  onChange={handleChange}
+                  className={`h-10 text-sm bg-white dark:bg-slate-900 rounded-lg ${
+                    errors.order_number ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                  }`}
+                />
+              </div>
+            ) : user && isManualOrderEntry ? (
+              /* Scenario A Fallback: User toggled to manual input */
+              <div className="space-y-1.5">
+                <Input
+                  type="text"
+                  name="order_number"
+                  required={isOrderRequired}
+                  placeholder="e.g. NIR-ORD-2026-84920"
+                  value={formData.order_number}
+                  onChange={handleChange}
+                  className={`h-10 text-sm bg-white dark:bg-slate-900 rounded-lg ${
+                    errors.order_number ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                  }`}
+                />
+                {customerOrders.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualOrderEntry(false);
+                      setFormData((prev) => ({
+                        ...prev,
+                        order_number: customerOrders[0]?.order_number || "",
+                      }));
+                    }}
+                    className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    ← Choose from your account orders
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* Scenario C: Guest / Logged-out visitor */
+              <div className="space-y-1.5">
+                <Input
+                  type="text"
+                  name="order_number"
+                  required={isOrderRequired}
+                  placeholder="e.g. #NIR-ORD-2026-84920"
+                  value={formData.order_number}
+                  onChange={handleChange}
+                  className={`h-10 text-sm bg-white dark:bg-slate-900 rounded-lg ${
+                    errors.order_number ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                  }`}
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Enter your 16-digit Order ID (e.g. #NIR-ORD-...) or{" "}
+                  <Link
+                    href="/sign-in?redirect_url=/contact"
+                    className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
+                  >
+                    sign in
+                  </Link>{" "}
+                  to choose from your orders automatically.
+                </p>
+              </div>
+            )}
+
             {errors.order_number && (
               <p className="text-rose-500 text-xs mt-1 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> {errors.order_number}
