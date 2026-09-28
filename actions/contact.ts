@@ -95,76 +95,63 @@ export async function submitContactInquiryAction(
     // 6. Graceful Resend Email Dispatch
     const resendApiKey = process.env.RESEND_API_KEY;
     if (resendApiKey) {
-      try {
-        const resend = new Resend(resendApiKey);
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "Nirosha Support <onboarding@resend.dev>";
-        const typeLabel = INQUIRY_TYPE_LABELS[inquiry_type] || inquiry_type;
-        const istTimestamp =
-          new Date().toLocaleString("en-IN", {
-            timeZone: "Asia/Kolkata",
-            dateStyle: "full",
-            timeStyle: "medium",
-          }) + " IST";
+      const resend = new Resend(resendApiKey);
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "Nirosha Support <onboarding@resend.dev>";
+      const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || "niroshaindia26@gmail.com";
+      const typeLabel = INQUIRY_TYPE_LABELS[inquiry_type] || inquiry_type;
+      const istTimestamp =
+        new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          dateStyle: "full",
+          timeStyle: "medium",
+        }) + " IST";
 
-        // Dispatch Admin Alert to niroshaindia26@gmail.com
-        const adminNotificationPromise = resend.emails.send({
+      // 6a. Dispatch Admin Alert
+      try {
+        const adminResult = await resend.emails.send({
           from: fromEmail,
-          to: ["niroshaindia26@gmail.com"],
+          to: [ADMIN_EMAIL],
           subject: `[New Support Ticket] #${ticketId}: ${typeLabel} - ${name}`,
           html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
-              <div style="border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px;">
-                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #059669;">Nirosha Helpdesk Alert</span>
-                <h2 style="color: #0f172a; margin: 6px 0 0 0; font-size: 20px;">New Support Ticket Received</h2>
-              </div>
-
-              <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
-                <tbody>
-                  <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600; width: 150px;">Ticket ID:</td>
-                    <td style="padding: 10px 0; color: #0f172a; font-weight: 800; font-family: monospace; font-size: 16px;">#${ticketId}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Customer Name:</td>
-                    <td style="padding: 10px 0; color: #0f172a; font-weight: 600;">${name}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Customer Email:</td>
-                    <td style="padding: 10px 0; color: #059669;"><a href="mailto:${email}" style="color: #059669; text-decoration: none;">${email}</a></td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Phone:</td>
-                    <td style="padding: 10px 0; color: #0f172a;">${cleanPhone || phone || "Not provided"}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Inquiry Type:</td>
-                    <td style="padding: 10px 0; color: #0f172a;">${typeLabel}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Associated Order #:</td>
-                    <td style="padding: 10px 0; color: #0f172a; font-family: monospace;">${order_number || "N/A"}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Timestamp:</td>
-                    <td style="padding: 10px 0; color: #64748b;">${istTimestamp}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-top: 10px;">
-                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Customer Message:</p>
-                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #1e293b; white-space: pre-wrap;">${message}</p>
-              </div>
-
-              <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;">
-                Automated triage alert sent from Nirosha India Production Helpdesk.
-              </div>
+            <div style="font-family: sans-serif; padding: 20px; line-height: 1.5; color: #1e293b; background-color: #ffffff;">
+              <h2 style="color: #0f172a; margin-top: 0;">New Support Ticket: #${ticketId}</h2>
+              <p><strong>Customer Name:</strong> ${name}</p>
+              <p><strong>Customer Email:</strong> ${email}</p>
+              <p><strong>Phone:</strong> ${cleanPhone || phone || "Not provided"}</p>
+              <p><strong>Inquiry Type:</strong> ${typeLabel}</p>
+              <p><strong>Associated Order #:</strong> ${order_number || "N/A"}</p>
+              <p><strong>Message:</strong></p>
+              <blockquote style="background: #f1f5f9; padding: 12px; border-left: 4px solid #0f172a; margin: 12px 0;">
+                ${message}
+              </blockquote>
+              <p style="font-size: 12px; color: #64748b;">Submitted at: ${istTimestamp}</p>
             </div>
           `,
         });
 
-        // Dispatch User Confirmation
-        const userConfirmationPromise = resend.emails.send({
+        if (adminResult.error) {
+          console.error("ADMIN EMAIL FAILED TO SEND:", adminResult.error.message || adminResult.error);
+          if (adminResult.error.message?.includes("testing emails to your own email address")) {
+            console.warn(
+              "\n⚠️ [RESEND SANDBOX RESTRICTION]:\n" +
+              `You are sending from '${fromEmail}'. Resend sandbox strictly restricts outgoing emails to your account's registered address.\n` +
+              `Attempted recipient: '${ADMIN_EMAIL}'.\n` +
+              "How to resolve:\n" +
+              "1. Testing: In Resend Dashboard (resend.com/emails), invite 'niroshaindia26@gmail.com' to your Team / Audience, or set ADMIN_NOTIFICATION_EMAIL in .env.local to your registered Resend email.\n" +
+              "2. Production: Verify 'niroshaindia.com' in Resend (resend.com/domains) and set RESEND_FROM_EMAIL='support@niroshaindia.com'.\n"
+            );
+          }
+        } else {
+          console.log("Admin email dispatch result:", adminResult);
+        }
+      } catch (adminErr: unknown) {
+        const errMsg = adminErr instanceof Error ? adminErr.message : String(adminErr);
+        console.error("ADMIN EMAIL FAILED TO SEND:", errMsg);
+      }
+
+      // 6b. Dispatch Customer Confirmation
+      try {
+        const customerResult = await resend.emails.send({
           from: fromEmail,
           to: [email],
           subject: `Ticket Received: #${ticketId} — Nirosha India Support`,
@@ -193,9 +180,14 @@ export async function submitContactInquiryAction(
           `,
         });
 
-        await Promise.allSettled([adminNotificationPromise, userConfirmationPromise]);
-      } catch (emailErr) {
-        console.warn("Resend email dispatch error (non-blocking):", emailErr);
+        if (customerResult.error) {
+          console.warn("Customer confirmation email error:", customerResult.error.message || customerResult.error);
+        } else {
+          console.log("Customer email dispatch result:", customerResult);
+        }
+      } catch (customerErr: unknown) {
+        const errMsg = customerErr instanceof Error ? customerErr.message : String(customerErr);
+        console.warn("Customer confirmation email error (non-blocking):", errMsg);
       }
     }
 
