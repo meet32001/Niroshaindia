@@ -1,12 +1,45 @@
 import { supabase } from "@/lib/supabase/client";
-import { supabaseServer } from "@/lib/supabase/server";
 import { Product, Category, Brand } from "@/types";
 
-export const CATEGORY_SLUG_ALIASES: Record<string, string> = {
+export const CATEGORY_SLUG_ALIASES: Record<string, string | string[]> = {
+  // Laptops & Computers
+  "laptops-computers": "laptops-accessories",
+  "laptops-pcs": "laptops-accessories",
+  "laptops-workstations": "laptops-accessories",
+  "laptops": "laptops-macbooks",
+  "laptops-ultrabooks": "laptops-macbooks",
+
+  // Smart Televisions
+  "smart-televisions": "televisions-audio",
+  "tv-vision": "televisions-audio",
+  "televisions": "televisions-audio",
+
+  // Mobiles & Smartphones
+  "smartphones-tablets": ["smartphones", "tablets-ipads"],
+  "mobiles-tablets": ["smartphones", "tablets-ipads"],
+  "mobile-phones": "smartphones",
+  "mobiles": "smartphones",
+
+  // Kitchen Chimneys & Appliances
+  "home-kitchen": "kitchen-chimneys",
+  "kitchen": "kitchen-appliances",
   "air-fryers-deep-fryers": "air-fryers",
   "electric-kettles-coffee-makers": "kettles-coffee-makers",
   "induction-cooktops-stoves": "cooktops-stoves",
   "mixer-grinders-juicers-blenders": "mixers-juicers-blenders",
+
+  // Audio & Headphones
+  "headphones-audio": "headphones-speakers",
+  "audio-headphones": "headphones-speakers",
+  "headphones-tws": "headphones-speakers",
+  "audio": "headphones-speakers",
+  "gadget": "headphones-speakers",
+  "gadgets": "headphones-speakers",
+
+  // Home Appliances & Wearables
+  "appliances": "home-appliances",
+  "wearables": "smartwatches-wearables",
+  "smart-wearables": "smartwatches-wearables",
 };
 
 export const MOCK_CATEGORIES: Category[] = [
@@ -188,6 +221,9 @@ export function normalizeProduct(item: any) {
     };
   });
 
+  // Sort variants by price_cents ascending so primaryVariant is always the base lowest-price variant
+  variants.sort((a: any, b: any) => (a.price_cents || 0) - (b.price_cents || 0));
+
   const primaryVariant = variants[0] || {
     id: item.id || "var-default",
     sku: "SKU-DEFAULT",
@@ -238,6 +274,8 @@ export function normalizeProduct(item: any) {
   return {
     ...item,
     id: item.id || item._id,
+    variant_id: primaryVariant.id,
+    selectedVariant: primaryVariant,
     title: item.name || item.title || "Electronics Product",
     name: item.name || item.title || "Electronics Product",
     slug: typeof item.slug === "string" ? item.slug : item.slug?.current || "product",
@@ -245,6 +283,7 @@ export function normalizeProduct(item: any) {
     brands: typeof brandObj === "object" ? brandObj : { name: brandName },
     category: categoryName,
     categories: typeof catObj === "object" ? catObj : { name: categoryName },
+    price_cents: minPriceCents,
     min_price_cents: minPriceCents,
     max_price_cents: maxPriceCents,
     price: minPriceCents > 0 ? minPriceCents / 100 : primaryVariant.price,
@@ -474,13 +513,54 @@ export async function getBrands() {
 
 export const getAllBrands = getBrands;
 
+/**
+ * Resolves a category slug (or alias) to a list of matching category IDs.
+ * Handles root departments by querying all their child subcategories.
+ * Handles aliases that map to multiple categories or root departments.
+ */
+export async function resolveCategoryIds(categoryParam: string): Promise<number[]> {
+  if (!categoryParam || categoryParam === "all") return [];
+  const cleanCatSlug = categoryParam.trim().toLowerCase();
+  const alias = CATEGORY_SLUG_ALIASES[cleanCatSlug] || cleanCatSlug;
+  const targetSlugs = Array.isArray(alias) ? alias : [alias];
+  const lookupSlugs = Array.from(new Set([...targetSlugs, cleanCatSlug]));
+
+  const { data: matchedCats } = await supabase
+    .from("categories")
+    .select("id, parent_id, slug")
+    .in("slug", lookupSlugs);
+
+  if (!matchedCats || matchedCats.length === 0) {
+    return [];
+  }
+
+  const catIds: number[] = [];
+  for (const cat of matchedCats) {
+    if (cat.parent_id === null) {
+      const { data: childCats } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("parent_id", cat.id);
+      catIds.push(cat.id, ...(childCats || []).map((c) => c.id));
+    } else {
+      catIds.push(cat.id);
+    }
+  }
+
+  return Array.from(new Set(catIds));
+}
+
 // Contextual brand facets for category: RPC call with fast fallback
 export async function getContextualBrands(categorySlug?: string | null) {
   try {
     // 1. Try RPC function if migration has been executed
+    const cleanSlug = categorySlug?.trim().toLowerCase() || null;
+    const alias = cleanSlug ? (CATEGORY_SLUG_ALIASES[cleanSlug] || cleanSlug) : null;
+    const rpcSlug = Array.isArray(alias) ? alias[0] : (alias || cleanSlug);
+
     const { data: rpcBrands, error: rpcErr } = await supabase.rpc(
       "get_contextual_category_brands",
-      { cat_slug: categorySlug || null }
+      { cat_slug: rpcSlug }
     );
 
     if (!rpcErr && Array.isArray(rpcBrands) && rpcBrands.length > 0) {
@@ -496,26 +576,7 @@ export async function getContextualBrands(categorySlug?: string | null) {
     // 2. High-speed resilient fallback
     let targetCatIds: number[] | null = null;
     if (categorySlug && categorySlug !== "all") {
-      const cleanSlug = categorySlug.trim().toLowerCase();
-      const resolvedSlug = CATEGORY_SLUG_ALIASES[cleanSlug] || cleanSlug;
-      const { data: cat } = await supabase
-        .from("categories")
-        .select("id, parent_id")
-        .in("slug", [resolvedSlug, cleanSlug])
-        .limit(1)
-        .maybeSingle();
-
-      if (cat) {
-        if (cat.parent_id === null) {
-          const { data: children } = await supabase
-            .from("categories")
-            .select("id")
-            .eq("parent_id", cat.id);
-          targetCatIds = [cat.id, ...(children || []).map((c) => c.id)];
-        } else {
-          targetCatIds = [cat.id];
-        }
-      }
+      targetCatIds = await resolveCategoryIds(categorySlug);
     }
 
     let prodQuery = supabase.from("products").select("brand_id").eq("is_active", true);
@@ -659,30 +720,11 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
       .eq("is_active", true)
       .gt("product_variants.price_cents", 0);
 
-    // 1. Resolve Category Filter (supports root departments and child subcategories)
+    // 1. Resolve Category Filter (supports root departments, child subcategories, and aliases)
     if (category) {
-      const cleanCatSlug = category.trim().toLowerCase();
-      const targetSlug = CATEGORY_SLUG_ALIASES[cleanCatSlug] || cleanCatSlug;
-      const { data: matchedCat } = await supabase
-        .from("categories")
-        .select("id, parent_id")
-        .in("slug", [targetSlug, cleanCatSlug])
-        .limit(1)
-        .maybeSingle();
-
-      if (matchedCat) {
-        if (matchedCat.parent_id === null) {
-          // It's a ROOT department! Query all its child categories
-          const { data: childCats } = await supabase
-            .from("categories")
-            .select("id")
-            .eq("parent_id", matchedCat.id);
-          const catIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
-          query = query.in("category_id", catIds);
-        } else {
-          // Specific subcategory
-          query = query.eq("category_id", matchedCat.id);
-        }
+      const catIds = await resolveCategoryIds(category);
+      if (catIds.length > 0) {
+        query = query.in("category_id", catIds);
       } else {
         query = query.eq("category_id", -1); // No match
       }
@@ -745,26 +787,9 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
 
       // Resolve Category Filter
       if (category) {
-        const cleanCatSlug = category.trim().toLowerCase();
-        const targetSlug = CATEGORY_SLUG_ALIASES[cleanCatSlug] || cleanCatSlug;
-        const { data: matchedCat } = await supabase
-          .from("categories")
-          .select("id, parent_id")
-          .in("slug", [targetSlug, cleanCatSlug])
-          .limit(1)
-          .maybeSingle();
-
-        if (matchedCat) {
-          if (matchedCat.parent_id === null) {
-            const { data: childCats } = await supabase
-              .from("categories")
-              .select("id")
-              .eq("parent_id", matchedCat.id);
-            const catIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
-            idQuery = idQuery.in("category_id", catIds);
-          } else {
-            idQuery = idQuery.eq("category_id", matchedCat.id);
-          }
+        const catIds = await resolveCategoryIds(category);
+        if (catIds.length > 0) {
+          idQuery = idQuery.in("category_id", catIds);
         } else {
           idQuery = idQuery.eq("category_id", -1);
         }
@@ -944,30 +969,12 @@ export async function getDealProducts() {
 export async function getProductsByCategory(categorySlug: string) {
   try {
     const cleanSlug = categorySlug.trim().toLowerCase();
-    const resolvedSlug = CATEGORY_SLUG_ALIASES[cleanSlug] || cleanSlug;
-
-    // Check if category exists in database
-    const { data: matchedCat } = await supabase
-      .from("categories")
-      .select("id, parent_id")
-      .in("slug", [resolvedSlug, cleanSlug])
-      .limit(1)
-      .maybeSingle();
-
-    let targetCatIds: number[] = [];
-    if (matchedCat) {
-      if (matchedCat.parent_id === null) {
-        const { data: childCats } = await supabase
-          .from("categories")
-          .select("id")
-          .eq("parent_id", matchedCat.id);
-        targetCatIds = [matchedCat.id, ...(childCats || []).map((c) => c.id)];
-      } else {
-        targetCatIds = [matchedCat.id];
-      }
+    const targetCatIds = await resolveCategoryIds(categorySlug);
+    if (targetCatIds.length === 0) {
+      return [];
     }
 
-    let prodQuery = supabase
+    const prodQuery = supabase
       .from("products")
       .select(`
         id,
@@ -993,13 +1000,8 @@ export async function getProductsByCategory(categorySlug: string) {
           inventory:warehouse_inventory ( quantity_on_hand, quantity_reserved )
         )
       `)
-      .eq("is_active", true);
-
-    if (targetCatIds.length > 0) {
-      prodQuery = prodQuery.in("category_id", targetCatIds);
-    } else {
-      prodQuery = prodQuery.in("category.slug", [resolvedSlug, cleanSlug]);
-    }
+      .eq("is_active", true)
+      .in("category_id", targetCatIds);
 
     const { data, error } = await prodQuery.order("id", { ascending: false });
 
@@ -1009,8 +1011,7 @@ export async function getProductsByCategory(categorySlug: string) {
     const all = await getAllProducts();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return all.filter((p: any) =>
-      (p.category || "").toLowerCase().includes(resolvedSlug.toLowerCase()) ||
-      (p.category || "").toLowerCase().includes(cleanSlug.toLowerCase())
+      (p.category || "").toLowerCase().includes(cleanSlug)
     );
   } catch {
     const all = await getAllProducts();
@@ -1018,53 +1019,5 @@ export async function getProductsByCategory(categorySlug: string) {
     return all.filter((p: any) =>
       (p.category || "").toLowerCase().includes(categorySlug.toLowerCase())
     );
-  }
-}
-
-// Fetch user orders by Clerk UserId via customers table join
-export async function getMyOrders(userId: string) {
-  try {
-    if (!userId) return [];
-
-    const { data: customer, error: custErr } = await supabaseServer
-      .from("customers")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .maybeSingle();
-
-    if (custErr || !customer) {
-      // Fallback query directly on orders table if customer record is pending
-      const { data: directOrders } = await supabaseServer
-        .from("orders")
-        .select("*")
-        .eq("clerk_user_id", userId)
-        .order("created_at", { ascending: false });
-
-      return directOrders || [];
-    }
-
-    const { data, error } = await supabaseServer
-      .from("orders")
-      .select(`
-        *,
-        order_items (
-          *,
-          product_variants (
-            name,
-            sku,
-            product_images ( image_url )
-          )
-        )
-      `)
-      .eq("customer_id", customer.id)
-      .order("created_at", { ascending: false });
-
-    if (!error && Array.isArray(data)) {
-      return data;
-    }
-    return [];
-  } catch (error) {
-    console.error("Error fetching user orders from Supabase:", error);
-    return [];
   }
 }

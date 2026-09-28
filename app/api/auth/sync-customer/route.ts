@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verify Environment Variables
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error('[SYNC CUSTOMER ERROR] Missing SUPABASE environment variables:', {
-        hasUrl: !!supabaseUrl,
-        hasServiceKey: !!serviceRoleKey,
-      });
+    // 1. Session Verification (Prevent unauthenticated customer upsert / IDOR)
+    const { userId: authedUserId } = await auth();
+    if (!authedUserId) {
       return NextResponse.json(
-        { error: 'Server configuration error: missing Supabase keys' },
-        { status: 500 }
+        { error: 'Unauthorized: Valid Clerk session required' },
+        { status: 401 }
       );
     }
 
@@ -26,31 +21,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
-    const { userId, email, firstName, lastName, phone } = body || {};
+    const { userId, firstName, lastName, phone } = body || {};
 
-    if (!userId || !email) {
-      console.warn('[SYNC CUSTOMER WARN] Missing required fields:', { userId, email });
-      return NextResponse.json({ error: 'Missing required fields: userId or email' }, { status: 400 });
+    // 3. Reject Mismatched Identity Payloads
+    if (userId && userId !== authedUserId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Cannot sync user profile for another user identity' },
+        { status: 403 }
+      );
     }
 
-    // 3. Initialize Admin Client
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    // 4. Retrieve Verified Identity Details from Clerk
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Unable to resolve active user profile' },
+        { status: 401 }
+      );
+    }
 
-    // 4. Upsert into customers table
+    const primaryEmail =
+      clerkUser.emailAddresses?.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ||
+      clerkUser.emailAddresses?.[0]?.emailAddress;
+
+    if (!primaryEmail) {
+      return NextResponse.json(
+        { error: 'Missing verified email address from auth provider' },
+        { status: 400 }
+      );
+    }
+
+    const resolvedFirstName = firstName || clerkUser.firstName || '';
+    const resolvedLastName = lastName || clerkUser.lastName || '';
+    const resolvedPhone = phone || clerkUser.phoneNumbers?.[0]?.phoneNumber || null;
+
+    // 5. Secure Admin Upsert into customers Table
     const { data, error } = await supabaseAdmin
       .from('customers')
       .upsert(
         {
-          clerk_user_id: userId,
-          email: email.trim().toLowerCase(),
-          first_name: firstName || '',
-          last_name: lastName || '',
-          phone: phone || null,
+          clerk_user_id: authedUserId,
+          email: primaryEmail.trim().toLowerCase(),
+          first_name: resolvedFirstName,
+          last_name: resolvedLastName,
+          phone: resolvedPhone,
           is_active: true,
         },
         { onConflict: 'clerk_user_id' }

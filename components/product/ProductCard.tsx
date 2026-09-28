@@ -157,7 +157,15 @@ export function ProductCard(product: any) {
               </span>
             )}
           </div>
-          <AddToCartButton product={product} />
+          <AddToCartButton
+            product={{
+              ...product,
+              variant_id: baseVariant?.id || product.variant_id,
+              selectedVariant: baseVariant || product.selectedVariant,
+              price: minPrice,
+              price_cents: minPriceCents,
+            }}
+          />
         </div>
       </div>
     </div>

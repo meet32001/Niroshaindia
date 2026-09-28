@@ -274,8 +274,8 @@ export const CATEGORIES: Category[] = [
 
 export const CUSTOMER_CARE_LINKS: NavigationItem[] = [
   { title: "Order Tracking", href: "/orders" },
-  { title: "Warranty Policy", href: "/warranty" },
-  { title: "Returns & Refunds", href: "/returns" },
+  { title: "Warranty Policy", href: "/terms#brand-warranty" },
+  { title: "Returns & Replacements", href: "/terms#replacement-policy" },
   { title: "Shipping & Delivery", href: "/shipping" },
   { title: "Support Center", href: "/support" },
 ];

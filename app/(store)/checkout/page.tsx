@@ -42,6 +42,7 @@ import { addressSchema, AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";
 import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
 import { urlFor } from "@/lib/image";
+import { sanitizeProductTitle } from "@/lib/utils";
 
 interface DeliveryStateItem {
   id: string;
@@ -462,6 +463,8 @@ function CheckoutContent() {
   const couponDiscountAmount = appliedCoupon ? appliedCoupon.discountCents / 100 : 0;
   const totalPrice = Math.max(0, baseTotalPrice - couponDiscountAmount);
   const totalSavings = Math.max(0, subtotalPrice - totalPrice);
+  const postDiscountSubtotal = Math.max(0, subtotalPrice - (couponDiscountAmount || 0));
+  const estimatedGst = Math.round((postDiscountSubtotal - postDiscountSubtotal / 1.18) * 100) / 100;
 
   const getImageUrl = (img: unknown) => {
     if (!img) return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
@@ -543,7 +546,7 @@ function CheckoutContent() {
 
     try {
       setIsProcessingPayment(true);
-      const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+      const orderNumber = `NIR-ORD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
       const metadata = {
         orderNumber,
         customerName: targetAddress.recipient_name || user?.fullName || "Customer",
@@ -600,7 +603,7 @@ function CheckoutContent() {
                     <span>Shipping Address</span>
                   </CardTitle>
 
-                  {isSignedIn && savedAddresses.length > 0 && !showAddForm && (
+                  {!loadingAddresses && isSignedIn && savedAddresses.length > 0 && !showAddForm && (
                     <Button
                       type="button"
                       variant="outline"
@@ -615,268 +618,290 @@ function CheckoutContent() {
               </CardHeader>
 
               <CardContent className="pt-5 space-y-4">
-                {/* 1. Logged-in Saved Address List */}
-                {isSignedIn && !showAddForm && savedAddresses.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {savedAddresses.map((addr) => {
-                      const isSelected = selectedAddressId === addr.id;
-                      return (
-                        <div
-                          key={addr.id}
-                          onClick={() => setSelectedAddressId(addr.id)}
-                          className={`relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
-                            isSelected
-                              ? "border-shop-orange bg-orange-50/20 dark:bg-orange-950/20 shadow-xs"
-                              : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                <User className="w-3.5 h-3.5 text-slate-400" />
-                                <span>{addr.recipient_name || addr.full_name}</span>
-                              </h4>
-                              {isSelected && (
-                                <CheckCircle2 className="w-4 h-4 text-shop-orange shrink-0" />
+                {/* 0. Address Loading Shimmer Skeleton */}
+                {loadingAddresses ? (
+                  <div className="space-y-4 animate-pulse" aria-busy="true" aria-label="Loading delivery addresses">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                        <div className="h-3 w-48 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                        <div className="h-3 w-40 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                        <div className="h-3 w-28 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                      </div>
+                      <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="h-4 w-36 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                        <div className="h-3 w-52 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                        <div className="h-3 w-36 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                        <div className="h-3 w-32 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* 1. Logged-in Saved Address List */}
+                    {isSignedIn && !showAddForm && savedAddresses.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {savedAddresses.map((addr) => {
+                          const isSelected = selectedAddressId === addr.id;
+                          return (
+                            <div
+                              key={addr.id}
+                              onClick={() => setSelectedAddressId(addr.id)}
+                              className={`relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                                isSelected
+                                  ? "border-shop-orange bg-orange-50/20 dark:bg-orange-950/20 shadow-xs"
+                                  : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
+                              }`}
+                            >
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <User className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{addr.recipient_name || addr.full_name}</span>
+                                  </h4>
+                                  {isSelected && (
+                                    <CheckCircle2 className="w-4 h-4 text-shop-orange shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-600 dark:text-slate-300">
+                                  {addr.address_line1 || addr.street_address}
+                                </p>
+                                {addr.address_line2 && (
+                                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                                    {addr.address_line2}
+                                  </p>
+                                )}
+                                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                  {addr.city}, {addr.state} - {addr.postal_code}
+                                </p>
+                                <p className="text-xs text-slate-500 flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  <span>{addr.phone}</span>
+                                </p>
+                              </div>
+
+                              {(addr.is_default || addr.is_default_shipping) && (
+                                <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+                                  <Badge className="bg-emerald-600 text-white text-[9px]">
+                                    Default Address
+                                  </Badge>
+                                </div>
                               )}
                             </div>
-                            <p className="text-xs text-slate-600 dark:text-slate-300">
-                              {addr.address_line1 || addr.street_address}
-                            </p>
-                            {addr.address_line2 && (
-                              <p className="text-xs text-slate-600 dark:text-slate-300">
-                                {addr.address_line2}
-                              </p>
-                            )}
-                            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                              {addr.city}, {addr.state} - {addr.postal_code}
-                            </p>
-                            <p className="text-xs text-slate-500 flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              <span>{addr.phone}</span>
-                            </p>
-                          </div>
-
-                          {(addr.is_default || addr.is_default_shipping) && (
-                            <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
-                              <Badge className="bg-emerald-600 text-white text-[9px]">
-                                Default Address
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* 2. Add New / Guest Address Form */}
-                {(showAddForm || savedAddresses.length === 0 || !isSignedIn) && (
-                  <form onSubmit={handleSaveInlineAddress} className="space-y-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="recipient_name" className="text-xs font-semibold">
-                        Full Name / Recipient Name *
-                      </Label>
-                      <Input
-                        id="recipient_name"
-                        value={formAddress.recipient_name}
-                        onChange={(e) =>
-                          setFormAddress({ ...formAddress, recipient_name: e.target.value })
-                        }
-                        placeholder="John Doe"
-                        required
-                        className="rounded-xl text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="address_line1" className="text-xs font-semibold">
-                        Address Line 1 (Flat, House No, Building, Street) *
-                      </Label>
-                      <Input
-                        id="address_line1"
-                        value={formAddress.address_line1}
-                        onChange={(e) =>
-                          setFormAddress({ ...formAddress, address_line1: e.target.value })
-                        }
-                        placeholder="123 Main Street, Apt 4B"
-                        required
-                        className="rounded-xl text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="address_line2" className="text-xs font-semibold">
-                        Address Line 2 (Landmark / Area / Suite)
-                      </Label>
-                      <Input
-                        id="address_line2"
-                        value={formAddress.address_line2 || ""}
-                        onChange={(e) =>
-                          setFormAddress({ ...formAddress, address_line2: e.target.value })
-                        }
-                        placeholder="Near City Park"
-                        className="rounded-xl text-sm"
-                      />
-                    </div>
-
-                    {/* PIN Code Verification Row */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="postal_code" className="text-xs font-semibold">
-                          PIN Code (6 Digits) *
-                        </Label>
-                        {pinLoading && (
-                          <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Verifying PIN code...</span>
-                          </span>
-                        )}
-                        {pinVerified && !pinLoading && (
-                          <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Verified</span>
-                          </Badge>
-                        )}
-                      </div>
-                      <Input
-                        id="postal_code"
-                        value={formAddress.postal_code}
-                        onChange={(e) => handlePincodeChange(e.target.value)}
-                        placeholder="e.g. 395007 or 380015"
-                        maxLength={6}
-                        required
-                        className={`rounded-xl text-sm ${
-                          pinError
-                            ? "border-rose-500 focus-visible:ring-rose-500"
-                            : pinVerified
-                            ? "border-emerald-500 focus-visible:ring-emerald-500"
-                            : ""
-                        }`}
-                      />
-                      {pinError && (
-                        <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
-                          <AlertCircle className="w-3 h-3" />
-                          <span>{pinError}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* State & City Dropdown Selectors */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="state" className="text-xs font-semibold">
-                          State *
-                        </Label>
-                        <select
-                          id="state"
-                          value={formAddress.state}
-                          onChange={(e) => handleStateChange(e.target.value)}
-                          required
-                          className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shop-orange"
-                        >
-                          <option value="">Select State</option>
-                          {stateOptions.map((stateName) => (
-                            <option key={stateName} value={stateName}>
-                              {stateName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="city" className="text-xs font-semibold">
-                          City / District *
-                        </Label>
-                        <select
-                          id="city"
-                          value={formAddress.city}
-                          onChange={(e) =>
-                            setFormAddress({ ...formAddress, city: e.target.value })
-                          }
-                          disabled={!formAddress.state}
-                          required
-                          className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-shop-orange"
-                        >
-                          <option value="">
-                            {formAddress.state ? "Select City / District" : "Select State First"}
-                          </option>
-                          {availableCities.map((cityName) => (
-                            <option key={cityName} value={cityName}>
-                              {cityName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Fixed Locked Country Field */}
-                    <div className="space-y-1">
-                      <Label htmlFor="country" className="text-xs font-semibold">
-                        Country
-                      </Label>
-                      <Input
-                        id="country"
-                        value="India"
-                        readOnly
-                        disabled
-                        className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500 rounded-xl text-sm font-medium border-slate-200 dark:border-slate-700"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="phone" className="text-xs font-semibold">
-                        Mobile Phone (10 Digits) *
-                      </Label>
-                      <Input
-                        id="phone"
-                        value={formAddress.phone}
-                        onChange={(e) =>
-                          setFormAddress({ ...formAddress, phone: e.target.value })
-                        }
-                        placeholder="9876543210"
-                        maxLength={10}
-                        required
-                        className="rounded-xl text-sm"
-                      />
-                    </div>
-
-                    {isSignedIn && (
-                      <div className="flex items-center space-x-2 pt-1">
-                        <Checkbox
-                          id="is_default"
-                          checked={formAddress.is_default}
-                          onCheckedChange={(checked) =>
-                            setFormAddress({ ...formAddress, is_default: !!checked })
-                          }
-                        />
-                        <Label htmlFor="is_default" className="text-xs font-normal">
-                          Save as default delivery address
-                        </Label>
+                          );
+                        })}
                       </div>
                     )}
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      {savedAddresses.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setShowAddForm(false)}
-                          className="text-xs rounded-xl"
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                      <Button
-                        type="submit"
-                        disabled={savingAddress || pinLoading || !!pinError}
-                        className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-xs"
-                      >
-                        {savingAddress && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                        <span>{isSignedIn ? "Save Address" : "Confirm Delivery Address"}</span>
-                      </Button>
-                    </div>
-                  </form>
+                    {/* 2. Add New / Guest Address Form */}
+                    {!loadingAddresses && (showAddForm || savedAddresses.length === 0 || !isSignedIn) && (
+                      <form onSubmit={handleSaveInlineAddress} className="space-y-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="recipient_name" className="text-xs font-semibold">
+                            Full Name / Recipient Name *
+                          </Label>
+                          <Input
+                            id="recipient_name"
+                            value={formAddress.recipient_name}
+                            onChange={(e) =>
+                              setFormAddress({ ...formAddress, recipient_name: e.target.value })
+                            }
+                            placeholder="e.g. Rahul Sharma"
+                            required
+                            className="rounded-xl text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="address_line1" className="text-xs font-semibold">
+                            Address Line 1 (Flat, House No, Building, Street) *
+                          </Label>
+                          <Input
+                            id="address_line1"
+                            value={formAddress.address_line1}
+                            onChange={(e) =>
+                              setFormAddress({ ...formAddress, address_line1: e.target.value })
+                            }
+                            placeholder="e.g. Flat 402, Royal Residency"
+                            required
+                            className="rounded-xl text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="address_line2" className="text-xs font-semibold">
+                            Address Line 2 (Landmark / Area / Suite)
+                          </Label>
+                          <Input
+                            id="address_line2"
+                            value={formAddress.address_line2 || ""}
+                            onChange={(e) =>
+                              setFormAddress({ ...formAddress, address_line2: e.target.value })
+                            }
+                            placeholder="e.g. Near City Mall, S.G. Highway"
+                            className="rounded-xl text-sm"
+                          />
+                        </div>
+
+                        {/* PIN Code Verification Row */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="postal_code" className="text-xs font-semibold">
+                              PIN Code (6 Digits) *
+                            </Label>
+                            {pinLoading && (
+                              <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span>Verifying PIN code...</span>
+                              </span>
+                            )}
+                            {pinVerified && !pinLoading && (
+                              <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Verified</span>
+                              </Badge>
+                            )}
+                          </div>
+                          <Input
+                            id="postal_code"
+                            value={formAddress.postal_code}
+                            onChange={(e) => handlePincodeChange(e.target.value)}
+                            placeholder="e.g. 380054"
+                            maxLength={6}
+                            required
+                            className={`rounded-xl text-sm ${
+                              pinError
+                                ? "border-rose-500 focus-visible:ring-rose-500"
+                                : pinVerified
+                                ? "border-emerald-500 focus-visible:ring-emerald-500"
+                                : ""
+                            }`}
+                          />
+                          {pinError && (
+                            <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{pinError}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* State & City Dropdown Selectors */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="state" className="text-xs font-semibold">
+                              State *
+                            </Label>
+                            <select
+                              id="state"
+                              value={formAddress.state}
+                              onChange={(e) => handleStateChange(e.target.value)}
+                              required
+                              className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shop-orange"
+                            >
+                              <option value="">Select State</option>
+                              {stateOptions.map((stateName) => (
+                                <option key={stateName} value={stateName}>
+                                  {stateName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label htmlFor="city" className="text-xs font-semibold">
+                              City / District *
+                            </Label>
+                            <select
+                              id="city"
+                              value={formAddress.city}
+                              onChange={(e) =>
+                                setFormAddress({ ...formAddress, city: e.target.value })
+                              }
+                              disabled={!formAddress.state}
+                              required
+                              className="w-full h-10 px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-shop-orange"
+                            >
+                              <option value="">
+                                {formAddress.state ? "Select City / District" : "Select State First"}
+                              </option>
+                              {availableCities.map((cityName) => (
+                                <option key={cityName} value={cityName}>
+                                  {cityName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Fixed Locked Country Field */}
+                        <div className="space-y-1">
+                          <Label htmlFor="country" className="text-xs font-semibold">
+                            Country
+                          </Label>
+                          <Input
+                            id="country"
+                            value="India"
+                            readOnly
+                            disabled
+                            className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500 rounded-xl text-sm font-medium border-slate-200 dark:border-slate-700"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="phone" className="text-xs font-semibold">
+                            Mobile Phone (10 Digits) *
+                          </Label>
+                          <Input
+                            id="phone"
+                            value={formAddress.phone}
+                            onChange={(e) =>
+                              setFormAddress({ ...formAddress, phone: e.target.value })
+                            }
+                            placeholder="e.g. 9876543210"
+                            maxLength={10}
+                            required
+                            className="rounded-xl text-sm"
+                          />
+                        </div>
+
+                        {isSignedIn && (
+                          <div className="flex items-center space-x-2 pt-1">
+                            <Checkbox
+                              id="is_default"
+                              checked={formAddress.is_default}
+                              onCheckedChange={(checked) =>
+                                setFormAddress({ ...formAddress, is_default: !!checked })
+                              }
+                            />
+                            <Label htmlFor="is_default" className="text-xs font-normal">
+                              Save as default delivery address
+                            </Label>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                          {savedAddresses.length > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setShowAddForm(false)}
+                              className="text-xs rounded-xl"
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                          <Button
+                            type="submit"
+                            disabled={savingAddress || pinLoading || !!pinError}
+                            className="bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-xs"
+                          >
+                            {savingAddress && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                            <span>{isSignedIn ? "Save Address" : "Confirm Delivery Address"}</span>
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -912,7 +937,8 @@ function CheckoutContent() {
                 {items.map((cartItem) => {
                   const product = cartItem.product;
                   const productId = product?._id || product?.id || "";
-                  const name = product?.name || "Product Name";
+                  const rawName = product?.name || product?.title || "Product Name";
+                  const { title: name, warranty } = sanitizeProductTitle(rawName);
                   const price = product?.price || 0;
                   const image = getImageUrl(product?.images?.[0] || product?.image);
 
@@ -922,7 +948,14 @@ function CheckoutContent() {
                         <Image src={image} alt={name} fill className="object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 text-xs">
-                        <h4 className="font-bold text-slate-900 dark:text-slate-100 truncate">{name}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-slate-100 truncate" title={name}>
+                          {name}
+                        </h4>
+                        {warranty && (
+                          <span className="inline-flex items-center text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-sm mt-0.5">
+                            {warranty}
+                          </span>
+                        )}
                         <p className="text-slate-500">Qty: {cartItem.quantity}</p>
                       </div>
                       <PriceFormatter amount={price * cartItem.quantity} className="font-bold text-xs text-slate-900 dark:text-slate-100" />
@@ -1011,8 +1044,10 @@ function CheckoutContent() {
                 </div>
 
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span>Estimated GST (Included)</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">₹0</span>
+                  <span>Estimated GST (18% Included)</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    ₹{estimatedGst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
 
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-base font-extrabold text-slate-900 dark:text-slate-100">

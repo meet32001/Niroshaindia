@@ -4,12 +4,57 @@ import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
 import { currentUser } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { sanitizeProductTitle } from '@/lib/utils';
 import type { CustomerOrderOption } from '@/types/contact';
 
 export type { CustomerOrderOption };
 
+export interface EnrichedOrderItem {
+  id: number;
+  quantity: number;
+  unit_price_cents: number;
+  title: string;
+  variant_name: string | null;
+  slug: string;
+  image_url: string;
+  warranty_months?: number;
+  variant_id?: number;
+}
 
-export async function getUserOrders() {
+export interface EnrichedOrder {
+  id: number;
+  order_number: string;
+  created_at: string;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
+  payment_status: string;
+  total_amount_cents: number;
+  shipping_amount_cents?: number;
+  tax_amount_cents?: number;
+  discount_amount_cents?: number;
+  shipping_address_snapshot: {
+    recipient_name?: string;
+    address_line1?: string;
+    address_line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+    phone?: string;
+    carrier?: string;
+    tracking_number?: string;
+    estimated_delivery?: string;
+  } | null;
+  items: EnrichedOrderItem[];
+}
+
+/**
+ * Retrieves deep relational orders with fully normalized items for the authenticated customer.
+ */
+export async function getCustomerOrdersAction(): Promise<{
+  success: boolean;
+  error?: string;
+  orders: EnrichedOrder[];
+}> {
   try {
     const authData = await getAuthenticatedCustomer();
     if (!authData) {
@@ -27,19 +72,31 @@ export async function getUserOrders() {
         payment_status,
         total_amount_cents,
         shipping_amount_cents,
+        tax_amount_cents,
+        discount_amount_cents,
+        shipping_address_snapshot,
         created_at,
         order_items (
           id,
           variant_id,
           quantity,
           unit_price_cents,
+          warranty_months,
           product_variants (
             id,
             sku,
             name,
             price_cents,
-            product_images ( image_url ),
-            products:product_id ( id, name, slug )
+            product_images (
+              image_url,
+              is_featured,
+              sort_order
+            ),
+            products:product_id (
+              id,
+              name,
+              slug
+            )
           )
         )
       `)
@@ -47,23 +104,66 @@ export async function getUserOrders() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[GET USER ORDERS ERROR]:', error);
+      console.error('[GET CUSTOMER ORDERS ERROR]:', error);
       return { success: false, error: error.message, orders: [] };
     }
 
-    const formattedOrders = (orders || []).map((o) => ({
-      ...o,
-      total_cents: o.total_amount_cents,
-      shipping_cents: o.shipping_amount_cents,
-      tax_cents: 0,
-      discount_cents: 0,
-    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const enrichedOrders: EnrichedOrder[] = (orders || []).map((o: any) => {
+      // Normalize items
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items: EnrichedOrderItem[] = (o.order_items || []).map((oi: any) => {
+        const variant = oi.product_variants;
+        const product = variant?.products;
+        const rawTitle = product?.name || variant?.name || 'Electronics Product';
+        const { title } = sanitizeProductTitle(rawTitle);
 
-    return { success: true, orders: formattedOrders };
+        // Resolve primary/featured image with fallback
+        let imageUrl =
+          'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80';
+        if (Array.isArray(variant?.product_images) && variant.product_images.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const featured = variant.product_images.find((img: any) => img.is_featured);
+          imageUrl = (featured || variant.product_images[0])?.image_url || imageUrl;
+        }
+
+        return {
+          id: oi.id,
+          quantity: oi.quantity || 1,
+          unit_price_cents: oi.unit_price_cents || 0,
+          title,
+          variant_name: variant?.name || null,
+          slug: product?.slug || String(product?.id || variant?.id || ''),
+          image_url: imageUrl,
+          warranty_months: oi.warranty_months || 12,
+          variant_id: oi.variant_id || variant?.id,
+        };
+      });
+
+      return {
+        id: o.id,
+        order_number: o.order_number,
+        created_at: o.created_at,
+        status: (o.status || 'processing') as EnrichedOrder['status'],
+        payment_status: o.payment_status || 'paid',
+        total_amount_cents: o.total_amount_cents || 0,
+        shipping_amount_cents: o.shipping_amount_cents || 0,
+        tax_amount_cents: o.tax_amount_cents || 0,
+        discount_amount_cents: o.discount_amount_cents || 0,
+        shipping_address_snapshot: o.shipping_address_snapshot || null,
+        items,
+      };
+    });
+
+    return { success: true, orders: enrichedOrders };
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch orders';
+    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch customer orders';
     return { success: false, error: errorMessage, orders: [] };
   }
+}
+
+export async function getUserOrders() {
+  return await getCustomerOrdersAction();
 }
 
 const orderIdSchema = z.string().min(1, 'Order ID is required');

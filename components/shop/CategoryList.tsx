@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { RotateCcw, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CATEGORY_SLUG_ALIASES } from "@/lib/db/products";
 
 export interface CategoryItem {
   id?: string | number;
@@ -22,6 +23,13 @@ export interface CategoryListProps {
   setSelectedCategory: (category: string | null) => void;
 }
 
+function getCategorySlugs(slug: string | null): string[] {
+  if (!slug) return [];
+  const norm = slug.toLowerCase();
+  const alias = CATEGORY_SLUG_ALIASES[norm] || norm;
+  return Array.isArray(alias) ? [...alias, norm] : [alias, norm];
+}
+
 export function CategoryList({
   categories,
   selectedCategory,
@@ -30,17 +38,19 @@ export function CategoryList({
   // State to track which parent categories are expanded
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
 
+  const activeSlugs = getCategorySlugs(selectedCategory);
+
   // Automatically expand parent if the selectedCategory matches the parent or any child
   useEffect(() => {
     if (!selectedCategory) return;
-    const normSelected = selectedCategory.toLowerCase();
+    const slugs = getCategorySlugs(selectedCategory);
 
     categories.forEach((cat) => {
       const rawParentSlug = typeof cat.slug === "string" ? cat.slug : cat.slug?.current;
       const parentSlug = (rawParentSlug || cat.name || "").toLowerCase();
       const parentKey = String(cat.id || parentSlug);
 
-      if (parentSlug === normSelected) {
+      if (slugs.includes(parentSlug)) {
         setExpandedParents((prev) => ({ ...prev, [parentKey]: true }));
         return;
       }
@@ -49,7 +59,7 @@ export function CategoryList({
         const matchesChild = cat.children.some((child: CategoryItem) => {
           const rawChildSlug = typeof child.slug === "string" ? child.slug : child.slug?.current;
           const childSlug = (rawChildSlug || child.name || "").toLowerCase();
-          return childSlug === normSelected;
+          return slugs.includes(childSlug);
         });
 
         if (matchesChild) {
@@ -92,14 +102,14 @@ export function CategoryList({
           const parentName = cat.name || cat.title || "Category";
           const parentKey = String(cat.id || idx);
 
-          const isParentActive = selectedCategory?.toLowerCase() === parentSlug.toLowerCase();
+          const isParentActive = activeSlugs.includes(parentSlug.toLowerCase());
           const hasChildren = Array.isArray(cat.children) && cat.children.length > 0;
           const isExpanded = Boolean(expandedParents[parentKey]);
 
           // Check if any child of this parent is currently selected
           const isAnyChildActive = hasChildren && cat.children.some((child: CategoryItem) => {
             const rawChildSlug = typeof child.slug === "string" ? child.slug : child.slug?.current;
-            return rawChildSlug?.toLowerCase() === selectedCategory?.toLowerCase();
+            return rawChildSlug && activeSlugs.includes(rawChildSlug.toLowerCase());
           });
 
           return (
@@ -176,8 +186,9 @@ export function CategoryList({
                       typeof child.slug === "string" ? child.slug : child.slug?.current;
                     const childSlug = rawChildSlug || "subcategory";
                     const childName = child.name || child.title || "Subcategory";
-                    const isChildActive =
-                      selectedCategory?.toLowerCase() === childSlug.toLowerCase();
+                    const isChildActive = Boolean(
+                      rawChildSlug && activeSlugs.includes(rawChildSlug.toLowerCase())
+                    );
 
                     return (
                       <button

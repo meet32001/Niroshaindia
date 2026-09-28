@@ -35,7 +35,7 @@ const TRIAGE_CARDS = [
   {
     title: "7-Day Return Policy",
     description: "Instant doorstep pickups for transit damage, technical defects, or missing items.",
-    href: "/returns",
+    href: "/terms#replacement-policy",
     icon: RotateCcw,
     badge: "Hassle-Free",
     cta: "Read Returns Policy",
@@ -44,7 +44,7 @@ const TRIAGE_CARDS = [
   {
     title: "Brand Warranty Claims",
     description: "100% manufacturer warranties with pan-India authorized brand service network support.",
-    href: "/warranty",
+    href: "/terms#brand-warranty",
     icon: ShieldCheck,
     badge: "Official Coverage",
     cta: "Check Warranty",

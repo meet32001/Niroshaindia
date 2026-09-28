@@ -7,6 +7,15 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface AppliedCoupon {
+  code: string;
+  discountPercentage?: number; // e.g. 15 for 15%
+  fixedDiscountCents?: number;
+  eligibleItemIds?: (string | number)[]; // optional: for item-scoped deals
+  isDealCoupon?: boolean;
+  message?: string;
+}
+
 export interface ActiveDealInfo {
   dealId?: number;
   variantId: number;
@@ -19,32 +28,129 @@ export interface ActiveDealInfo {
   isBumper?: boolean;
 }
 
+export interface CartTotals {
+  subtotalCents: number;
+  discountCents: number;
+  shippingCents: number;
+  totalCents: number;
+  estimatedGstCents: number;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  total: number;
+  estimatedGst: number;
+  eligibleItemCount: number;
+}
+
+// Helper to reliably extract product or variant identifier
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getProductId(product: any): string {
+  if (!product) return "";
+  if (product.variant_id) return String(product.variant_id);
+  if (product.selectedVariant?.id) return String(product.selectedVariant.id);
+  return String(product._id || product.id || "");
+}
+
+// Dynamically derive pricing, discounts, taxes, and shipping from current items and active coupon
+export function calculateTotals(items: CartItem[], coupon: AppliedCoupon | null): CartTotals {
+  const subtotalCents = items.reduce((acc, item) => {
+    const p = item.product || {};
+    const priceCents =
+      p.price_cents != null && Number(p.price_cents) > 0
+        ? Number(p.price_cents)
+        : Math.round((Number(p.price) || 0) * 100);
+    return acc + priceCents * Math.max(1, Number(item.quantity) || 1);
+  }, 0);
+
+  let discountCents = 0;
+  let eligibleCount = 0;
+
+  if (coupon && items.length > 0) {
+    if (coupon.discountPercentage && coupon.discountPercentage > 0) {
+      if (coupon.eligibleItemIds && coupon.eligibleItemIds.length > 0) {
+        const eligibleSubtotal = items
+          .filter((i) => {
+            const p = i.product || {};
+            const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id;
+            const pId = p.product_id ?? p.productId ?? p.id ?? p._id;
+            const isMatch = coupon.eligibleItemIds!.some(
+              (id) =>
+                (vId != null && String(id) === String(vId)) ||
+                (pId != null && String(id) === String(pId))
+            );
+            if (isMatch) eligibleCount += i.quantity || 1;
+            return isMatch;
+          })
+          .reduce((acc, i) => {
+            const p = i.product || {};
+            const priceCents =
+              p.price_cents != null && Number(p.price_cents) > 0
+                ? Number(p.price_cents)
+                : Math.round((Number(p.price) || 0) * 100);
+            return acc + priceCents * Math.max(1, Number(i.quantity) || 1);
+          }, 0);
+
+        discountCents = Math.round(eligibleSubtotal * (coupon.discountPercentage / 100));
+      } else {
+        eligibleCount = items.reduce((acc, i) => acc + (i.quantity || 1), 0);
+        discountCents = Math.round(subtotalCents * (coupon.discountPercentage / 100));
+      }
+    } else if (coupon.fixedDiscountCents && coupon.fixedDiscountCents > 0) {
+      eligibleCount = items.reduce((acc, i) => acc + (i.quantity || 1), 0);
+      discountCents = Math.min(coupon.fixedDiscountCents, subtotalCents);
+    }
+  }
+
+  // Strict guard: discount cannot exceed subtotal
+  discountCents = Math.min(discountCents, subtotalCents);
+  const shippingCents = subtotalCents >= 49900 || subtotalCents === 0 ? 0 : 4900; // Free delivery over ₹499
+  const totalCents = Math.max(0, subtotalCents - discountCents + shippingCents);
+
+  // Embedded 18% GST calculation (Base = postDiscount / 1.18, GST = postDiscount - Base)
+  const postDiscountSubtotal = Math.max(0, subtotalCents - discountCents);
+  const estimatedGstCents = Math.round(postDiscountSubtotal - postDiscountSubtotal / 1.18);
+
+  return {
+    subtotalCents,
+    discountCents,
+    shippingCents,
+    totalCents,
+    estimatedGstCents,
+    subtotal: subtotalCents / 100,
+    discount: discountCents / 100,
+    shipping: shippingCents / 100,
+    total: totalCents / 100,
+    estimatedGst: estimatedGstCents / 100,
+    eligibleItemCount: eligibleCount,
+  };
+}
+
 interface StoreState {
   items: CartItem[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   favoriteProduct: any[];
   activeDeal: ActiveDealInfo | null;
+  appliedCoupon: AppliedCoupon | null;
+
   setActiveDeal: (deal: ActiveDealInfo | null) => void;
+  setAppliedCoupon: (coupon: AppliedCoupon | null) => void;
+  removeAppliedCoupon: () => void;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   addItem: (product: any) => void;
   removeItem: (productId: string) => void;
   deleteCartProduct: (productId: string) => void;
   resetCart: () => void;
+
+  getTotals: () => CartTotals;
   getTotalPrice: () => number;
   getSubtotalPrice: () => number;
   getItemCount: (productId: string) => number;
   getGroupedItems: () => CartItem[];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   addToFavorite: (product: any) => void;
   resetFavorite: () => void;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getProductId(product: any): string {
-  if (!product) return "";
-  if (product.variant_id) return String(product.variant_id);
-  if (product.selectedVariant?.id) return String(product.selectedVariant.id);
-  return String(product._id || product.id || "");
 }
 
 export const useStore = create<StoreState>()(
@@ -53,7 +159,37 @@ export const useStore = create<StoreState>()(
       items: [],
       favoriteProduct: [],
       activeDeal: null,
-      setActiveDeal: (deal: ActiveDealInfo | null) => set({ activeDeal: deal }),
+      appliedCoupon: null,
+
+      setActiveDeal: (deal: ActiveDealInfo | null) => {
+        if (deal) {
+          const coupon: AppliedCoupon = {
+            code: deal.couponCode,
+            discountPercentage: deal.discountPercent,
+            eligibleItemIds: [deal.variantId, deal.productId].filter(Boolean) as (string | number)[],
+            isDealCoupon: true,
+            message: `VIP Deal Applied (${deal.discountPercent}% OFF)`,
+          };
+          set({ activeDeal: deal, appliedCoupon: coupon });
+        } else {
+          set({
+            activeDeal: null,
+            appliedCoupon: get().appliedCoupon?.isDealCoupon ? null : get().appliedCoupon,
+          });
+        }
+      },
+
+      setAppliedCoupon: (coupon: AppliedCoupon | null) => {
+        if (!coupon) {
+          set({ appliedCoupon: null, activeDeal: null });
+        } else {
+          set({ appliedCoupon: coupon });
+        }
+      },
+
+      removeAppliedCoupon: () => {
+        set({ appliedCoupon: null, activeDeal: null });
+      },
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       addItem: (product: any) => {
@@ -108,23 +244,38 @@ export const useStore = create<StoreState>()(
         });
       },
 
-      resetCart: () => set({ items: [] }),
+      resetCart: () => {
+        set({ items: [], appliedCoupon: null, activeDeal: null });
+        if (typeof window !== "undefined") {
+          try {
+            const raw = localStorage.getItem("cart-store");
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.state) {
+                parsed.state.items = [];
+                parsed.state.appliedCoupon = null;
+                parsed.state.activeDeal = null;
+                localStorage.setItem("cart-store", JSON.stringify(parsed));
+              }
+            } else {
+              localStorage.removeItem("cart-store");
+            }
+          } catch (e) {
+            console.error("Failed to sync resetCart to localStorage", e);
+          }
+        }
+      },
+
+      getTotals: () => {
+        return calculateTotals(get().items, get().appliedCoupon);
+      },
 
       getTotalPrice: () => {
-        return get().items.reduce((total, item) => {
-          const price = item.product.price || 0;
-          return total + price * item.quantity;
-        }, 0);
+        return calculateTotals(get().items, get().appliedCoupon).total;
       },
 
       getSubtotalPrice: () => {
-        return get().items.reduce((total, item) => {
-          const price = item.product.price || 0;
-          const discount = item.product.discount || 0;
-          const originalPrice =
-            discount > 0 ? price + price * (discount / 100) : price;
-          return total + originalPrice * item.quantity;
-        }, 0);
+        return calculateTotals(get().items, get().appliedCoupon).subtotal;
       },
 
       getItemCount: (productId: string) => {
@@ -161,3 +312,5 @@ export const useStore = create<StoreState>()(
     }
   )
 );
+
+export const useCartStore = useStore;

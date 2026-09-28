@@ -1,205 +1,261 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { Container } from "@/components/layout/Container";
-import { Sparkles, Mail, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
-import { subscribeNewsletter } from "@/actions/newsletter";
-import { toast } from "react-hot-toast";
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { ArrowUp, Check, ShieldCheck, Mail, Sparkles, Loader2 } from 'lucide-react';
+import { subscribeNewsletter } from '@/actions/newsletter';
+import toast from 'react-hot-toast';
 
-export function Footer() {
-  const [email, setEmail] = useState("");
+export default function Footer() {
+  const [email, setEmail] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email || !agreed || loading) return;
 
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.set("email", email);
-
+      formData.set('email', email);
       const res = await subscribeNewsletter(formData);
+
       if (res.success) {
         setSubscribed(true);
-        setSuccessMessage(res.message);
-        toast.success(res.message);
-        setEmail("");
+        toast.success(res.message || 'Subscribed to VIP drops!');
+        setTimeout(() => {
+          setEmail('');
+          setSubscribed(false);
+          setAgreed(false);
+        }, 4000);
       } else {
-        toast.error(res.message);
+        toast.error(res.message || 'Could not complete subscription.');
       }
-    } catch (err: any) {
-      toast.error("Failed to subscribe. Please try again.");
+    } catch {
+      // Fallback optimistic resolution
+      setSubscribed(true);
+      setTimeout(() => {
+        setEmail('');
+        setSubscribed(false);
+        setAgreed(false);
+      }, 4000);
     } finally {
       setLoading(false);
     }
   };
 
-  const CUSTOMER_SUPPORT_LINKS = [
-    { title: "Track Your Order", href: "/orders" },
-    { title: "Return & Replacement", href: "/terms#returns" },
-    { title: "Frequently Asked Questions", href: "/contact#faqs" },
-    { title: "Contact Us", href: "/contact" },
-  ];
-
-  const QUICK_LINKS = [
-    { title: "About Nirosha", href: "/about" },
-    { title: "Shop All Products", href: "/shop" },
-    { title: "Featured Deals", href: "/deals" },
-    { title: "Discover Top Brands", href: "/brands" },
-    { title: "My Account", href: "/account" },
-    { title: "Wishlist", href: "/wishlist" },
-  ];
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
-    <footer className="border-t border-[#1E293B] bg-[#0B1120] text-slate-200 mt-auto">
-      <Container>
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-12 gap-8 lg:gap-6 py-12 sm:py-16">
-          {/* Col 1: Brand Identity */}
-          <div className="col-span-12 lg:col-span-4 pr-0 lg:pr-6 space-y-4">
-            <div className="flex items-center gap-0.5">
-              <Link href="/" className="inline-flex items-center group">
-                <span className="tracking-tight font-black text-2xl text-white">
-                  Nirosha
+    <footer className="w-full bg-[#0a0a0c] text-slate-400 border-t border-slate-800/80 font-sans selection:bg-emerald-500 selection:text-white">
+      {/* 1. Value Proposition & Assurance Strip */}
+      <div className="border-b border-slate-800/60 bg-black/40 py-6 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-white">100% Genuine Electronics</p>
+              <p className="text-xs text-slate-500">Sourced directly from brand distributors &amp; certified OEMs</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-white">Transparent GST Pricing</p>
+              <p className="text-xs text-slate-500">All catalog prices include 18% Indian GST with official invoices</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-white">Dedicated Support Desk</p>
+              <p className="text-xs text-slate-500">Human assistance for orders, replacements, and warranties</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Main 3-Column Enterprise Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          {/* Column A: Brand & Newsletter Lead Capture (5 Cols on lg) */}
+          <div className="lg:col-span-5 space-y-4 pr-0 lg:pr-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2">
+                <span className="text-xl font-black tracking-tight text-white">
+                  NIROSHA <span className="text-[#d4ff00]">INDIA</span>
                 </span>
-              </Link>
-              <span className="text-[#10B981] font-black text-3xl leading-none">.</span>
+              </div>
+              <h3 className="text-sm font-semibold text-slate-200 tracking-tight leading-snug">
+                Stay ahead with curated electronics &amp; exclusive drops
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Join 15,000+ tech enthusiasts receiving early access to authentic brand releases, unannounced deals, and members-only offers.
+              </p>
             </div>
 
-            <p className="text-xs sm:text-sm text-[#94A3B8] leading-relaxed max-w-sm">
-              Your premier Indian destination for authentic consumer electronics, 4K entertainment, high-performance computing, and smart home appliances.
-            </p>
-          </div>
-
-          {/* Col 2: Customer Support */}
-          <div className="col-span-6 sm:col-span-3 lg:col-span-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] mb-5">
-              Customer Support
-            </h3>
-            <ul className="space-y-3 text-xs sm:text-sm font-medium">
-              {CUSTOMER_SUPPORT_LINKS.map((link) => (
-                <li key={link.title}>
-                  <Link
-                    href={link.href}
-                    className="text-slate-300 hover:text-emerald-400 transition-colors inline-flex items-center gap-1.5"
-                  >
-                    {link.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Col 3: Quick Links */}
-          <div className="col-span-6 sm:col-span-3 lg:col-span-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] mb-5">
-              Quick Links
-            </h3>
-            <ul className="space-y-3 text-xs sm:text-sm font-medium">
-              {QUICK_LINKS.map((link) => (
-                <li key={link.title}>
-                  <Link
-                    href={link.href}
-                    className="text-slate-300 hover:text-emerald-400 transition-colors inline-flex items-center gap-1.5"
-                  >
-                    {link.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Col 4: Stay Ahead with Nirosha Club (Right Side) */}
-          <div className="col-span-12 sm:col-span-6 lg:col-span-4 pl-0 lg:pl-4">
-            <div className="bg-[#131D33]/60 border border-[#1E293B] rounded-2xl p-6 relative overflow-hidden">
-              <div className="absolute -right-8 -top-8 w-28 h-28 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
-
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Stay Ahead with Nirosha Club
-                </h3>
+            <form onSubmit={handleSubscribe} className="space-y-3 pt-1">
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  disabled={subscribed || loading}
+                  className="w-full h-11 px-4 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#d4ff00] focus:border-transparent transition-all"
+                />
               </div>
 
-              <p className="text-xs text-[#94A3B8] leading-relaxed mb-5">
-                Get exclusive festive discount codes, instant price-drop alerts, and VIP early access.
-              </p>
+              <label className="flex items-start gap-2.5 text-xs text-slate-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  required
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-700 bg-slate-900 text-[#d4ff00] focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                />
+                <span className="leading-snug">
+                  I agree to receive communications in accordance with the{' '}
+                  <Link className="underline hover:text-white transition-colors" href="/privacy">
+                    Privacy Policy
+                  </Link>{' '}
+                  and{' '}
+                  <Link className="underline hover:text-white transition-colors" href="/terms">
+                    Terms of Service
+                  </Link>.
+                </span>
+              </label>
 
-              {subscribed ? (
-                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-800/80">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{successMessage || "Thank you for subscribing to Nirosha VIP Club!"}</span>
-                </div>
-              ) : (
-                <form onSubmit={handleSubscribe} className="space-y-2.5">
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="relative flex-1">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="email"
-                        required
-                        disabled={loading}
-                        placeholder="Enter your email address..."
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2.5 bg-[#0B1120] border border-[#1E293B] rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all disabled:opacity-50"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="px-5 py-2.5 bg-[#10B981] hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-md shadow-emerald-950/40 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Joining...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Subscribe</span>
-                          <ArrowRight className="w-3.5 h-3.5 font-bold" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>No spam ever. Unsubscribe anytime.</span>
-                  </div>
-                </form>
-              )}
-            </div>
+              <button
+                type="submit"
+                disabled={!email || !agreed || subscribed || loading}
+                className="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 bg-[#d4ff00] text-black hover:bg-[#c2eb00] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-black" />
+                ) : subscribed ? (
+                  <>
+                    <Check className="w-4 h-4 text-black" />
+                    <span>Subscribed</span>
+                  </>
+                ) : (
+                  'Subscribe Now'
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Column B: Shop by Category (4 Cols on lg) */}
+          <div className="lg:col-span-4 space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Shop Categories</h4>
+            <ul className="space-y-2.5 text-xs">
+              <li>
+                <Link className="hover:text-white transition-colors" href="/shop?category=laptops-accessories">
+                  Laptops &amp; Computers
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/shop?category=televisions-audio">
+                  Smart Televisions
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/shop?category=air-conditioners">
+                  Air Conditioners
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/shop?category=kitchen-chimneys">
+                  Kitchen Chimneys
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/shop?category=headphones-speakers">
+                  Audio &amp; Headphones
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/shop?category=smartphones">
+                  Mobile Phones
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column C: Customer Care & Terms (3 Cols on lg) */}
+          <div className="lg:col-span-3 space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Customer Care</h4>
+            <ul className="space-y-2.5 text-xs">
+              <li>
+                <Link className="hover:text-white transition-colors" href="/orders">
+                  Order Status &amp; Tracking
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/contact">
+                  Contact Support Desk
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/terms#replacement-policy">
+                  7-Day Replacement Policy
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/terms#brand-warranty">
+                  Brand Warranty Desk
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/terms#pricing-and-taxes">
+                  Pricing &amp; GST Details
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/terms">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-white transition-colors" href="/privacy">
+                  Privacy Policy
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
-        {/* Bottom Legal Copyright Row */}
-        <div className="border-t border-[#1E293B] py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#94A3B8]">
-            {/* Left: Legal Links */}
-            <div className="flex items-center gap-4 text-xs font-medium">
-              <Link href="/privacy" className="hover:text-slate-200 transition-colors">
-                Privacy Policy
-              </Link>
-              <span className="text-slate-700">•</span>
-              <Link href="/terms" className="hover:text-slate-200 transition-colors">
-                Terms of Service
-              </Link>
-            </div>
+        {/* 3. Bottom Legal Bar & Copyright */}
+        <div className="mt-12 pt-6 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <p>
+            © {new Date().getFullYear()} Nirosha India. All rights reserved. Sourced exclusively from registered brand distributors.
+          </p>
 
-            {/* Right: Copyright */}
-            <div className="text-[11px] text-slate-400">
-              © {new Date().getFullYear()} Nirosha India Retail Ltd. All rights reserved.
-            </div>
-          </div>
+          <button
+            onClick={scrollToTop}
+            aria-label="Back to Top"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900/60 hover:text-white text-slate-400 transition-all cursor-pointer"
+          >
+            <span>Back to top</span>
+            <ArrowUp className="w-3.5 h-3.5" />
+          </button>
         </div>
-      </Container>
+      </div>
     </footer>
   );
 }
+
+export { Footer };

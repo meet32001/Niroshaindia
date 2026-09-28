@@ -15,7 +15,7 @@ const BANNER_SLIDES = [
     headline: "Grab Up to 50% Off On Premium Audio",
     description: "Upgrade your daily listening with noise-cancelling headphones, high-fidelity earbuds, and spatial sound audio.",
     buttonText: "Shop Audio",
-    buttonHref: "/shop?category=gadget",
+    buttonHref: "/shop?category=headphones-speakers",
     image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
   },
   {
@@ -24,7 +24,7 @@ const BANNER_SLIDES = [
     headline: "Supercharge Your Productivity & Workstation",
     description: "Discover ultra-fast M-series & Intel laptops, mechanical keyboards, and 4K color-accurate displays.",
     buttonText: "Explore Laptops",
-    buttonHref: "/shop?category=gadget",
+    buttonHref: "/shop?category=laptops-accessories",
     image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
   },
   {
@@ -33,7 +33,7 @@ const BANNER_SLIDES = [
     headline: "The Latest Flagship Smartphones & Wearables",
     description: "Trade in and upgrade to cutting-edge AMOLED smartwatches, flagship phones, and MagSafe accessories.",
     buttonText: "Discover Phones",
-    buttonHref: "/shop?category=gadget",
+    buttonHref: "/shop?category=smartphones",
     image: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&auto=format&fit=crop&q=80",
   },
   {
@@ -42,7 +42,7 @@ const BANNER_SLIDES = [
     headline: "Modern Living with Intelligent Smart Appliances",
     description: "Energy-efficient smart refrigerators, robotic vacuums, and IoT kitchen appliances at festive rates.",
     buttonText: "Shop Appliances",
-    buttonHref: "/shop?category=appliances",
+    buttonHref: "/shop?category=home-appliances",
     image: "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=800&auto=format&fit=crop&q=80",
   },
 ];
