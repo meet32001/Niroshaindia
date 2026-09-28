@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { ShoppingBag, RotateCcw, ArrowRight, Loader2 } from "lucide-react";
@@ -16,8 +17,17 @@ import { useIsMounted } from "@/hooks/useIsMounted";
 
 export default function CartPage() {
   const { isLoaded, isSignedIn } = useUser();
-  const { items, resetCart, getTotals, appliedCoupon } = useStore();
+  const { items, resetCart, getTotals, appliedCoupon, removeAppliedCoupon } = useStore();
   const isMounted = useIsMounted();
+
+  const totals = getTotals();
+
+  // Auto-purge zombie coupon if cart is empty or discount drops to 0
+  useEffect(() => {
+    if (appliedCoupon && (items.length === 0 || totals.discountCents === 0)) {
+      removeAppliedCoupon();
+    }
+  }, [appliedCoupon, items.length, totals.discountCents, removeAppliedCoupon]);
 
   if (!isLoaded || !isMounted) {
     return (
@@ -36,7 +46,6 @@ export default function CartPage() {
     return <EmptyCart />;
   }
 
-  const totals = getTotals();
   const itemCount = items.reduce((acc, item) => acc + (item.quantity || 1), 0);
 
   const handleResetCart = () => {
@@ -46,9 +55,10 @@ export default function CartPage() {
     }
   };
 
-  const checkoutHref = appliedCoupon
-    ? `/checkout?coupon=${encodeURIComponent(appliedCoupon.code)}`
-    : "/checkout";
+  const checkoutHref =
+    appliedCoupon && totals.discount > 0
+      ? `/checkout?coupon=${encodeURIComponent(appliedCoupon.code)}`
+      : "/checkout";
 
   return (
     <div className="bg-slate-50/50 dark:bg-slate-950 min-h-screen pb-24">

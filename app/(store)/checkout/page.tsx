@@ -32,7 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PriceFormatter } from "@/components/shared/PriceFormatter";
-import { useStore } from "@/store";
+import { useStore, calculateTotals } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { getUserAddresses, saveAddress } from "@/actions/address";
 import { getActiveDeliveryRegions } from "@/actions/deliveryRegions";
@@ -43,6 +43,12 @@ import { verifyIndianPincode } from "@/lib/services/pincode";
 import { INDIAN_STATES, getAvailableCities } from "@/lib/constants/regions";
 import { urlFor } from "@/lib/image";
 import { sanitizeProductTitle } from "@/lib/utils";
+import {
+  PaymentMethodSelector,
+  type PaymentSubmissionData,
+} from "@/components/checkout/PaymentMethodSelector";
+import { BankAuthModal } from "@/components/checkout/BankAuthModal";
+import { processNativeOrderAction } from "@/actions/processNativeOrder";
 
 interface DeliveryStateItem {
   id: string;
@@ -117,14 +123,49 @@ function CheckoutContent() {
 
     // A. Priority: activeDeal from Zustand store
     if (activeDeal) {
-      setAppliedCoupon({
-        valid: true,
-        code: activeDeal.couponCode,
-        discountCents: activeDeal.savingsCents,
-        discountPercent: activeDeal.discountPercent,
-        message: `VIP Deal Applied (${activeDeal.discountPercent}% OFF)`,
+      const isDealItemInCart = items.some((item) => {
+        const p = item.product || {};
+        const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id;
+        const pId = p.product_id ?? p.productId ?? p.id ?? p._id;
+        return (
+          (activeDeal.variantId != null && Number(vId) === Number(activeDeal.variantId)) ||
+          (activeDeal.productId != null && Number(pId) === Number(activeDeal.productId))
+        );
       });
-      return;
+
+      if (isDealItemInCart) {
+        setAppliedCoupon({
+          valid: true,
+          code: activeDeal.couponCode,
+          discountCents: activeDeal.savingsCents,
+          discountPercent: activeDeal.discountPercent,
+          message: `VIP Deal Applied (${activeDeal.discountPercent}% OFF)`,
+        });
+        return;
+      } else {
+        useStore.getState().setActiveDeal(null);
+        setAppliedCoupon(null);
+      }
+    } else if (!couponParam && !variantIdParam && !dealIdParam) {
+      // Sync with Zustand store's appliedCoupon if available and valid
+      const storeCoupon = useStore.getState().appliedCoupon;
+      if (storeCoupon) {
+        const totals = calculateTotals(items, storeCoupon);
+        if (totals.discountCents > 0) {
+          setAppliedCoupon({
+            valid: true,
+            code: storeCoupon.code,
+            discountCents: totals.discountCents,
+            discountPercent: storeCoupon.discountPercentage,
+            message: storeCoupon.message || "Coupon Applied",
+          });
+        } else {
+          setAppliedCoupon(null);
+          useStore.getState().removeAppliedCoupon();
+        }
+      } else {
+        setAppliedCoupon(null);
+      }
     }
 
     // B. Resolve from URL searchParams
@@ -228,6 +269,11 @@ function CheckoutContent() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<PaymentSubmissionData | null>(null);
+  const [orderReference] = useState(
+    () => `NIR-ORD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`
+  );
 
   // Dynamic Database Delivery Regions State
   const [dbStates, setDbStates] = useState<DeliveryStateItem[]>([]);
@@ -335,6 +381,23 @@ function CheckoutContent() {
       isMountedFlag = false;
     };
   }, [isLoaded, isSignedIn]);
+
+  // Auto-purge zombie coupon if present on checkout but gives ₹0 discount or items empty
+  useEffect(() => {
+    if (!isMounted) return;
+    if (items.length === 0) {
+      if (appliedCoupon) setAppliedCoupon(null);
+      if (activeDeal) useStore.getState().setActiveDeal(null);
+      return;
+    }
+    if (appliedCoupon) {
+      const discount = appliedCoupon.discountCents || 0;
+      if (discount === 0) {
+        setAppliedCoupon(null);
+        useStore.getState().removeAppliedCoupon();
+      }
+    }
+  }, [isMounted, appliedCoupon, activeDeal, items]);
 
   // Handle PIN Code Auto-Fill & Lookup
   const handlePincodeChange = async (newPin: string) => {
@@ -466,6 +529,8 @@ function CheckoutContent() {
   const postDiscountSubtotal = Math.max(0, subtotalPrice - (couponDiscountAmount || 0));
   const estimatedGst = Math.round((postDiscountSubtotal - postDiscountSubtotal / 1.18) * 100) / 100;
 
+
+
   const getImageUrl = (img: unknown) => {
     if (!img) return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
     if (typeof img === "string") return img;
@@ -515,22 +580,16 @@ function CheckoutContent() {
     }
   };
 
-  const handleProceedToPayment = async () => {
-    if (!isSignedIn) {
-      sessionStorage.setItem("checkout_guest_address", JSON.stringify({ ...formAddress, country: "India" }));
-      toast.error("Please sign in to complete your order");
-      router.push("/sign-in?redirect=/checkout");
-      return;
-    }
-
-    let targetAddress = savedAddresses.find((a) => a.id === selectedAddressId);
+  // Helper to resolve validated shipping address from saved list or inline form
+  const resolveTargetAddress = () => {
+    let targetAddress = savedAddresses.find((a) => String(a.id) === String(selectedAddressId));
 
     if (!targetAddress && showAddForm) {
       const payload = { ...formAddress, country: "India" };
       const validation = addressSchema.safeParse(payload);
       if (!validation.success) {
         toast.error(validation.error.issues[0]?.message || "Please complete valid shipping address");
-        return;
+        return null;
       }
       targetAddress = payload;
     }
@@ -539,35 +598,144 @@ function CheckoutContent() {
       targetAddress = savedAddresses[0];
     }
 
+    return targetAddress || null;
+  };
+
+  // Called when user clicks "Pay ₹..." or "Confirm Order" inside PaymentMethodSelector
+  const handlePaymentSubmit = async (data: PaymentSubmissionData) => {
+    if (!isSignedIn) {
+      sessionStorage.setItem("checkout_guest_address", JSON.stringify({ ...formAddress, country: "India" }));
+      toast.error("Please sign in to complete your order");
+      router.push("/sign-in?redirect=/checkout");
+      return;
+    }
+
+    const targetAddress = resolveTargetAddress();
     if (!targetAddress) {
       toast.error("Please select or enter a valid delivery address");
       return;
     }
 
-    try {
-      setIsProcessingPayment(true);
-      const orderNumber = `NIR-ORD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-      const metadata = {
-        orderNumber,
-        customerName: targetAddress.recipient_name || user?.fullName || "Customer",
-        customerEmail: user?.primaryEmailAddress?.emailAddress || "",
-        clerkUserId: user?.id || "",
-        address: { ...targetAddress, country: "India" },
-        couponCode: appliedCoupon?.code,
-        discountCents: appliedCoupon?.discountCents,
-      };
+    setPendingPayment(data);
 
-      const checkoutUrl = await createCheckoutSession(items, metadata);
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+    if (data.method === "cod") {
+      // Cash on Delivery bypasses issuing bank 3D-Secure 2FA
+      await handleExecuteOrder(data, targetAddress);
+    } else {
+      // Trigger Indian Issuing Bank RBI 3D-Secure 2.0 2FA modal
+      setShowBankModal(true);
+    }
+  };
+
+  // Zero-Trust order persistence trigger
+  const handleExecuteOrder = async (
+    paymentData: PaymentSubmissionData,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    addressOverride?: any
+  ) => {
+    const targetAddress = addressOverride || resolveTargetAddress();
+    if (!targetAddress) {
+      toast.error("Please complete delivery address details");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const orderItemsPayload = items.map((item) => {
+        const p = item.product || {};
+        const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id ?? p.id;
+        const price = item.product?.price || 0;
+        return {
+          variant_id: Number(vId),
+          quantity: item.quantity,
+          price_cents: Math.round(price * 100),
+        };
+      });
+
+      const idempotencyKey = crypto.randomUUID();
+      const clientTotalCents = Math.round(totalPrice * 100);
+      const discountCents = Math.round((couponDiscountAmount || 0) * 100);
+
+      const res = await processNativeOrderAction({
+        items: orderItemsPayload,
+        idempotency_key: idempotencyKey,
+        idempotencyKey,
+        clientTotalCents,
+        totalAmountCents: clientTotalCents,
+        shipping_address: {
+          recipient_name: targetAddress.recipient_name || targetAddress.full_name || "Customer",
+          address_line1: targetAddress.address_line1 || targetAddress.street_address || "",
+          address_line2: targetAddress.address_line2 || null,
+          city: targetAddress.city || "",
+          state: targetAddress.state || "",
+          postal_code: targetAddress.postal_code || "",
+          country: "India",
+          phone: targetAddress.phone || "",
+        },
+        shippingAddress: {
+          recipient_name: targetAddress.recipient_name || targetAddress.full_name || "Customer",
+          address_line1: targetAddress.address_line1 || targetAddress.street_address || "",
+          address_line2: targetAddress.address_line2 || null,
+          city: targetAddress.city || "",
+          state: targetAddress.state || "",
+          postal_code: targetAddress.postal_code || "",
+          country: "India",
+          phone: targetAddress.phone || "",
+        },
+        payment_method: paymentData.method,
+        paymentMethod: paymentData.method,
+        payment_details: {
+          ...paymentData.details,
+          otp_verified: paymentData.method !== "cod",
+        },
+        paymentDetails: {
+          ...paymentData.details,
+          otp_verified: paymentData.method !== "cod",
+        },
+        coupon_code: appliedCoupon?.code || null,
+        couponCode: appliedCoupon?.code || null,
+        discount_cents: discountCents,
+        discountCents,
+      });
+
+      if (res.success && res.orderNumber) {
+        useStore.getState().resetCart();
+        try {
+          localStorage.removeItem("cart-store");
+        } catch {
+          // ignore
+        }
+        toast.success("Order authorized & placed successfully!");
+        setShowBankModal(false);
+        router.push(`/success?order_number=${res.orderNumber}`);
       } else {
-        toast.error("Failed to initialize Stripe checkout session");
-        setIsProcessingPayment(false);
+        toast.error(res.error || "Order placement failed. Please try again.");
       }
-    } catch (err) {
-      console.error("Payment error:", err);
-      toast.error("An error occurred during payment setup");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Payment execution failed.";
+      toast.error(msg);
+    } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  // Callback from BankAuthModal when 2FA is confirmed
+  const handleBankAuthorize = async () => {
+    if (!pendingPayment) {
+      throw new Error("No active payment method selected.");
+    }
+    await handleExecuteOrder(pendingPayment);
+  };
+
+  // Summary card CTA
+  const handleProceedToPayment = () => {
+    if (pendingPayment) {
+      handlePaymentSubmit(pendingPayment);
+    } else {
+      handlePaymentSubmit({
+        method: "card",
+        details: { mode: "card_default" },
+      });
     }
   };
 
@@ -906,6 +1074,19 @@ function CheckoutContent() {
               </CardContent>
             </Card>
 
+            {/* Indian Multi-Rail Payment Rails Interface */}
+            <PaymentMethodSelector
+              amountCents={Math.round(totalPrice * 100)}
+              onSubmit={handlePaymentSubmit}
+              isSubmitting={isProcessingPayment}
+              orderReference={orderReference}
+              customerPhone={
+                formAddress.phone ||
+                (savedAddresses.length > 0 ? savedAddresses[0].phone : undefined) ||
+                user?.phoneNumbers?.[0]?.phoneNumber
+              }
+            />
+
             {/* Unauthenticated Alert Banner */}
             {!isSignedIn && (
               <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3">
@@ -915,7 +1096,7 @@ function CheckoutContent() {
                     Sign in Checkpoint Required for Payment
                   </h4>
                   <p className="text-amber-700 dark:text-amber-300">
-                    You can draft your shipping address now. Clicking <strong>Proceed to Payment</strong> will securely prompt sign-in via Clerk before initiating payment.
+                    You can draft your shipping address now. Selecting a payment method will securely prompt sign-in via Clerk before initiating payment.
                   </p>
                 </div>
               </div>
@@ -966,7 +1147,7 @@ function CheckoutContent() {
 
               {/* Promo / VIP Coupon Code Entry */}
               <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                {appliedCoupon ? (
+                {appliedCoupon && couponDiscountAmount > 0 ? (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-xs">
                     <div className="flex items-center gap-2">
                       <Ticket className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -1019,7 +1200,7 @@ function CheckoutContent() {
                   <PriceFormatter amount={subtotalPrice} className="font-bold text-slate-900 dark:text-slate-100" />
                 </div>
 
-                {appliedCoupon && (
+                {appliedCoupon && couponDiscountAmount > 0 && (
                   <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
                     <div className="flex items-center gap-1.5">
                       <Ticket className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -1079,6 +1260,29 @@ function CheckoutContent() {
           </div>
         </div>
       </Container>
+
+      {/* RBI 2-Factor Authentication Issuing Bank Modal */}
+      <BankAuthModal
+        isOpen={showBankModal}
+        onClose={() => setShowBankModal(false)}
+        onSuccess={handleBankAuthorize}
+        amountCents={Math.round(totalPrice * 100)}
+        paymentMethodLabel={
+          pendingPayment?.method === "card"
+            ? `Credit / Debit Card (${pendingPayment.details?.card_network || "RuPay / Visa"})`
+            : pendingPayment?.method === "upi"
+            ? "UPI Instant (BHIM / VPA)"
+            : pendingPayment?.method === "netbanking"
+            ? `NetBanking (${pendingPayment?.details?.bank_name || "Online Bank"})`
+            : "Domestic Indian Payment"
+        }
+        customerPhone={
+          formAddress.phone ||
+          (savedAddresses.length > 0 ? savedAddresses[0].phone : undefined) ||
+          user?.phoneNumbers?.[0]?.phoneNumber
+        }
+        orderReference={orderReference}
+      />
     </div>
   );
 }

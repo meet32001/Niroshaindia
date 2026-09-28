@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight, Tag, X, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
@@ -16,6 +16,13 @@ export function CartSummary() {
 
   const totals = getTotals();
   const itemCount = items.reduce((acc, item) => acc + (item.quantity || 1), 0);
+
+  // Auto-purge zombie coupon if present but gives ₹0 discount or cart is empty
+  useEffect(() => {
+    if (appliedCoupon && (items.length === 0 || totals.discountCents === 0)) {
+      removeAppliedCoupon();
+    }
+  }, [appliedCoupon, items.length, totals.discountCents, removeAppliedCoupon]);
 
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,9 +88,10 @@ export function CartSummary() {
     toast.success("Coupon removed");
   };
 
-  const checkoutHref = appliedCoupon
-    ? `/checkout?coupon=${encodeURIComponent(appliedCoupon.code)}`
-    : "/checkout";
+  const checkoutHref =
+    appliedCoupon && totals.discount > 0
+      ? `/checkout?coupon=${encodeURIComponent(appliedCoupon.code)}`
+      : "/checkout";
 
   return (
     <div className="space-y-4">
@@ -99,7 +107,7 @@ export function CartSummary() {
             Promo Code / VIP Coupon
           </label>
 
-          {appliedCoupon ? (
+          {appliedCoupon && totals.discount > 0 ? (
             <div className="flex items-center justify-between p-3 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all">
               <div className="space-y-0.5 min-w-0 pr-2">
                 <div className="flex items-center gap-1.5">

@@ -12,6 +12,7 @@ export interface AppliedCoupon {
   discountPercentage?: number; // e.g. 15 for 15%
   fixedDiscountCents?: number;
   eligibleItemIds?: (string | number)[]; // optional: for item-scoped deals
+  scoped_variant_id?: number; // optional: scoped variant ID
   isDealCoupon?: boolean;
   message?: string;
 }
@@ -66,18 +67,24 @@ export function calculateTotals(items: CartItem[], coupon: AppliedCoupon | null)
   let eligibleCount = 0;
 
   if (coupon && items.length > 0) {
+    const hasScopedFilter =
+      coupon.scoped_variant_id != null ||
+      (coupon.eligibleItemIds && coupon.eligibleItemIds.length > 0);
+
     if (coupon.discountPercentage && coupon.discountPercentage > 0) {
-      if (coupon.eligibleItemIds && coupon.eligibleItemIds.length > 0) {
+      if (hasScopedFilter) {
         const eligibleSubtotal = items
           .filter((i) => {
             const p = i.product || {};
             const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id;
             const pId = p.product_id ?? p.productId ?? p.id ?? p._id;
-            const isMatch = coupon.eligibleItemIds!.some(
-              (id) =>
-                (vId != null && String(id) === String(vId)) ||
-                (pId != null && String(id) === String(pId))
-            );
+            const isMatch =
+              (coupon.scoped_variant_id != null && vId != null && Number(vId) === Number(coupon.scoped_variant_id)) ||
+              (coupon.eligibleItemIds && coupon.eligibleItemIds.some(
+                (id) =>
+                  (vId != null && String(id) === String(vId)) ||
+                  (pId != null && String(id) === String(pId))
+              ));
             if (isMatch) eligibleCount += i.quantity || 1;
             return isMatch;
           })
@@ -125,6 +132,91 @@ export function calculateTotals(items: CartItem[], coupon: AppliedCoupon | null)
   };
 }
 
+/**
+ * Reactively revalidates active coupon & active deal against remaining cart items.
+ * Purges orphaned/zombie coupons when qualifying items are removed or cart is emptied.
+ */
+export function revalidateCouponForItems(
+  items: CartItem[],
+  coupon: AppliedCoupon | null,
+  activeDeal: ActiveDealInfo | null
+): { appliedCoupon: AppliedCoupon | null; activeDeal: ActiveDealInfo | null } {
+  if (items.length === 0) {
+    return { appliedCoupon: null, activeDeal: null };
+  }
+
+  let nextActiveDeal = activeDeal;
+  let nextCoupon = coupon;
+
+  // 1. Check activeDeal eligibility
+  if (nextActiveDeal) {
+    const hasDealItem = items.some((item) => {
+      const p = item.product || {};
+      const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id;
+      const pId = p.product_id ?? p.productId ?? p.id ?? p._id;
+      return (
+        (nextActiveDeal!.variantId != null && Number(vId) === Number(nextActiveDeal!.variantId)) ||
+        (nextActiveDeal!.productId != null && Number(pId) === Number(nextActiveDeal!.productId))
+      );
+    });
+
+    if (!hasDealItem) {
+      nextActiveDeal = null;
+      if (nextCoupon?.isDealCoupon || nextCoupon?.code === activeDeal?.couponCode) {
+        nextCoupon = null;
+      }
+    }
+  }
+
+  // 2. Check coupon eligibility
+  if (nextCoupon) {
+    // A. Check scoped_variant_id
+    if (nextCoupon.scoped_variant_id != null) {
+      const hasScopedItem = items.some((item) => {
+        const p = item.product || {};
+        const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id;
+        return vId != null && Number(vId) === Number(nextCoupon!.scoped_variant_id);
+      });
+      if (!hasScopedItem) {
+        nextCoupon = null;
+      }
+    }
+
+    // B. Check eligibleItemIds
+    if (nextCoupon && nextCoupon.eligibleItemIds && nextCoupon.eligibleItemIds.length > 0) {
+      const hasEligibleItem = items.some((item) => {
+        const p = item.product || {};
+        const vId = p.variant_id ?? p.variantId ?? p.selectedVariant?.id;
+        const pId = p.product_id ?? p.productId ?? p.id ?? p._id;
+        return nextCoupon!.eligibleItemIds!.some(
+          (id) =>
+            (vId != null && String(id) === String(vId)) ||
+            (pId != null && String(id) === String(pId))
+        );
+      });
+      if (!hasEligibleItem) {
+        nextCoupon = null;
+      }
+    }
+
+    // C. Check computed discount for deal / scoped coupons
+    if (
+      nextCoupon &&
+      (nextCoupon.isDealCoupon ||
+        nextCoupon.code.startsWith("VIP-") ||
+        nextCoupon.scoped_variant_id != null ||
+        (nextCoupon.eligibleItemIds && nextCoupon.eligibleItemIds.length > 0))
+    ) {
+      const totals = calculateTotals(items, nextCoupon);
+      if (totals.discountCents <= 0) {
+        nextCoupon = null;
+      }
+    }
+  }
+
+  return { appliedCoupon: nextCoupon, activeDeal: nextActiveDeal };
+}
+
 interface StoreState {
   items: CartItem[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,6 +259,7 @@ export const useStore = create<StoreState>()(
             code: deal.couponCode,
             discountPercentage: deal.discountPercent,
             eligibleItemIds: [deal.variantId, deal.productId].filter(Boolean) as (string | number)[],
+            scoped_variant_id: deal.variantId,
             isDealCoupon: true,
             message: `VIP Deal Applied (${deal.discountPercent}% OFF)`,
           };
@@ -200,17 +293,28 @@ export const useStore = create<StoreState>()(
           (item) => getProductId(item.product) === id
         );
 
+        let updatedItems: CartItem[];
         if (existingItem) {
-          set({
-            items: currentItems.map((item) =>
-              getProductId(item.product) === id
-                ? { ...item, product: { ...item.product, ...product }, quantity: item.quantity + 1 }
-                : item
-            ),
-          });
+          updatedItems = currentItems.map((item) =>
+            getProductId(item.product) === id
+              ? { ...item, product: { ...item.product, ...product }, quantity: item.quantity + 1 }
+              : item
+          );
         } else {
-          set({ items: [...currentItems, { product, quantity: 1 }] });
+          updatedItems = [...currentItems, { product, quantity: 1 }];
         }
+
+        const { appliedCoupon, activeDeal } = revalidateCouponForItems(
+          updatedItems,
+          get().appliedCoupon,
+          get().activeDeal
+        );
+
+        set({
+          items: updatedItems,
+          appliedCoupon,
+          activeDeal,
+        });
       },
 
       removeItem: (productId: string) => {
@@ -219,28 +323,47 @@ export const useStore = create<StoreState>()(
           (item) => getProductId(item.product) === productId
         );
 
+        let updatedItems: CartItem[];
         if (existingItem && existingItem.quantity > 1) {
-          set({
-            items: currentItems.map((item) =>
-              getProductId(item.product) === productId
-                ? { ...item, quantity: item.quantity - 1 }
-                : item
-            ),
-          });
+          updatedItems = currentItems.map((item) =>
+            getProductId(item.product) === productId
+              ? { ...item, quantity: item.quantity - 1 }
+              : item
+          );
         } else {
-          set({
-            items: currentItems.filter(
-              (item) => getProductId(item.product) !== productId
-            ),
-          });
+          updatedItems = currentItems.filter(
+            (item) => getProductId(item.product) !== productId
+          );
         }
+
+        const { appliedCoupon, activeDeal } = revalidateCouponForItems(
+          updatedItems,
+          get().appliedCoupon,
+          get().activeDeal
+        );
+
+        set({
+          items: updatedItems,
+          appliedCoupon,
+          activeDeal,
+        });
       },
 
       deleteCartProduct: (productId: string) => {
+        const updatedItems = get().items.filter(
+          (item) => getProductId(item.product) !== productId
+        );
+
+        const { appliedCoupon, activeDeal } = revalidateCouponForItems(
+          updatedItems,
+          get().appliedCoupon,
+          get().activeDeal
+        );
+
         set({
-          items: get().items.filter(
-            (item) => getProductId(item.product) !== productId
-          ),
+          items: updatedItems,
+          appliedCoupon,
+          activeDeal,
         });
       },
 

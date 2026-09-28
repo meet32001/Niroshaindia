@@ -300,7 +300,7 @@ export async function validateCouponAction(
     const matchWk = code.match(/VIP-DROP-(?:(?:[0-9]{4}-W)|WK)?([0-9]+)/i);
     if (matchWk && matchWk[1]) {
       const codeWeek = parseInt(matchWk[1], 10);
-      if (codeWeek < currentWeekNumber) {
+      if (codeWeek < currentWeekNumber - 1) {
         return {
           valid: false,
           code,
@@ -334,23 +334,16 @@ export async function validateCouponAction(
           ? new Date(weeklyRow.expires_at).getTime() <= Date.now()
           : false;
 
-        if (isExpired) {
-          return {
-            valid: false,
-            code,
-            discountCents: 0,
-            message: 'This VIP deal drop has expired. Please check back for the next Monday drop!',
-          };
-        }
-
-        if (weeklyRow.discount_percent || weeklyRow.discount_pct) {
-          discountPercent = weeklyRow.discount_percent || weeklyRow.discount_pct;
-        }
-        if (Array.isArray(weeklyRow.products)) {
-          for (const p of weeklyRow.products) {
-            if (p.id) dealProductIds.add(String(p.id));
-            if (p.productId) dealProductIds.add(String(p.productId));
-            if (p.variantId) dealVariantIds.add(String(p.variantId));
+        if (!isExpired) {
+          if (weeklyRow.discount_percent || weeklyRow.discount_pct) {
+            discountPercent = weeklyRow.discount_percent || weeklyRow.discount_pct;
+          }
+          if (Array.isArray(weeklyRow.products)) {
+            for (const p of weeklyRow.products) {
+              if (p.id) dealProductIds.add(String(p.id));
+              if (p.productId) dealProductIds.add(String(p.productId));
+              if (p.variantId) dealVariantIds.add(String(p.variantId));
+            }
           }
         }
       }

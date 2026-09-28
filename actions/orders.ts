@@ -43,6 +43,10 @@ export interface EnrichedOrder {
     carrier?: string;
     tracking_number?: string;
     estimated_delivery?: string;
+    payment_method?: string;
+    idempotency_key?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    payment_details?: any;
   } | null;
   items: EnrichedOrderItem[];
 }
@@ -231,6 +235,115 @@ export async function getOrderById(orderId: string) {
     return { success: false, error: errorMessage, order: null };
   }
 }
+
+export async function getOrderByOrderNumberAction(orderNumber: string) {
+  try {
+    if (!orderNumber || typeof orderNumber !== 'string') {
+      return { success: false, error: 'Invalid order number', order: null };
+    }
+
+    const authData = await getAuthenticatedCustomer();
+    if (!authData) {
+      return { success: false, error: 'Unauthenticated', order: null };
+    }
+
+    const { customer, supabaseAdmin } = authData;
+
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        status,
+        payment_status,
+        total_amount_cents,
+        shipping_amount_cents,
+        tax_amount_cents,
+        discount_amount_cents,
+        shipping_address_snapshot,
+        created_at,
+        order_items (
+          id,
+          variant_id,
+          quantity,
+          unit_price_cents,
+          warranty_months,
+          product_variants (
+            id,
+            sku,
+            name,
+            price_cents,
+            product_images (
+              image_url,
+              is_featured,
+              sort_order
+            ),
+            products:product_id (
+              id,
+              name,
+              slug
+            )
+          )
+        )
+      `)
+      .eq('order_number', orderNumber.trim())
+      .eq('customer_id', customer.id)
+      .maybeSingle();
+
+    if (error || !order) {
+      console.warn('[GET ORDER BY ORDER NUMBER NOTICE]:', error?.message || 'Order not found for customer');
+      return { success: false, error: 'Order not found or unauthorized access', order: null };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: EnrichedOrderItem[] = (order.order_items || []).map((oi: any) => {
+      const variant = oi.product_variants;
+      const product = variant?.products;
+      const rawTitle = product?.name || variant?.name || 'Electronics Product';
+      const { title } = sanitizeProductTitle(rawTitle);
+
+      let imageUrl =
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80';
+      if (Array.isArray(variant?.product_images) && variant.product_images.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const featured = variant.product_images.find((img: any) => img.is_featured);
+        imageUrl = (featured || variant.product_images[0])?.image_url || imageUrl;
+      }
+
+      return {
+        id: oi.id,
+        quantity: oi.quantity || 1,
+        unit_price_cents: oi.unit_price_cents || 0,
+        title,
+        variant_name: variant?.name || null,
+        slug: product?.slug || String(product?.id || variant?.id || ''),
+        image_url: imageUrl,
+        warranty_months: oi.warranty_months || 12,
+        variant_id: oi.variant_id || variant?.id,
+      };
+    });
+
+    const enrichedOrder: EnrichedOrder = {
+      id: order.id,
+      order_number: order.order_number,
+      created_at: order.created_at,
+      status: (order.status || 'processing') as EnrichedOrder['status'],
+      payment_status: order.payment_status || 'paid',
+      total_amount_cents: order.total_amount_cents || 0,
+      shipping_amount_cents: order.shipping_amount_cents || 0,
+      tax_amount_cents: order.tax_amount_cents || 0,
+      discount_amount_cents: order.discount_amount_cents || 0,
+      shipping_address_snapshot: order.shipping_address_snapshot || null,
+      items,
+    };
+
+    return { success: true, order: enrichedOrder };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order details';
+    return { success: false, error: errorMessage, order: null };
+  }
+}
+
 
 export async function getCustomerOrdersForSelectAction(userEmail?: string): Promise<{
   success: boolean;
