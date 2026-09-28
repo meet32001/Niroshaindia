@@ -94,10 +94,12 @@ export async function submitContactInquiryAction(
 
     // 6. Graceful Resend Email Dispatch
     const resendApiKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.RESEND_FROM_EMAIL;
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+    const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
+
     if (resendApiKey) {
       const resend = new Resend(resendApiKey);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "Nirosha Support <onboarding@resend.dev>";
-      const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || "niroshaindia26@gmail.com";
       const typeLabel = INQUIRY_TYPE_LABELS[inquiry_type] || inquiry_type;
       const istTimestamp =
         new Date().toLocaleString("en-IN", {
@@ -107,87 +109,103 @@ export async function submitContactInquiryAction(
         }) + " IST";
 
       // 6a. Dispatch Admin Alert
-      try {
-        const adminResult = await resend.emails.send({
-          from: fromEmail,
-          to: [ADMIN_EMAIL],
-          subject: `[New Support Ticket] #${ticketId}: ${typeLabel} - ${name}`,
-          html: `
-            <div style="font-family: sans-serif; padding: 20px; line-height: 1.5; color: #1e293b; background-color: #ffffff;">
-              <h2 style="color: #0f172a; margin-top: 0;">New Support Ticket: #${ticketId}</h2>
-              <p><strong>Customer Name:</strong> ${name}</p>
-              <p><strong>Customer Email:</strong> ${email}</p>
-              <p><strong>Phone:</strong> ${cleanPhone || phone || "Not provided"}</p>
-              <p><strong>Inquiry Type:</strong> ${typeLabel}</p>
-              <p><strong>Associated Order #:</strong> ${order_number || "N/A"}</p>
-              <p><strong>Message:</strong></p>
-              <blockquote style="background: #f1f5f9; padding: 12px; border-left: 4px solid #0f172a; margin: 12px 0;">
-                ${message}
-              </blockquote>
-              <p style="font-size: 12px; color: #64748b;">Submitted at: ${istTimestamp}</p>
-            </div>
-          `,
-        });
+      if (!adminEmail) {
+        console.warn(
+          "[Config Error]: ADMIN_NOTIFICATION_EMAIL is not set in environment. Skipping admin notification dispatch."
+        );
+      } else if (!fromEmail) {
+        console.warn(
+          "[Config Error]: RESEND_FROM_EMAIL is not set in environment. Skipping admin notification dispatch."
+        );
+      } else {
+        try {
+          const adminResult = await resend.emails.send({
+            from: fromEmail,
+            to: [adminEmail],
+            subject: `[New Support Ticket] #${ticketId}: ${typeLabel} - ${name}`,
+            html: `
+              <div style="font-family: sans-serif; padding: 20px; line-height: 1.5; color: #1e293b; background-color: #ffffff;">
+                <h2 style="color: #0f172a; margin-top: 0;">New Support Ticket: #${ticketId}</h2>
+                <p><strong>Customer Name:</strong> ${name}</p>
+                <p><strong>Customer Email:</strong> ${email}</p>
+                <p><strong>Phone:</strong> ${cleanPhone || phone || "Not provided"}</p>
+                <p><strong>Inquiry Type:</strong> ${typeLabel}</p>
+                <p><strong>Associated Order #:</strong> ${order_number || "N/A"}</p>
+                <p><strong>Message:</strong></p>
+                <blockquote style="background: #f1f5f9; padding: 12px; border-left: 4px solid #0f172a; margin: 12px 0;">
+                  ${message}
+                </blockquote>
+                <p style="font-size: 12px; color: #64748b;">Submitted at: ${istTimestamp}</p>
+              </div>
+            `,
+          });
 
-        if (adminResult.error) {
-          console.error("ADMIN EMAIL FAILED TO SEND:", adminResult.error.message || adminResult.error);
-          if (adminResult.error.message?.includes("testing emails to your own email address")) {
-            console.warn(
-              "\n⚠️ [RESEND SANDBOX RESTRICTION]:\n" +
-              `You are sending from '${fromEmail}'. Resend sandbox strictly restricts outgoing emails to your account's registered address.\n` +
-              `Attempted recipient: '${ADMIN_EMAIL}'.\n` +
-              "How to resolve:\n" +
-              "1. Testing: In Resend Dashboard (resend.com/emails), invite 'niroshaindia26@gmail.com' to your Team / Audience, or set ADMIN_NOTIFICATION_EMAIL in .env.local to your registered Resend email.\n" +
-              "2. Production: Verify 'niroshaindia.com' in Resend (resend.com/domains) and set RESEND_FROM_EMAIL='support@niroshaindia.com'.\n"
-            );
+          if (adminResult.error) {
+            console.error("ADMIN EMAIL FAILED TO SEND:", adminResult.error.message || adminResult.error);
+            if (adminResult.error.message?.includes("testing emails to your own email address")) {
+              console.warn(
+                "\n⚠️ [RESEND SANDBOX RESTRICTION]:\n" +
+                `You are sending from '${fromEmail}'. Resend sandbox strictly restricts outgoing emails to your account's registered address.\n` +
+                `Attempted recipient: '${adminEmail}'.\n` +
+                "To resolve, verify your custom domain in Resend Dashboard (resend.com/domains) or set ADMIN_NOTIFICATION_EMAIL to your verified sandbox recipient.\n"
+              );
+            }
+          } else {
+            console.log("Admin email dispatch result:", adminResult);
           }
-        } else {
-          console.log("Admin email dispatch result:", adminResult);
+        } catch (adminErr: unknown) {
+          const errMsg = adminErr instanceof Error ? adminErr.message : String(adminErr);
+          console.error("ADMIN EMAIL FAILED TO SEND:", errMsg);
         }
-      } catch (adminErr: unknown) {
-        const errMsg = adminErr instanceof Error ? adminErr.message : String(adminErr);
-        console.error("ADMIN EMAIL FAILED TO SEND:", errMsg);
       }
 
       // 6b. Dispatch Customer Confirmation
-      try {
-        const customerResult = await resend.emails.send({
-          from: fromEmail,
-          to: [email],
-          subject: `Ticket Received: #${ticketId} — Nirosha India Support`,
-          html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
-              <h2 style="color: #0f172a; margin-top: 0;">We've received your request!</h2>
-              <p>Hi <strong>${name}</strong>,</p>
-              <p>Thank you for reaching out to Nirosha India Customer Support. Your inquiry has been routed to our live triage desk with the reference ticket below:</p>
-              
-              <div style="background-color: #f8fafc; border-left: 4px solid #059669; padding: 16px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; font-size: 13px; text-transform: uppercase; color: #64748b; font-weight: 600;">Assigned Ticket ID</p>
-                <p style="margin: 4px 0 0 0; font-size: 24px; font-weight: 800; color: #059669; letter-spacing: 1px;">#${ticketId}</p>
-                <p style="margin: 8px 0 0 0; font-size: 14px; color: #334155;"><strong>Topic:</strong> ${typeLabel}</p>
-                ${order_number ? `<p style="margin: 4px 0 0 0; font-size: 14px; color: #334155;"><strong>Order Number:</strong> ${order_number}</p>` : ""}
+      if (!fromEmail) {
+        console.warn(
+          "[Config Error]: RESEND_FROM_EMAIL is not set in environment. Skipping customer confirmation dispatch."
+        );
+      } else {
+        try {
+          const customerResult = await resend.emails.send({
+            from: fromEmail,
+            to: [email],
+            subject: `Ticket Received: #${ticketId} — Nirosha India Support`,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #0f172a; margin-top: 0;">We've received your request!</h2>
+                <p>Hi <strong>${name}</strong>,</p>
+                <p>Thank you for reaching out to Nirosha India Customer Support. Your inquiry has been routed to our live triage desk with the reference ticket below:</p>
+                
+                <div style="background-color: #f8fafc; border-left: 4px solid #059669; padding: 16px; margin: 20px 0; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 13px; text-transform: uppercase; color: #64748b; font-weight: 600;">Assigned Ticket ID</p>
+                  <p style="margin: 4px 0 0 0; font-size: 24px; font-weight: 800; color: #059669; letter-spacing: 1px;">#${ticketId}</p>
+                  <p style="margin: 8px 0 0 0; font-size: 14px; color: #334155;"><strong>Topic:</strong> ${typeLabel}</p>
+                  ${order_number ? `<p style="margin: 4px 0 0 0; font-size: 14px; color: #334155;"><strong>Order Number:</strong> ${order_number}</p>` : ""}
+                </div>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+                  Expected response time: 24–48 business hours (Mon–Sat, 09:00 AM – 08:00 PM IST).
+                </p>
+
+                ${supportEmail ? `
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+                  <p style="margin: 0;">Nirosha India • Customer Support Desk</p>
+                  <p style="margin: 4px 0 0 0;">Official customer service channel: ${supportEmail}</p>
+                </div>
+                ` : ""}
               </div>
+            `,
+          });
 
-              <p style="font-size: 14px; line-height: 1.6; color: #475569;">
-                Expected response time: 24–48 business hours (Mon–Sat, 09:00 AM – 08:00 PM IST).
-              </p>
-
-              <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-                <p style="margin: 0;">Nirosha India • Customer Support Desk</p>
-                <p style="margin: 4px 0 0 0;">Official customer service channel: support@niroshaindia.com</p>
-              </div>
-            </div>
-          `,
-        });
-
-        if (customerResult.error) {
-          console.warn("Customer confirmation email error:", customerResult.error.message || customerResult.error);
-        } else {
-          console.log("Customer email dispatch result:", customerResult);
+          if (customerResult.error) {
+            console.warn("Customer confirmation email error:", customerResult.error.message || customerResult.error);
+          } else {
+            console.log("Customer email dispatch result:", customerResult);
+          }
+        } catch (customerErr: unknown) {
+          const errMsg = customerErr instanceof Error ? customerErr.message : String(customerErr);
+          console.warn("Customer confirmation email error (non-blocking):", errMsg);
         }
-      } catch (customerErr: unknown) {
-        const errMsg = customerErr instanceof Error ? customerErr.message : String(customerErr);
-        console.warn("Customer confirmation email error (non-blocking):", errMsg);
       }
     }
 
@@ -198,9 +216,12 @@ export async function submitContactInquiryAction(
     };
   } catch (err) {
     console.error("Unhandled error in submitContactInquiryAction:", err);
+    const fallbackSupportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
     return {
       success: false,
-      message: "An unexpected error occurred. Please try again or email us directly at support@niroshaindia.com.",
+      message: fallbackSupportEmail
+        ? `An unexpected error occurred. Please try again or email us directly at ${fallbackSupportEmail}.`
+        : "An unexpected error occurred. Please try again or contact customer support.",
     };
   }
 }

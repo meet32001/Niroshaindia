@@ -62,6 +62,8 @@ const TRIAGE_CARDS = [
 ];
 
 export default function ContactPage() {
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@niroshaindia.com";
+
   return (
     <div className="bg-slate-50/70 dark:bg-slate-950 min-h-screen py-10 sm:py-16">
       <Container className="space-y-12">
@@ -158,10 +160,10 @@ export default function ContactPage() {
                     Direct Inquiries
                   </span>
                   <a
-                    href="mailto:support@niroshaindia.com"
+                    href={`mailto:${supportEmail}`}
                     className="text-base sm:text-lg font-extrabold text-emerald-600 dark:text-emerald-400 hover:underline tracking-tight"
                   >
-                    support@niroshaindia.com
+                    {supportEmail}
                   </a>
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">

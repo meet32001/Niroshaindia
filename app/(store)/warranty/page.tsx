@@ -8,6 +8,8 @@ export const metadata = {
 };
 
 export default function WarrantyPage() {
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@niroshaindia.com";
+
   return (
     <div className="bg-slate-50 dark:bg-slate-950 min-h-screen py-12 sm:py-16">
       <Container className="max-w-4xl">
@@ -80,7 +82,7 @@ export default function WarrantyPage() {
                 4. Need Assistance with Brand Service?
               </h2>
               <p>
-                If you face any issues claiming warranty with a manufacturer, Nirosha India customer care will step in to escalate with brand liaisons on your behalf. Please reach out to our dedicated support team at <Link href="/contact" className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Support Desk</Link> or email <strong>support@niroshaindia.com</strong>.
+                If you face any issues claiming warranty with a manufacturer, Nirosha India customer care will step in to escalate with brand liaisons on your behalf. Please reach out to our dedicated support team at <Link href="/contact" className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Support Desk</Link> or email <strong>{supportEmail}</strong>.
               </p>
             </section>
           </div>

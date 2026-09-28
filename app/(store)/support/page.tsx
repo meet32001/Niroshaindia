@@ -8,6 +8,8 @@ export const metadata = {
 };
 
 export default function SupportPage() {
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@niroshaindia.com";
+
   return (
     <div className="bg-slate-50 dark:bg-slate-950 min-h-screen py-12 sm:py-16">
       <Container className="max-w-4xl">
@@ -44,10 +46,10 @@ export default function SupportPage() {
                 Send queries regarding bulk orders, cancellations, or returns. Typical response within 4 to 6 business hours.
               </p>
               <a
-                href="mailto:support@niroshaindia.com"
+                href={`mailto:${supportEmail}`}
                 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
               >
-                support@niroshaindia.com <ArrowRight className="w-3 h-3" />
+                {supportEmail} <ArrowRight className="w-3 h-3" />
               </a>
             </div>
 
