@@ -6,18 +6,19 @@ import { syncUserToSupabase } from '@/lib/db/sync-user';
 export async function syncCurrentCustomer() {
   try {
     const { userId } = await auth();
-    console.log('[SYNC] Checking auth state... userId:', userId);
+    console.log('[SYNC] Checking auth state...');
 
     if (!userId) {
-      console.warn('[SYNC] No active userId found.');
+      console.warn('[SYNC] No active session found.');
       return { success: false, reason: 'No session' };
     }
 
     const user = await currentUser();
     if (!user) {
-      console.warn('[SYNC] currentUser() returned null for userId:', userId);
+      console.warn('[SYNC] currentUser() returned null for active session');
       return { success: false, reason: 'User not found in Clerk' };
     }
+
 
     const email =
       user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress ||

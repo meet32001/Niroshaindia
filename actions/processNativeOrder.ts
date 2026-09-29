@@ -5,6 +5,7 @@ import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { validateCouponAction, CartItemForCouponValidation } from '@/actions/deals';
 import { selectWeeklyDeals } from '@/lib/deals/deal-selector';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 // In-memory mutex / lock set to prevent concurrent duplicate submissions for identical idempotency keys
 const activeSubmissionLocks = new Set<string>();
@@ -80,12 +81,36 @@ export async function processNativeOrderAction(
     };
   }
 
+  // 1b. Abuse Mitigation: IP-based Rate Limiting (max 10 checkout attempts per 10 mins)
+  const clientIp = await getClientIp();
+  const rateLimit = checkRateLimit('checkout', clientIp, { windowMs: 10 * 60 * 1000, max: 10 });
+  if (!rateLimit.success) {
+    return {
+      success: false,
+      code: 'RATE_LIMIT_EXCEEDED',
+      error: 'Too many checkout attempts. Please wait a few minutes before trying again.',
+    };
+  }
+
   const data = validation.data;
   const items = data.items;
   const idempotency_key = data.idempotency_key || data.idempotencyKey || crypto.randomUUID();
   const rawTotal = data.totalAmountCents ?? data.clientTotalCents ?? 0;
   const shipping_address = data.shipping_address || data.shippingAddress;
-  const payment_method = (data.payment_method || data.paymentMethod || 'card').toLowerCase();
+
+  // Allowlist payment method — reject any non-enumerated value (e.g. "free", "admin", "")
+  const ALLOWED_PAYMENT_METHODS = ['card', 'upi', 'netbanking', 'cod'] as const;
+  type AllowedPaymentMethod = typeof ALLOWED_PAYMENT_METHODS[number];
+  const rawPaymentMethod = (data.payment_method || data.paymentMethod || 'card').toLowerCase();
+  if (!ALLOWED_PAYMENT_METHODS.includes(rawPaymentMethod as AllowedPaymentMethod)) {
+    return {
+      success: false,
+      code: 'VALIDATION_ERROR',
+      error: 'Invalid payment method.',
+    };
+  }
+  const payment_method = rawPaymentMethod as AllowedPaymentMethod;
+
   const payment_details = data.payment_details || data.paymentDetails || {};
   const coupon_code = data.couponCode || data.coupon_code || null;
   const rawDiscountCents = data.discountCents ?? data.discount_cents ?? 0;
@@ -97,6 +122,24 @@ export async function processNativeOrderAction(
       error: 'Valid delivery shipping address is required.',
     };
   }
+
+  // COD Unboxing Policy — server-side enforcement.
+  // The checkbox is shown client-side, but the server must independently verify
+  // that `payment_details.unboxing_policy_agreed === true` was submitted by the caller.
+  // An attacker who bypasses the frontend and POSTs directly without the flag will
+  // have their COD order rejected, preventing dispute waiver bypass.
+  if (payment_method === 'cod') {
+    const detailsObj = payment_details as Record<string, unknown>;
+    if (detailsObj.unboxing_policy_agreed !== true) {
+      return {
+        success: false,
+        code: 'COD_POLICY_VIOLATION',
+        error:
+          'COD orders require acknowledgement of the mandatory unboxing video policy. Please tick the checkbox and try again.',
+      };
+    }
+  }
+
 
   // 2. Concurrency Lock & Replay Attack Defense
   if (activeSubmissionLocks.has(idempotency_key)) {
@@ -232,7 +275,6 @@ export async function processNativeOrderAction(
           variantId: vli.variant.id,
           price_cents: vli.unitPriceCents,
           quantity: vli.quantity,
-          isDeal: true,
         }));
 
         const couponRes = await validateCouponAction(
@@ -322,33 +364,33 @@ export async function processNativeOrderAction(
         }
       }
 
-      // Reconcile discount:
+      // Reconcile discount: Zero-Trust baseline enforcement
       const isVipPromo = cleanCoupon.startsWith('VIP-') || cleanCoupon.includes('DEAL') || cleanCoupon.includes('DROP');
       const baselineServerDiscount = Math.max(serverValidatedDiscount, dbCouponDiscount, weeklyDealDiscount);
 
-      if (rawDiscountCents > 0 && isVipPromo) {
-        // VIP promotional deal item discount from weekly drops:
-        // As long as rawDiscountCents does not exceed standard 40% VIP limit, adopt client's deal discount for exact float paise alignment
-        const maxAllowedPromoDiscount = Math.round(authoritativeSubtotalCents * 0.40);
-        if (rawDiscountCents <= maxAllowedPromoDiscount) {
-          calculatedDiscountCents = rawDiscountCents;
-        } else {
-          calculatedDiscountCents = baselineServerDiscount > 0 ? baselineServerDiscount : maxAllowedPromoDiscount;
-        }
-      } else if (baselineServerDiscount > 0) {
+      if (baselineServerDiscount > 0) {
         calculatedDiscountCents = baselineServerDiscount;
-        // If client passed discountCents that matches within tolerance or percentage, align to client for sub-paisa precision
+        // Float-to-paise alignment: if client calculated fractional paise within close tolerance (10 paise or 2%), align to client
         if (
           rawDiscountCents > 0 &&
-          Math.abs(rawDiscountCents - baselineServerDiscount) <= Math.max(5, Math.round(baselineServerDiscount * 0.08))
+          Math.abs(rawDiscountCents - baselineServerDiscount) <= Math.max(10, Math.round(baselineServerDiscount * 0.02))
         ) {
           calculatedDiscountCents = rawDiscountCents;
         }
+      } else {
+        // Zero-Trust: If server found 0 eligible discount, reject client-claimed discount completely
+        calculatedDiscountCents = 0;
       }
-    }
 
-    // Ensure discount never exceeds total subtotal
-    calculatedDiscountCents = Math.min(calculatedDiscountCents, authoritativeSubtotalCents);
+      // Hard mathematical caps:
+      // 1. If VIP promo, enforce maximum 40% cap on promotional discount
+      if (isVipPromo) {
+        const maxPromoDiscount = Math.round(authoritativeSubtotalCents * 0.40);
+        calculatedDiscountCents = Math.min(calculatedDiscountCents, maxPromoDiscount);
+      }
+      // 2. Discount can never exceed subtotal (prevent negative order totals)
+      calculatedDiscountCents = Math.max(0, Math.min(calculatedDiscountCents, authoritativeSubtotalCents));
+    }
 
     // 7. Canonical Total & 18% GST (Indian Statutory Inclusivity)
     const shippingCents = 0;
@@ -465,8 +507,14 @@ export async function processNativeOrderAction(
       alreadyProcessed: false,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Internal Server Error';
-    console.error('[ORDER PROCESS EXCEPTION]:', err);
+    const errorId = crypto.randomUUID();
+    console.error(`[Error ID: ${errorId}] [ORDER PROCESS EXCEPTION]:`, err);
+    const errorMsg =
+      process.env.NODE_ENV === "production"
+        ? `An unexpected error occurred while processing your order (Ref: ${errorId.slice(0, 8)}). Please try again or contact customer support.`
+        : err instanceof Error
+        ? err.message
+        : "Internal Server Error";
     return {
       success: false,
       code: 'SERVER_EXCEPTION',

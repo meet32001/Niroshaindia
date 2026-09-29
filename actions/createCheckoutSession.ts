@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 import { CartItem } from "@/store";
 import { urlFor } from "@/lib/image";
@@ -8,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { validateCouponAction, CartItemForCouponValidation } from "@/actions/deals";
 import { MOCK_PRODUCTS } from "@/lib/db/products";
 import { persistCompletedOrder } from "@/lib/orders/persistence";
+
 
 export interface CheckoutMetadata {
   orderNumber: string;
@@ -399,10 +401,19 @@ export async function createCheckoutSession(
 }
 
 /**
- * Retrieve verified session details from Stripe for the /success confirmation page
+ * Retrieve verified session details from Stripe for the /success confirmation page.
+ * Requires an active Clerk session — prevents unauthenticated retrieval of
+ * customer PII (name, email, delivery address) via a guessed / intercepted session ID.
  */
 export async function getOrderSuccessDetails(sessionId: string) {
   try {
+    // Auth guard: unauthenticated callers must not retrieve PII from Stripe sessions
+    const { userId } = await auth();
+    if (!userId) {
+      console.warn('[AUTH] getOrderSuccessDetails called without an active session');
+      return null;
+    }
+
     if (!sessionId) return null;
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["line_items", "line_items.data.price.product"],
@@ -446,3 +457,4 @@ export async function getOrderSuccessDetails(sessionId: string) {
     return null;
   }
 }
+
