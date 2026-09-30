@@ -78,6 +78,7 @@ const nextConfig: NextConfig = {
       font-src 'self' https://fonts.gstatic.com data:;
       connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com https://api.postalpincode.in;
       frame-src 'self' https://challenges.cloudflare.com;
+      worker-src 'self' blob:;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
