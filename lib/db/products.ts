@@ -732,13 +732,16 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
 
     // 2. Resolve Brand Filter (direct indexed lookup on products.brand_id)
     if (brand) {
-      const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
+      const brandList = brand
+        .split(",")
+        .map((b) => b.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+        .filter(Boolean);
       let { data: matchedBrands } = await supabase
         .from("brands")
         .select("id, slug")
         .in("slug", brandList);
 
-      if (!matchedBrands || matchedBrands.length === 0) {
+      if ((!matchedBrands || matchedBrands.length === 0) && brandList.length > 0) {
         // Fallback: match via ILIKE on slug or name
         const orClauses = brandList.map((b) => `slug.ilike.${b},name.ilike.${b}`).join(",");
         const { data: ilikeBrands } = await supabase
@@ -756,9 +759,12 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
       }
     }
 
-    // 3. Search filter
+    // 3. Search filter (sanitized to prevent wildcard or PostgREST operator injection)
     if (search) {
-      query = query.ilike("name", `%${search}%`);
+      const sanitizedSearch = search.replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
+      if (sanitizedSearch) {
+        query = query.ilike("name", `%${sanitizedSearch}%`);
+      }
     }
 
     // 4. Price range filter (via joined variants inner join)
@@ -797,13 +803,16 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
 
       // Resolve Brand Filter
       if (brand) {
-        const brandList = brand.split(",").map((b) => b.trim().toLowerCase()).filter(Boolean);
+        const brandList = brand
+          .split(",")
+          .map((b) => b.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+          .filter(Boolean);
         let { data: matchedBrands } = await supabase
           .from("brands")
           .select("id, slug")
           .in("slug", brandList);
 
-        if (!matchedBrands || matchedBrands.length === 0) {
+        if ((!matchedBrands || matchedBrands.length === 0) && brandList.length > 0) {
           const orClauses = brandList.map((b) => `slug.ilike.${b},name.ilike.${b}`).join(",");
           const { data: ilikeBrands } = await supabase
             .from("brands")
@@ -819,9 +828,12 @@ export async function getShopCatalog(params: ShopCatalogParams = {}): Promise<Sh
         }
       }
 
-      // Resolve Search Filter
+      // Resolve Search Filter (sanitized)
       if (search) {
-        idQuery = idQuery.ilike("name", `%${search}%`);
+        const sanitizedSearch = search.replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
+        if (sanitizedSearch) {
+          idQuery = idQuery.ilike("name", `%${sanitizedSearch}%`);
+        }
       }
 
       // Resolve Price Boundaries directly on products min_price_cents

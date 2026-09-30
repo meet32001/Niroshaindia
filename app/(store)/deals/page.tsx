@@ -6,7 +6,7 @@ import { DealsCountdown } from "@/components/deals/DealsCountdown";
 import { DealsCouponBar } from "@/components/deals/DealsCouponBar";
 import { ClaimDealButton } from "@/components/deals/ClaimDealButton";
 import { selectWeeklyDeals, SelectedDealProduct } from "@/lib/deals/deal-selector";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata = {
   title: "VIP Weekly Deals & Bumper Offers | Nirosha India",
@@ -53,14 +53,8 @@ async function getActiveWeeklyDeals(): Promise<ActiveWeeklyDealsResult> {
   // Intermission window: Sunday 23:59:59 IST until Monday 08:59:59 AM IST
   const isIntermission = dayOfWeekIST === 1 && hoursIST < 9;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (supabaseUrl && supabaseKey && !supabaseUrl.includes("placeholder")) {
-    try {
-      const supabase = createClient(supabaseUrl, supabaseKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+  try {
+    const supabase = supabaseAdmin;
 
       // Try fetching active drop from weekly_deals table
       const { data: dbDeals, error } = await supabase
@@ -126,7 +120,6 @@ async function getActiveWeeklyDeals(): Promise<ActiveWeeklyDealsResult> {
     } catch (err) {
       console.warn("[DealsPage] Error querying weekly_deals table, falling back to algorithm:", err);
     }
-  }
 
   // Fallback: Run deterministic selection algorithm directly
   const dynamicDeals = await selectWeeklyDeals();

@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { redactEmail } from '@/lib/utils';
 
 export async function syncUserToSupabase(user: {
   id: string;
@@ -7,15 +8,6 @@ export async function syncUserToSupabase(user: {
   lastName?: string | null;
   phone?: string | null;
 }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    console.error('[DATABASE SYNC ERROR]: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-    throw new Error('Missing Supabase service role credentials');
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
   const { data, error } = await supabaseAdmin
     .from('customers')
@@ -38,6 +30,6 @@ export async function syncUserToSupabase(user: {
     throw error;
   }
 
-  console.log('[DATABASE SYNC SUCCESS]: Customer saved ->', data.email, `(${data.clerk_user_id})`);
+  console.log('[DATABASE SYNC SUCCESS]: Customer saved ->', redactEmail(data.email), `(${data.clerk_user_id})`);
   return data;
 }

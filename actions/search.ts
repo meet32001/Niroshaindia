@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 
 export interface SearchResultItem {
@@ -25,17 +25,6 @@ export interface SearchResponse {
 
 const querySchema = z.string().trim().max(100);
 
-function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    'placeholder-key';
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
 export async function liveSearch(rawQuery: string): Promise<SearchResponse> {
   const parseResult = querySchema.safeParse(rawQuery);
   if (!parseResult.success) {
@@ -54,7 +43,7 @@ export async function liveSearch(rawQuery: string): Promise<SearchResponse> {
     return { products: [], totalCount: 0, suggestedCategories: [], isFallback: false };
   }
 
-  const supabase = getSupabaseAdmin();
+  const supabase = supabaseAdmin;
   const defaultFallbackImg =
     'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80';
 

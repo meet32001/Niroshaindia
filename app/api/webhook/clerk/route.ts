@@ -29,9 +29,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Get raw payload body
-  const payload = await req.json();
-  const body = JSON.stringify(payload);
+  // Get raw unparsed text body for cryptographic signature verification
+  const body = await req.text();
 
   const wh = new Webhook(WEBHOOK_SECRET);
 

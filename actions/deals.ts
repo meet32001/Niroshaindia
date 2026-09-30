@@ -378,13 +378,13 @@ export async function validateCouponAction(
     let dealItemsSubtotalCents = 0;
     if (Array.isArray(cartItems) && cartItems.length > 0) {
       for (const item of cartItems) {
-        const isExplicitDeal = !!item.isDeal;
         const vId = item.variantId ? String(item.variantId) : '';
         const pId = item.productId ? String(item.productId) : '';
-        const isMatchingDeal =
-          isExplicitDeal ||
+        // Zero-Trust: Deal item eligibility is strictly server-verified against active drop sets
+        const isMatchingDeal = Boolean(
           (vId && dealVariantIds.has(vId)) ||
-          (pId && dealProductIds.has(pId));
+          (pId && dealProductIds.has(pId))
+        );
 
         if (isMatchingDeal) {
           const itemPriceCents =

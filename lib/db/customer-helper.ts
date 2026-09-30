@@ -69,3 +69,48 @@ export async function getAuthenticatedCustomer() {
     return null;
   }
 }
+
+/**
+ * Privacy Compliance & Right to Erasure (DPDP Act / GDPR)
+ * Anonymizes customer profile data and addresses while preserving transactional history
+ * required for statutory 7-year GST/tax accounting.
+ */
+export async function anonymizeCustomerData(customerId: number | string) {
+  const anonymizedEmail = `anonymized_${customerId}_${Date.now()}@redacted.invalid`;
+
+  // 1. Redact profile PII in customers table
+  await supabaseAdmin
+    .from('customers')
+    .update({
+      email: anonymizedEmail,
+      first_name: 'Redacted',
+      last_name: 'Customer',
+      phone: null,
+      is_active: false,
+    })
+    .eq('id', customerId);
+
+  // 2. Anonymize shipping addresses linked to customer
+  await supabaseAdmin
+    .from('addresses')
+    .update({
+      recipient_name: 'Redacted Customer',
+      address_line1: '[REDACTED_SHIPPING_DESTINATION]',
+      address_line2: null,
+      phone: '0000000000',
+    })
+    .eq('customer_id', customerId);
+
+  // 3. Redact contact inquiries linked to customer email or ID
+  await supabaseAdmin
+    .from('contact_inquiries')
+    .update({
+      name: 'Redacted Customer',
+      email: anonymizedEmail,
+      phone: null,
+      message: '[REDACTED_UPON_PRIVACY_REQUEST]',
+    })
+    .eq('customer_id', customerId);
+
+  return { success: true };
+}

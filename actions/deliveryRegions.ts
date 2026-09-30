@@ -1,19 +1,12 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { INDIAN_STATES, STATE_CITIES_MAP } from '@/lib/constants/regions';
 
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
-export async function seedDeliveryRegions() {
+// Internal seed helper — not exposed as a public Server Action
+async function seedDeliveryRegions() {
   try {
-    const supabase = getAdminClient();
+    const supabase = supabaseAdmin;
 
     // 1. Prepare states data
     const statesToInsert = INDIAN_STATES.map((stateName) => ({
@@ -82,7 +75,7 @@ export async function seedDeliveryRegions() {
 
 export async function getActiveDeliveryRegions() {
   try {
-    const supabase = getAdminClient();
+    const supabase = supabaseAdmin;
 
     const { data: initialStates, error: statesError } = await supabase
       .from('delivery_states')

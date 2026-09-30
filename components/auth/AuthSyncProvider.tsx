@@ -9,8 +9,8 @@ export function AuthSync() {
 
   useEffect(() => {
     if (isSignedIn && userId) {
-      syncCurrentCustomer().then((res) => {
-        console.log('[CLIENT AUTH SYNC RESULT]:', res);
+      syncCurrentCustomer().catch(() => {
+        // Non-blocking background sync failure handled gracefully
       });
     }
   }, [isSignedIn, userId]);

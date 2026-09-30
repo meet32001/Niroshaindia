@@ -9,5 +9,5 @@ export const client = createClient({
   dataset,
   apiVersion,
   useCdn: true,
-  token: process.env.SANITY_API_READ_TOKEN,
+  token: typeof window === "undefined" ? process.env.SANITY_API_READ_TOKEN : undefined,
 });

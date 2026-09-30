@@ -36,8 +36,8 @@ export function AuthSync() {
             console.warn('[AUTH SYNC NOTICE]: Endpoint returned status', res.status);
             return;
           }
-          const data = await res.json();
-          console.log('[AUTH SYNC COMPLETED]:', data);
+          await res.json();
+          console.log('[AUTH SYNC COMPLETED]');
         })
         .catch((err) => console.error('[AUTH SYNC FAILED]:', err));
     }

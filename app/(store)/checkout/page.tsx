@@ -702,6 +702,7 @@ function CheckoutContent() {
         useStore.getState().resetCart();
         try {
           localStorage.removeItem("cart-store");
+          sessionStorage.removeItem("checkout_guest_address");
         } catch {
           // ignore
         }

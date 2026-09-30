@@ -68,16 +68,41 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
+    const isProd = process.env.NODE_ENV === "production";
+
+    const cspHeader = `
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' blob: data: https://vsprod.vijaysales.com https://www.vijaysales.com https://images.unsplash.com https://upload.wikimedia.org https://*.supabase.co https://frigidaire.bynder.com https://img.clerk.com;
+      font-src 'self' https://fonts.gstatic.com data:;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com https://api.postalpincode.in;
+      frame-src 'self' https://challenges.cloudflare.com;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+      ${isProd ? "upgrade-insecure-requests;" : ""}
+    `
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
     return [
       {
         source: "/(.*)",
         headers: [
           { key: "X-DNS-Prefetch-Control", value: "on" },
-          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          {
+            key: "Strict-Transport-Security",
+            value: isProd
+              ? "max-age=63072000; includeSubDomains; preload"
+              : "max-age=0",
+          },
+          { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+          { key: "Content-Security-Policy", value: cspHeader },
         ],
       },
     ];

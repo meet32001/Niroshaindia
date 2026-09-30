@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { redactEmail } from '@/lib/utils';
 
 export async function POST(req: NextRequest) {
   try {
+    // 0. Same-Origin / CORS Enforcement
+    const origin = req.headers.get('origin');
+    const host = req.headers.get('host');
+    if (origin && host) {
+      try {
+        const originUrl = new URL(origin);
+        if (originUrl.host !== host && !originUrl.host.includes('localhost') && !originUrl.host.includes('127.0.0.1')) {
+          return NextResponse.json(
+            { error: 'Forbidden: Untrusted cross-origin request rejected' },
+            { status: 403 }
+          );
+        }
+      } catch {
+        return NextResponse.json({ error: 'Invalid Origin header' }, { status: 400 });
+      }
+    }
+
     // 1. Session Verification (Prevent unauthenticated customer upsert / IDOR)
     const { userId: authedUserId } = await auth();
     if (!authedUserId) {
@@ -73,15 +91,21 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error('[SYNC CUSTOMER DB ERROR]:', error);
-      return NextResponse.json({ error: error.message, details: error.details }, { status: 500 });
+      console.error('[SYNC CUSTOMER DB ERROR]:', error.message);
+      return NextResponse.json({ error: 'Failed to synchronize customer profile' }, { status: 500 });
     }
 
-    console.log('[SYNC CUSTOMER SUCCESS]: Synced user', data.email, `(${data.clerk_user_id})`);
-    return NextResponse.json({ success: true, customer: data }, { status: 200 });
+    console.log('[SYNC CUSTOMER SUCCESS]: Synced user', redactEmail(data.email), `(${data.clerk_user_id})`);
+    return NextResponse.json({ success: true, customerId: data.id }, { status: 200 });
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Internal Server Error';
-    console.error('[SYNC CUSTOMER UNCAUGHT EXCEPTION]:', err);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    const errorId = crypto.randomUUID();
+    console.error(`[Error ID: ${errorId}] [SYNC CUSTOMER UNCAUGHT EXCEPTION]:`, err);
+    return NextResponse.json(
+      {
+        error: 'Internal Server Error',
+        ref: errorId.slice(0, 8),
+      },
+      { status: 500 }
+    );
   }
 }

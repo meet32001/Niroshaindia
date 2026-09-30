@@ -1,18 +1,13 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function syncCartAndWishlistOnLogin(guestSessionToken: string | null) {
   const { userId } = await auth();
   if (!userId) {
     return { success: false, error: 'Unauthenticated' };
   }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
 
   // 1. Resolve Customer ID
   const { data: customer, error: customerError } = await supabaseAdmin

@@ -39,8 +39,8 @@ function AuthCallbackContent() {
             phone: user.phoneNumbers?.[0]?.phoneNumber || null,
           }),
         });
-        const data = await res.json();
-        console.log('[AUTH-CALLBACK] Sync result:', data);
+        await res.json();
+        console.log('[AUTH-CALLBACK] Customer session synchronized successfully');
       } catch (err) {
         console.error('[AUTH-CALLBACK] Sync fetch failed:', err);
       } finally {

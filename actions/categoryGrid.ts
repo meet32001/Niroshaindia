@@ -1,20 +1,9 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 import { MOCK_PRODUCTS, normalizeProduct } from '@/lib/db/products';
 import { PREVIEW_TABS } from '@/constants/navigation';
-
-function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    'placeholder-key';
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 const slugSchema = z.string().trim().max(100);
 
@@ -36,7 +25,7 @@ export async function getCategoryGridProducts(categorySlug: string) {
 
   const rawSlug = parseResult.data.toLowerCase();
   const slug = LEGACY_SLUG_MAP[rawSlug] || rawSlug;
-  const supabase = getSupabaseAdmin();
+  const supabase = supabaseAdmin;
 
   try {
     // 1. SPECIFIC TAB FILTER (Strict category slug mapping, NO fuzzy name matching)

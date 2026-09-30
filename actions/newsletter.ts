@@ -1,10 +1,11 @@
 "use server";
 
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import { WelcomeEmail } from "@/emails/WelcomeEmail";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const emailSchema = z.object({
   email: z.string().trim().email("Please enter a valid email address."),
@@ -18,6 +19,19 @@ export type SubscribeResult = {
 
 export async function subscribeNewsletter(formData: FormData): Promise<SubscribeResult> {
   try {
+    const clientIp = await getClientIp();
+    const rateLimit = checkRateLimit("newsletter", clientIp, {
+      windowMs: 10 * 60 * 1000, // 10 minutes
+      max: 5,
+    });
+
+    if (!rateLimit.success) {
+      return {
+        success: false,
+        message: "Too many subscription attempts. Please try again later.",
+      };
+    }
+
     const rawEmail = formData.get("email");
     const validated = emailSchema.safeParse({ email: rawEmail });
 
@@ -30,21 +44,7 @@ export async function subscribeNewsletter(formData: FormData): Promise<Subscribe
 
     const email = validated.data.email.toLowerCase();
 
-    // Supabase Service Role client for bypass RLS and admin access
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.warn("[Newsletter] Missing Supabase credentials in environment.");
-      return {
-        success: true,
-        message: "Thank you for subscribing to Nirosha VIP Club!",
-      };
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabase = supabaseAdmin;
 
     // Check if already subscribed
     const { data: existing, error: fetchError } = await supabase
@@ -145,11 +145,17 @@ export async function subscribeNewsletter(formData: FormData): Promise<Subscribe
       success: true,
       message: "Welcome to Nirosha VIP Club! Check your inbox for your exclusive welcome gift.",
     };
-  } catch (error: any) {
-    console.error("[Newsletter] Unexpected error:", error);
+  } catch (error: unknown) {
+    const errorId = crypto.randomUUID();
+    console.error(`[Newsletter Error] [ID: ${errorId}]:`, error);
     return {
       success: false,
-      message: "An unexpected error occurred. Please try again later.",
+      message:
+        process.env.NODE_ENV === "production"
+          ? `An unexpected error occurred. Please try again or quote reference: ${errorId.slice(0, 8)}`
+          : error instanceof Error
+          ? error.message
+          : "An unexpected error occurred. Please try again later.",
     };
   }
 }

@@ -2,7 +2,7 @@
 
 import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
 import { currentUser } from '@clerk/nextjs/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 import { sanitizeProductTitle } from '@/lib/utils';
 import type { CustomerOrderOption } from '@/types/contact';
@@ -161,7 +161,14 @@ export async function getCustomerOrdersAction(): Promise<{
 
     return { success: true, orders: enrichedOrders };
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch customer orders';
+    const errorId = crypto.randomUUID();
+    console.error(`[Error ID: ${errorId}] Failed to fetch customer orders:`, err);
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? `Failed to fetch customer orders (Ref: ${errorId.slice(0, 8)})`
+        : err instanceof Error
+        ? err.message
+        : 'Failed to fetch customer orders';
     return { success: false, error: errorMessage, orders: [] };
   }
 }
@@ -231,7 +238,14 @@ export async function getOrderById(orderId: string) {
 
     return { success: true, order: formattedOrder };
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order details';
+    const errorId = crypto.randomUUID();
+    console.error(`[Error ID: ${errorId}] Failed to fetch order details by ID:`, err);
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? `Failed to fetch order details (Ref: ${errorId.slice(0, 8)})`
+        : err instanceof Error
+        ? err.message
+        : 'Failed to fetch order details';
     return { success: false, error: errorMessage, order: null };
   }
 }
@@ -339,7 +353,14 @@ export async function getOrderByOrderNumberAction(orderNumber: string) {
 
     return { success: true, order: enrichedOrder };
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order details';
+    const errorId = crypto.randomUUID();
+    console.error(`[Error ID: ${errorId}] Failed to fetch order details by order number:`, err);
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? `Failed to fetch order details (Ref: ${errorId.slice(0, 8)})`
+        : err instanceof Error
+        ? err.message
+        : 'Failed to fetch order details';
     return { success: false, error: errorMessage, order: null };
   }
 }
@@ -351,28 +372,23 @@ export async function getCustomerOrdersForSelectAction(userEmail?: string): Prom
   message?: string;
 }> {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabase = supabaseAdmin;
 
-    if (!supabaseUrl || !serviceKey) {
-      return { success: false, orders: [], message: 'Database configuration missing' };
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    // 1. Identify customer email via Clerk currentUser() or passed userEmail
-    let email = userEmail;
+    // 1. Identify customer strictly via verified Clerk session
+    let email: string | undefined;
     let userId: string | undefined;
 
-    if (!email) {
-      try {
-        const user = await currentUser();
-        email = user?.emailAddresses?.[0]?.emailAddress;
-        userId = user?.id;
-      } catch {
-        // Guest or unauthenticated request
+    try {
+      const user = await currentUser();
+      if (!user) {
+        return { success: true, orders: [] };
       }
+      email =
+        user.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress ||
+        user.emailAddresses?.[0]?.emailAddress;
+      userId = user.id;
+    } catch {
+      return { success: true, orders: [] };
     }
 
     if (!email && !userId) {

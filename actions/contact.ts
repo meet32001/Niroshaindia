@@ -9,6 +9,7 @@ import {
   ContactFormData,
   ContactActionResult,
 } from "@/types/contact";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 function generateTicketId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // avoids confusing 0/O, 1/I
@@ -23,6 +24,16 @@ export async function submitContactInquiryAction(
   rawInput: ContactFormData
 ): Promise<ContactActionResult> {
   try {
+    // 0. Rate Limiting Check (Max 5 submissions per 15 minutes per IP)
+    const clientIp = await getClientIp();
+    const rateLimit = checkRateLimit("contact", clientIp, { windowMs: 15 * 60 * 1000, max: 5 });
+    if (!rateLimit.success) {
+      return {
+        success: false,
+        message: "Too many contact submissions. Please wait a few minutes before trying again.",
+      };
+    }
+
     // 1. Validate Form Input with Zod
     const parsed = contactFormSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -151,7 +162,7 @@ export async function submitContactInquiryAction(
               );
             }
           } else {
-            console.log("Admin email dispatch result:", adminResult);
+            console.log("Admin email dispatched successfully (ID:", adminResult.data?.id, ")");
           }
         } catch (adminErr: unknown) {
           const errMsg = adminErr instanceof Error ? adminErr.message : String(adminErr);
@@ -200,7 +211,7 @@ export async function submitContactInquiryAction(
           if (customerResult.error) {
             console.warn("Customer confirmation email error:", customerResult.error.message || customerResult.error);
           } else {
-            console.log("Customer email dispatch result:", customerResult);
+            console.log("Customer email dispatched successfully (ID:", customerResult.data?.id, ")");
           }
         } catch (customerErr: unknown) {
           const errMsg = customerErr instanceof Error ? customerErr.message : String(customerErr);
@@ -215,13 +226,11 @@ export async function submitContactInquiryAction(
       message: "Your inquiry has been logged successfully. Our team will get back to you shortly.",
     };
   } catch (err) {
-    console.error("Unhandled error in submitContactInquiryAction:", err);
-    const fallbackSupportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
+    const errorId = crypto.randomUUID();
+    console.error(`[Error ID: ${errorId}] Unhandled error in submitContactInquiryAction:`, err);
     return {
       success: false,
-      message: fallbackSupportEmail
-        ? `An unexpected error occurred. Please try again or email us directly at ${fallbackSupportEmail}.`
-        : "An unexpected error occurred. Please try again or contact customer support.",
+      message: `An unexpected error occurred (Ref: ${errorId.slice(0, 8)}). Please try again or contact customer support.`,
     };
   }
 }
