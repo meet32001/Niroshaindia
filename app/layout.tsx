@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthSync } from "@/components/auth/AuthSync";
+import { NavigationProgressBar } from "@/components/layout/NavigationProgressBar";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -28,6 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable}`}>
       <body className="font-poppins antialiased bg-background text-foreground min-h-screen">
+        <NavigationProgressBar />
         <ClerkProvider>
           <AuthSync />
           <TooltipProvider>{children}</TooltipProvider>

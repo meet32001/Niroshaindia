@@ -618,13 +618,8 @@ function CheckoutContent() {
 
     setPendingPayment(data);
 
-    if (data.method === "cod") {
-      // Cash on Delivery bypasses issuing bank 3D-Secure 2FA
-      await handleExecuteOrder(data, targetAddress);
-    } else {
-      // Trigger Indian Issuing Bank RBI 3D-Secure 2.0 2FA modal
-      setShowBankModal(true);
-    }
+    // Trigger Indian Issuing Bank RBI 3D-Secure 2.0 2FA modal for all online payments
+    setShowBankModal(true);
   };
 
   // Zero-Trust order persistence trigger
@@ -686,11 +681,11 @@ function CheckoutContent() {
         paymentMethod: paymentData.method,
         payment_details: {
           ...paymentData.details,
-          otp_verified: paymentData.method !== "cod",
+          otp_verified: true,
         },
         paymentDetails: {
           ...paymentData.details,
-          otp_verified: paymentData.method !== "cod",
+          otp_verified: true,
         },
         coupon_code: appliedCoupon?.code || null,
         couponCode: appliedCoupon?.code || null,

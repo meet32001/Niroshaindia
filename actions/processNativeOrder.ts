@@ -98,15 +98,24 @@ export async function processNativeOrderAction(
   const rawTotal = data.totalAmountCents ?? data.clientTotalCents ?? 0;
   const shipping_address = data.shipping_address || data.shippingAddress;
 
-  // Allowlist payment method — reject any non-enumerated value (e.g. "free", "admin", "")
-  const ALLOWED_PAYMENT_METHODS = ['card', 'upi', 'netbanking', 'cod'] as const;
-  type AllowedPaymentMethod = typeof ALLOWED_PAYMENT_METHODS[number];
+  // Decommission COD: Reject Cash on Delivery explicitly
   const rawPaymentMethod = (data.payment_method || data.paymentMethod || 'card').toLowerCase();
+  if (rawPaymentMethod === 'cod') {
+    return {
+      success: false,
+      code: 'COD_DISCONTINUED',
+      error: 'Cash on Delivery is discontinued. Please select an online payment method.',
+    };
+  }
+
+  // Allowlist online payment methods — reject any non-enumerated value (e.g. "free", "admin", "")
+  const ALLOWED_PAYMENT_METHODS = ['card', 'upi', 'netbanking'] as const;
+  type AllowedPaymentMethod = typeof ALLOWED_PAYMENT_METHODS[number];
   if (!ALLOWED_PAYMENT_METHODS.includes(rawPaymentMethod as AllowedPaymentMethod)) {
     return {
       success: false,
       code: 'VALIDATION_ERROR',
-      error: 'Invalid payment method.',
+      error: 'Invalid payment method. Only online payments (Card, UPI, NetBanking) are accepted.',
     };
   }
   const payment_method = rawPaymentMethod as AllowedPaymentMethod;
@@ -121,23 +130,6 @@ export async function processNativeOrderAction(
       code: 'VALIDATION_ERROR',
       error: 'Valid delivery shipping address is required.',
     };
-  }
-
-  // COD Unboxing Policy — server-side enforcement.
-  // The checkbox is shown client-side, but the server must independently verify
-  // that `payment_details.unboxing_policy_agreed === true` was submitted by the caller.
-  // An attacker who bypasses the frontend and POSTs directly without the flag will
-  // have their COD order rejected, preventing dispute waiver bypass.
-  if (payment_method === 'cod') {
-    const detailsObj = payment_details as Record<string, unknown>;
-    if (detailsObj.unboxing_policy_agreed !== true) {
-      return {
-        success: false,
-        code: 'COD_POLICY_VIOLATION',
-        error:
-          'COD orders require acknowledgement of the mandatory unboxing video policy. Please tick the checkbox and try again.',
-      };
-    }
   }
 
 
@@ -451,7 +443,7 @@ export async function processNativeOrderAction(
         customer_id: customer.id,
         order_number: orderNumber,
         status: 'processing',
-        payment_status: payment_method === 'cod' ? 'pending_cod' : 'paid',
+        payment_status: 'paid',
         subtotal_amount_cents: authoritativeSubtotalCents,
         tax_amount_cents: authoritativeTaxCents,
         shipping_amount_cents: 0,

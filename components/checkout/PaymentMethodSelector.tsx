@@ -7,12 +7,10 @@ import {
   CreditCard,
   QrCode,
   Building,
-  Truck,
   CheckCircle2,
   Shield,
   Lock,
   ArrowRight,
-  Info,
   Smartphone,
   Check,
 } from "lucide-react";
@@ -22,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
-export type PaymentMethodType = "upi" | "card" | "netbanking" | "cod";
+export type PaymentMethodType = "upi" | "card" | "netbanking";
 
 export interface PaymentSubmissionData {
   method: PaymentMethodType;
@@ -108,10 +106,6 @@ export function PaymentMethodSelector({
   // NetBanking State
   const [selectedBank, setSelectedBank] = useState<string>("HDFC");
   const [otherBank, setOtherBank] = useState<string>("");
-
-  // COD State
-  const [codAgreed, setCodAgreed] = useState(false);
-  const [codError, setCodError] = useState<string | null>(null);
 
   const formattedAmount = (amountCents / 100).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -233,18 +227,6 @@ export function PaymentMethodSelector({
           bank_name: bank,
         },
       });
-    } else if (selectedMethod === "cod") {
-      if (!codAgreed) {
-        setCodError("You must acknowledge the unboxing video requirement to proceed with COD.");
-        return;
-      }
-      onSubmit({
-        method: "cod",
-        details: {
-          cod_verified: true,
-          unboxing_policy_agreed: true,
-        },
-      });
     }
   };
 
@@ -273,7 +255,7 @@ export function PaymentMethodSelector({
       </div>
 
       {/* Payment Rail Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <button
           type="button"
           onClick={() => setSelectedMethod("card")}
@@ -357,35 +339,6 @@ export function PaymentMethodSelector({
             </div>
             <div className="text-[10px] text-slate-500 font-medium truncate">
               Top Indian Banks
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedMethod("cod")}
-          className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-            selectedMethod === "cod"
-              ? "border-shop-orange bg-orange-50/30 dark:bg-orange-950/30 shadow-xs"
-              : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
-          }`}
-        >
-          <div className="flex items-center justify-between pb-2">
-            <Truck
-              className={`w-5 h-5 ${
-                selectedMethod === "cod" ? "text-shop-orange" : "text-slate-400"
-              }`}
-            />
-            {selectedMethod === "cod" && (
-              <CheckCircle2 className="w-4 h-4 text-shop-orange" />
-            )}
-          </div>
-          <div>
-            <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
-              Cash on Delivery
-            </div>
-            <div className="text-[10px] text-slate-500 font-medium truncate">
-              Pay on Inspection
             </div>
           </div>
         </button>
@@ -709,63 +662,6 @@ export function PaymentMethodSelector({
           </div>
         )}
 
-        {/* ============================================================
-            TAB 4: CASH ON DELIVERY
-        ============================================================ */}
-        {selectedMethod === "cod" && (
-          <div className="space-y-4 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-950/60 text-shop-orange flex items-center justify-center shrink-0">
-                <Truck className="w-5 h-5" />
-              </div>
-              <div className="space-y-1 text-xs">
-                <h4 className="font-bold text-slate-900 dark:text-slate-100">
-                  Cash or UPI on Inspection
-                </h4>
-                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Pay cash or UPI to courier executive upon inspecting the outer parcel seal.
-                </p>
-              </div>
-            </div>
-
-            {/* Mandatory Unboxing Video Acknowledgement */}
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
-              <div className="flex items-start space-x-2.5">
-                <Checkbox
-                  id="cod_unboxing_agreed"
-                  checked={codAgreed}
-                  onCheckedChange={(c) => {
-                    setCodAgreed(!!c);
-                    setCodError(null);
-                  }}
-                  className="mt-0.5"
-                />
-                <Label
-                  htmlFor="cod_unboxing_agreed"
-                  className="text-xs text-slate-700 dark:text-slate-300 font-normal leading-relaxed cursor-pointer"
-                >
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    I acknowledge the Unboxing Video Requirement:
-                  </span>{" "}
-                  I agree to record a continuous unboxing video before breaking the outer brand seal, as required under{" "}
-                  <a
-                    href="/terms#replacement-policy"
-                    target="_blank"
-                    className="text-shop-orange font-bold hover:underline"
-                  >
-                    Nirosha India Replacement Policy
-                  </a>{" "}
-                  for any physical transit claims.
-                </Label>
-              </div>
-
-              {codError && (
-                <p className="text-xs text-rose-500 font-semibold">{codError}</p>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Action Button */}
         <div className="pt-2">
           <Button
@@ -774,11 +670,7 @@ export function PaymentMethodSelector({
             disabled={isSubmitting}
             className="w-full bg-shop-orange hover:bg-amber-600 text-white font-bold py-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
           >
-            <span>
-              {selectedMethod === "cod"
-                ? `Confirm Order (₹${formattedAmount})`
-                : `Pay ₹${formattedAmount}`}
-            </span>
+            <span>Pay ₹{formattedAmount}</span>
             <ArrowRight className="w-4 h-4" />
           </Button>
 
