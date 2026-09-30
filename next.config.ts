@@ -72,11 +72,11 @@ const nextConfig: NextConfig = {
 
     const cspHeader = `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com https://va.vercel-scripts.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       img-src 'self' blob: data: https://vsprod.vijaysales.com https://www.vijaysales.com https://images.unsplash.com https://upload.wikimedia.org https://*.supabase.co https://frigidaire.bynder.com https://img.clerk.com;
       font-src 'self' https://fonts.gstatic.com data:;
-      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com https://api.postalpincode.in;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://clerk.niroshaindia.com https://challenges.cloudflare.com https://api.postalpincode.in https://va.vercel-scripts.com;
       frame-src 'self' https://challenges.cloudflare.com;
       worker-src 'self' blob:;
       object-src 'none';

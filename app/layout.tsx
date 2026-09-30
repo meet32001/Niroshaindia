@@ -4,6 +4,7 @@ import { Poppins } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthSync } from "@/components/auth/AuthSync";
 import { NavigationProgressBar } from "@/components/layout/NavigationProgressBar";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -34,6 +35,7 @@ export default function RootLayout({
           <AuthSync />
           <TooltipProvider>{children}</TooltipProvider>
         </ClerkProvider>
+        <Analytics />
       </body>
     </html>
   );
