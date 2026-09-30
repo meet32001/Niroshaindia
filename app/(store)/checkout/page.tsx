@@ -20,6 +20,7 @@ import {
   Flame,
   X,
   Tag,
+  ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -723,18 +724,6 @@ function CheckoutContent() {
     await handleExecuteOrder(pendingPayment);
   };
 
-  // Summary card CTA
-  const handleProceedToPayment = () => {
-    if (pendingPayment) {
-      handlePaymentSubmit(pendingPayment);
-    } else {
-      handlePaymentSubmit({
-        method: "card",
-        details: { mode: "card_default" },
-      });
-    }
-  };
-
   return (
     <div className="bg-slate-50/50 dark:bg-slate-950 min-h-screen pb-24">
       <Container className="py-8 space-y-6">
@@ -1233,36 +1222,32 @@ function CheckoutContent() {
                 </div>
               </div>
 
-              {/* Proceed to Payment CTA */}
-              <Button
-                type="button"
-                onClick={handleProceedToPayment}
-                disabled={isProcessingPayment || loadingAddresses || pinLoading || !!pinError}
-                className="w-full bg-shop-orange hover:bg-amber-600 disabled:opacity-50 text-white font-bold py-3.5 px-6 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer"
-              >
-                {isProcessingPayment ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Connecting to Payment...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Proceed to Payment</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </Button>
+              {/* Single Source of Action Trust Badge (Payment submitted via active Payment panel) */}
+              <div className="pt-1 space-y-2">
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 text-xs flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="font-medium text-slate-700 dark:text-slate-300 leading-snug">
+                    Select payment method on the left to complete and authorize your order.
+                  </span>
+                </div>
+                <p className="text-[11px] text-center text-slate-400 font-medium flex items-center justify-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>256-Bit SSL Encrypted • PCI-DSS Compliant</span>
+                </p>
+              </div>
             </Card>
           </div>
         </div>
       </Container>
 
-      {/* RBI 2-Factor Authentication Issuing Bank Modal */}
+      {/* 3D-Secure 2.0 / UPI Authentication Modal */}
       <BankAuthModal
         isOpen={showBankModal}
         onClose={() => setShowBankModal(false)}
         onSuccess={handleBankAuthorize}
         amountCents={Math.round(totalPrice * 100)}
+        paymentMethod={pendingPayment?.method}
+        paymentDetails={pendingPayment?.details}
         paymentMethodLabel={
           pendingPayment?.method === "card"
             ? `Credit / Debit Card (${pendingPayment.details?.card_network || "RuPay / Visa"})`

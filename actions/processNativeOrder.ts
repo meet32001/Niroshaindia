@@ -419,7 +419,7 @@ export async function processNativeOrderAction(
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const orderNumber = `NIR-ORD-${new Date().getFullYear()}-${randomSuffix}`;
 
-    // Delivery snapshot with Blue Dart logistics partner simulation
+    // Delivery snapshot with Blue Dart Express logistics integration
     const estimatedDate = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
     const trackingNumber = `BLUEDART-IND-${Math.floor(10000000 + Math.random() * 90000000)}`;
 

@@ -670,7 +670,11 @@ export function PaymentMethodSelector({
             disabled={isSubmitting}
             className="w-full bg-shop-orange hover:bg-amber-600 text-white font-bold py-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
           >
-            <span>Pay ₹{formattedAmount}</span>
+            <span>
+              {selectedMethod === "upi"
+                ? `Verify & Pay ₹${formattedAmount}`
+                : `Pay ₹${formattedAmount}`}
+            </span>
             <ArrowRight className="w-4 h-4" />
           </Button>
 
