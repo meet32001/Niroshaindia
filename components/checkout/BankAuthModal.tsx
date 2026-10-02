@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 interface BankAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => Promise<void> | void;
+  onSuccess: (txnRef?: string) => Promise<void> | void;
   amountCents: number;
   paymentMethodLabel: string;
   paymentMethod?: "card" | "upi" | "netbanking";
@@ -43,7 +43,10 @@ export function BankAuthModal({
   const [isVerifying, setIsVerifying] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(paymentMethod === "upi" ? 299 : 45);
   const [referenceId] = useState(
-    () => orderReference || `RBI-PGW-${Math.floor(10000000 + Math.random() * 90000000)}`
+    () =>
+      orderReference?.startsWith("NIR-TXN-")
+        ? orderReference
+        : `NIR-TXN-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`
   );
 
   // Countdown timer
@@ -71,13 +74,21 @@ export function BankAuthModal({
 
   if (!isOpen) return null;
 
-  const phoneLast4 = customerPhone ? customerPhone.slice(-4) : "9210";
+  // Sanitize customer phone: strictly use valid Indian digits, fallback to 9210
+  const cleanPhone = customerPhone ? customerPhone.replace(/\D/g, "") : "";
+  const phoneLast4 =
+    cleanPhone.length >= 10 && /^[6-9]/.test(cleanPhone.slice(-10))
+      ? cleanPhone.slice(-4)
+      : "9210";
+
   const formattedAmount = (amountCents / 100).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
   const isUpi = paymentMethod === "upi";
+  const isNetBanking = paymentMethod === "netbanking";
+  const selectedBankName = paymentDetails?.bank_name || "Retail Bank";
 
   const handleAuthorize = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -97,7 +108,7 @@ export function BankAuthModal({
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
-      await onSuccess();
+      await onSuccess(referenceId);
     } catch (err: unknown) {
       setIsVerifying(false);
       const msg = err instanceof Error ? err.message : "Payment authorization failed.";
@@ -119,15 +130,27 @@ export function BankAuthModal({
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-indigo-900/50">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              {isNetBanking ? (
+                <Building2 className="w-5 h-5 text-emerald-400" />
+              ) : isUpi ? (
+                <Smartphone className="w-5 h-5 text-emerald-400" />
+              ) : (
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              )}
             </div>
             <div>
               <span className="text-[10px] text-indigo-300 font-bold tracking-wider uppercase block">
-                {isUpi ? "NPCI Unified Payments Interface" : "3D Secure 2.0 • Verified by Visa / Mastercard"}
+                {isNetBanking
+                  ? "Secure 256-bit Encrypted Banking Session"
+                  : isUpi
+                  ? "NPCI Unified Payments Interface"
+                  : "3D Secure 2.0 • Verified by Visa / Mastercard"}
               </span>
               <h3 className="text-xs font-black tracking-tight text-white flex items-center gap-1.5">
                 <span>
-                  {isUpi
+                  {isNetBanking
+                    ? `${selectedBankName} Retail Internet Banking Gateway`
+                    : isUpi
                     ? "BHIM UPI Instant Payment Request"
                     : "Verified by Visa / Mastercard Identity Check"}
                 </span>
@@ -265,7 +288,7 @@ export function BankAuthModal({
                   htmlFor="otp_input"
                   className="text-xs font-bold text-slate-900 dark:text-slate-100 block"
                 >
-                  Enter One-Time Password (OTP)
+                  {isNetBanking ? "Enter NetBanking One-Time Password (OTP)" : "Enter One-Time Password (OTP)"}
                 </label>
                 <p className="text-[11px] text-slate-500">
                   A one-time password (OTP) has been sent to your registered mobile number ending in{" "}
@@ -277,13 +300,17 @@ export function BankAuthModal({
               </div>
 
               {/* 6-Digit Styled Input */}
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <input
                   id="otp_input"
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={6}
+                  autoComplete="one-time-code"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
                   value={otp}
                   disabled={isVerifying}
                   autoFocus
@@ -294,6 +321,24 @@ export function BankAuthModal({
                   placeholder="• • • • • •"
                   className="w-full text-center text-2xl font-mono font-black tracking-widest h-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-shop-orange focus:ring-4 focus:ring-orange-500/10 transition-all disabled:opacity-50"
                 />
+
+                {/* Subtle Device Autofill Simulation (Task 6) */}
+                {otp.length < 6 && (
+                  <div className="flex items-center justify-center pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtp("123456");
+                        setError(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer shadow-2xs"
+                      aria-label="Autofill OTP from messages"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>From Messages: <strong>123456</strong></span>
+                    </button>
+                  </div>
+                )}
 
                 {error && (
                   <p className="text-[11px] text-rose-500 font-semibold flex items-center justify-center gap-1 pt-1">
@@ -345,6 +390,11 @@ export function BankAuthModal({
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-shop-orange" />
                       <span>Verifying with issuing bank...</span>
+                    </>
+                  ) : isNetBanking ? (
+                    <>
+                      <Building2 className="w-4 h-4 text-emerald-500" />
+                      <span>Confirm & Authorize NetBanking Payment</span>
                     </>
                   ) : (
                     <>

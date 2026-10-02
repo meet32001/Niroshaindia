@@ -265,8 +265,14 @@ export default function AddressBookPage() {
       return;
     }
 
+    const cleanPhone = formData.phone.replace(/\D/g, "");
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9");
+      return;
+    }
+
     setSaving(true);
-    const payload = { ...formData, country: "India" };
+    const payload = { ...formData, phone: cleanPhone, country: "India" };
     const res = await saveAddress(payload);
     setSaving(false);
 
@@ -467,10 +473,13 @@ export default function AddressBookPage() {
                 <Label htmlFor="phone">Mobile Phone (10 Digits)</Label>
                 <Input
                   id="phone"
+                  type="tel"
+                  inputMode="numeric"
                   value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setFormData({ ...formData, phone: digits });
+                  }}
                   placeholder="9876543210"
                   maxLength={10}
                   required

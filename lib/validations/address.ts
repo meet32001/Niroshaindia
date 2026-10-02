@@ -3,7 +3,12 @@ import { z } from 'zod';
 export const addressSchema = z.object({
   id: z.string().optional(),
   recipient_name: z.string().min(2, 'Recipient name must be at least 2 characters'),
-  phone: z.string().regex(/^[0-9]{10}$/, 'Please enter a valid 10-digit mobile number'),
+  phone: z
+    .string()
+    .regex(
+      /^[6-9]\d{9}$/,
+      'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9'
+    ),
   address_line1: z.string().min(3, 'Address line 1 is required'),
   address_line2: z.string().optional(),
   city: z.string().min(2, 'City is required'),

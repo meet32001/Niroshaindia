@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { useUser } from "@clerk/nextjs";
 
 export type PaymentMethodType = "upi" | "card" | "netbanking";
 
@@ -87,6 +88,7 @@ export function PaymentMethodSelector({
   orderReference = "NIR-ORD-2026-REF",
   customerPhone,
 }: PaymentMethodSelectorProps) {
+  const { user } = useUser();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType>("card");
 
   // UPI State
@@ -95,13 +97,25 @@ export function PaymentMethodSelector({
   const [vpaError, setVpaError] = useState<string | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
 
-  // Card State
+  // Card State (Initialized to empty strings)
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
   const [cardHolder, setCardHolder] = useState("");
   const [saveCardRbi, setSaveCardRbi] = useState(true);
   const [cardError, setCardError] = useState<string | null>(null);
+
+  // Pre-fill cardholder name with authenticated user's name if available
+  useEffect(() => {
+    if (user && !cardHolder) {
+      const name =
+        user.fullName ||
+        (user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "");
+      if (name) {
+        setCardHolder(name.toUpperCase());
+      }
+    }
+  }, [user, cardHolder]);
 
   // NetBanking State
   const [selectedBank, setSelectedBank] = useState<string>("HDFC");
@@ -384,7 +398,7 @@ export function PaymentMethodSelector({
                   inputMode="numeric"
                   value={cardNumber}
                   onChange={(e) => handleCardNumberChange(e.target.value)}
-                  placeholder="4532 8923 7482 9102"
+                  placeholder="•••• •••• •••• ••••"
                   maxLength={19}
                   required
                   className="rounded-xl font-mono text-sm pl-10"
@@ -405,7 +419,7 @@ export function PaymentMethodSelector({
                   inputMode="numeric"
                   value={cardExpiry}
                   onChange={(e) => handleExpiryChange(e.target.value)}
-                  placeholder="12/28"
+                  placeholder="MM / YY"
                   maxLength={5}
                   required
                   className="rounded-xl font-mono text-sm"
@@ -422,7 +436,7 @@ export function PaymentMethodSelector({
                   inputMode="numeric"
                   value={cardCvv}
                   onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  placeholder="•••"
+                  placeholder="CVV"
                   maxLength={4}
                   required
                   className="rounded-xl font-mono text-sm"
@@ -440,7 +454,7 @@ export function PaymentMethodSelector({
                 type="text"
                 value={cardHolder}
                 onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                placeholder="RAHUL SHARMA"
+                placeholder="Name on card"
                 required
                 className="rounded-xl uppercase text-sm font-medium"
               />

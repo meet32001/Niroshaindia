@@ -273,8 +273,25 @@ function CheckoutContent() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [pendingPayment, setPendingPayment] = useState<PaymentSubmissionData | null>(null);
   const [orderReference] = useState(
-    () => `NIR-ORD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`
+    () => `NIR-TXN-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`
   );
+
+  // Helper to ensure only genuine Indian mobile numbers are resolved for 2FA
+  const resolveIndianCustomerPhone = () => {
+    const candidates = [
+      formAddress.phone,
+      savedAddresses.length > 0 ? savedAddresses[0].phone : undefined,
+      user?.phoneNumbers?.[0]?.phoneNumber,
+    ];
+    for (const c of candidates) {
+      if (c) {
+        const digits = c.replace(/\D/g, "");
+        if (/^[6-9]\d{9}$/.test(digits)) return digits;
+        if (/^91[6-9]\d{9}$/.test(digits)) return digits.slice(2);
+      }
+    }
+    return undefined;
+  };
 
   // Dynamic Database Delivery Regions State
   const [dbStates, setDbStates] = useState<DeliveryStateItem[]>([]);
@@ -554,7 +571,13 @@ function CheckoutContent() {
       return;
     }
 
-    const payload = { ...formAddress, country: "India" };
+    const cleanPhone = formAddress.phone.replace(/\D/g, "");
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9");
+      return;
+    }
+
+    const payload = { ...formAddress, phone: cleanPhone, country: "India" };
     const result = addressSchema.safeParse(payload);
     if (!result.success) {
       toast.error(result.error.issues[0]?.message || "Please complete address details");
@@ -627,13 +650,16 @@ function CheckoutContent() {
   const handleExecuteOrder = async (
     paymentData: PaymentSubmissionData,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    addressOverride?: any
+    addressOverride?: any,
+    txnRef?: string
   ) => {
     const targetAddress = addressOverride || resolveTargetAddress();
     if (!targetAddress) {
       toast.error("Please complete delivery address details");
       return;
     }
+
+    const finalTxnRef = txnRef || orderReference;
 
     setIsProcessingPayment(true);
     try {
@@ -656,6 +682,8 @@ function CheckoutContent() {
         items: orderItemsPayload,
         idempotency_key: idempotencyKey,
         idempotencyKey,
+        transaction_reference: finalTxnRef,
+        transactionReference: finalTxnRef,
         clientTotalCents,
         totalAmountCents: clientTotalCents,
         shipping_address: {
@@ -682,10 +710,12 @@ function CheckoutContent() {
         paymentMethod: paymentData.method,
         payment_details: {
           ...paymentData.details,
+          transaction_reference: finalTxnRef,
           otp_verified: true,
         },
         paymentDetails: {
           ...paymentData.details,
+          transaction_reference: finalTxnRef,
           otp_verified: true,
         },
         coupon_code: appliedCoupon?.code || null,
@@ -717,11 +747,11 @@ function CheckoutContent() {
   };
 
   // Callback from BankAuthModal when 2FA is confirmed
-  const handleBankAuthorize = async () => {
+  const handleBankAuthorize = async (txnRef?: string) => {
     if (!pendingPayment) {
       throw new Error("No active payment method selected.");
     }
-    await handleExecuteOrder(pendingPayment);
+    await handleExecuteOrder(pendingPayment, undefined, txnRef || orderReference);
   };
 
   return (
@@ -1006,10 +1036,13 @@ function CheckoutContent() {
                           </Label>
                           <Input
                             id="phone"
+                            type="tel"
+                            inputMode="numeric"
                             value={formAddress.phone}
-                            onChange={(e) =>
-                              setFormAddress({ ...formAddress, phone: e.target.value })
-                            }
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                              setFormAddress({ ...formAddress, phone: digits });
+                            }}
                             placeholder="e.g. 9876543210"
                             maxLength={10}
                             required
@@ -1065,11 +1098,7 @@ function CheckoutContent() {
               onSubmit={handlePaymentSubmit}
               isSubmitting={isProcessingPayment}
               orderReference={orderReference}
-              customerPhone={
-                formAddress.phone ||
-                (savedAddresses.length > 0 ? savedAddresses[0].phone : undefined) ||
-                user?.phoneNumbers?.[0]?.phoneNumber
-              }
+              customerPhone={resolveIndianCustomerPhone()}
             />
 
             {/* Unauthenticated Alert Banner */}
@@ -1257,11 +1286,7 @@ function CheckoutContent() {
             ? `NetBanking (${pendingPayment?.details?.bank_name || "Online Bank"})`
             : "Domestic Indian Payment"
         }
-        customerPhone={
-          formAddress.phone ||
-          (savedAddresses.length > 0 ? savedAddresses[0].phone : undefined) ||
-          user?.phoneNumbers?.[0]?.phoneNumber
-        }
+        customerPhone={resolveIndianCustomerPhone()}
         orderReference={orderReference}
       />
     </div>

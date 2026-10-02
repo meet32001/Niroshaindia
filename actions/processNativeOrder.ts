@@ -18,7 +18,12 @@ const addressSchema = z.object({
   state: z.string().min(2, 'State is required'),
   postal_code: z.string().regex(/^[1-9][0-9]{5}$/, 'Valid 6-digit Indian PIN code required'),
   country: z.string().default('India'),
-  phone: z.string().regex(/^[6-9]\d{9}$/, 'Valid 10-digit Indian mobile number required'),
+  phone: z
+    .string()
+    .regex(
+      /^[6-9]\d{9}$/,
+      'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9'
+    ),
 });
 
 const processOrderSchema = z.object({
@@ -33,6 +38,8 @@ const processOrderSchema = z.object({
     .min(1, 'Cart must contain at least one item'),
   idempotency_key: z.string().min(8).optional(),
   idempotencyKey: z.string().min(8).optional(),
+  transaction_reference: z.string().optional(),
+  transactionReference: z.string().optional(),
   clientTotalCents: z.number().optional(),
   totalAmountCents: z.number().optional(),
   shipping_address: addressSchema.optional(),
@@ -415,9 +422,14 @@ export async function processNativeOrderAction(
       finalTotalCents - finalTotalCents / 1.18
     );
 
-    // 9. Generate Canonical Order Reference (#NIR-ORD-2026-XXXXX)
+    // 9. Generate Canonical Order Reference (#NIR-ORD-2026-XXXXX) & Transaction Reference
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const orderNumber = `NIR-ORD-${new Date().getFullYear()}-${randomSuffix}`;
+    const transactionReference =
+      data.transaction_reference ||
+      data.transactionReference ||
+      payment_details?.transaction_reference ||
+      `NIR-TXN-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // Delivery snapshot with Blue Dart Express logistics integration
     const estimatedDate = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
@@ -427,7 +439,11 @@ export async function processNativeOrderAction(
       ...shipping_address,
       idempotency_key,
       payment_method,
-      payment_details: payment_details || {},
+      payment_details: {
+        ...(payment_details || {}),
+        transaction_reference: transactionReference,
+      },
+      transaction_reference: transactionReference,
       carrier: 'Blue Dart Express',
       tracking_number: trackingNumber,
       estimated_delivery: estimatedDate.toISOString().split('T')[0],
