@@ -93,8 +93,8 @@ export function BankAuthModal({
     setError(null);
     setIsVerifying(true);
 
-    // Realistic network authorization duration (1.2 seconds)
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    // Realistic network authorization duration (1.5 seconds)
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
       await onSuccess();
@@ -123,7 +123,7 @@ export function BankAuthModal({
             </div>
             <div>
               <span className="text-[10px] text-indigo-300 font-bold tracking-wider uppercase block">
-                {isUpi ? "NPCI Unified Payments Interface" : "3D Secure 2.0 • Security Gateway"}
+                {isUpi ? "NPCI Unified Payments Interface" : "3D Secure 2.0 • Verified by Visa / Mastercard"}
               </span>
               <h3 className="text-xs font-black tracking-tight text-white flex items-center gap-1.5">
                 <span>
@@ -344,7 +344,7 @@ export function BankAuthModal({
                   {isVerifying ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-shop-orange" />
-                      <span>Contacting issuing bank...</span>
+                      <span>Verifying with issuing bank...</span>
                     </>
                   ) : (
                     <>
