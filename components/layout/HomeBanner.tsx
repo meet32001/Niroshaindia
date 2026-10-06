@@ -34,7 +34,7 @@ const BANNER_SLIDES = [
     description: "Trade in and upgrade to cutting-edge AMOLED smartwatches, flagship phones, and MagSafe accessories.",
     buttonText: "Discover Phones",
     buttonHref: "/shop?category=smartphones",
-    image: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=800&auto=format&fit=crop&q=80",
   },
   {
     id: 4,
@@ -43,7 +43,7 @@ const BANNER_SLIDES = [
     description: "Energy-efficient smart refrigerators, robotic vacuums, and IoT kitchen appliances at festive rates.",
     buttonText: "Shop Appliances",
     buttonHref: "/shop?category=home-appliances",
-    image: "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800&auto=format&fit=crop&q=80",
   },
 ];
 
