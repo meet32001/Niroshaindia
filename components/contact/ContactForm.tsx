@@ -294,7 +294,7 @@ export function ContactForm() {
               type="email"
               name="email"
               required
-              placeholder="e.g. rahul@example.com"
+              placeholder="name@email.com"
               value={formData.email}
               onChange={handleChange}
               className={`h-10 text-sm rounded-lg ${errors.email ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}

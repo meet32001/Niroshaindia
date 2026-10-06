@@ -17,7 +17,6 @@ import {
   Phone,
   AlertCircle,
   Ticket,
-  Flame,
   X,
   Tag,
   ShieldCheck,
@@ -37,7 +36,6 @@ import { useStore, calculateTotals } from "@/store";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { getUserAddresses, saveAddress } from "@/actions/address";
 import { getActiveDeliveryRegions } from "@/actions/deliveryRegions";
-import { createCheckoutSession } from "@/actions/createCheckoutSession";
 import { getVariantForCheckout, validateCouponAction, getDealDetailsAction, CouponValidationResult } from "@/actions/deals";
 import { addressSchema, AddressInput } from "@/lib/validations/address";
 import { verifyIndianPincode } from "@/lib/services/pincode";

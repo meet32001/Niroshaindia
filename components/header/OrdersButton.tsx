@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Package } from "lucide-react";
-import { fetchMyOrdersAction } from "@/actions/getOrders";
+import { fetchMyOrdersAction } from "@/actions/orders";
 import { useIsMounted } from "@/hooks/useIsMounted";
 
 export function OrdersButton() {

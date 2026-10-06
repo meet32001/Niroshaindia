@@ -67,10 +67,7 @@ function SuccessContent() {
               currency: "INR",
               customerEmail: "",
               customerName: snap.recipient_name || "Valued Customer",
-              paymentStatus:
-                o.payment_status === "pending_cod"
-                  ? "Cash on Delivery (Pending Inspection)"
-                  : `Paid (${snap.payment_method ? snap.payment_method.toUpperCase() : "Online Authorized"})`,
+              paymentStatus: `Paid (${snap.payment_method ? snap.payment_method.toUpperCase() : "Online Authorized"})`,
               address: snap,
               carrier: snap.carrier || "Blue Dart Express",
               trackingNumber: snap.tracking_number || "BLUEDART-IND-LIVE",

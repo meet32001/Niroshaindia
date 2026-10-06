@@ -14,13 +14,13 @@ export default async function StoreHomePage() {
         {/* 1. Top Hero Light Banner */}
         <HomeBanner />
 
-        {/* 2. Vijay Sales-Style Horizontal Category Bar & 3x5 Product Grid */}
+        {/* 2. Horizontal Category Bar & 3x5 Product Grid */}
         <HomeTabContainer initialProducts={initialProducts} />
 
         {/* 3. Popular Categories Grid */}
         <HomeCategories />
 
-        {/* 4. Vijay Sales-Style Discover Leading Brands Strip */}
+        {/* 4. Discover Leading Brands Strip */}
         <DiscoverBrandsSection />
       </Container>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import {
@@ -262,9 +262,6 @@ export function PaymentMethodSelector({
           <Badge className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
             RBI Verified
           </Badge>
-          <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold">
-            256-Bit SSL
-          </Badge>
         </div>
       </div>
 
@@ -476,7 +473,7 @@ export function PaymentMethodSelector({
                   Save card securely in compliance with RBI Tokenization guidelines
                 </span>
                 <span className="block text-[11px] text-slate-500 pt-0.5">
-                  Card details are encrypted using 256-bit SSL and tokenized without storing raw CVV.
+                  Card details are encrypted end-to-end and tokenized without storing raw CVV.
                 </span>
               </Label>
             </div>
@@ -694,7 +691,7 @@ export function PaymentMethodSelector({
 
           <p className="text-[11px] text-center text-slate-400 font-medium pt-3 flex items-center justify-center gap-1.5">
             <Lock className="w-3 h-3 text-emerald-600" />
-            <span>Guaranteed 256-Bit SSL Bank Grade Security • Zero Tampering Shield</span>
+            <span>Bank-Grade Encryption • Zero Tampering Shield</span>
           </p>
         </div>
       </form>

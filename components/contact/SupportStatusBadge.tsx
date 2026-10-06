@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clock, ShieldCheck } from "lucide-react";
+import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ISTStatus {

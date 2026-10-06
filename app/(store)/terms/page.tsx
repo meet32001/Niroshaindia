@@ -13,7 +13,6 @@ import {
   Scale,
   Ban,
   Building2,
-  Mail,
   ShieldAlert,
   ArrowRight,
   Truck,

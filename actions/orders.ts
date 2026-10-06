@@ -1,8 +1,9 @@
 'use server';
 
 import { getAuthenticatedCustomer } from '@/lib/db/customer-helper';
-import { currentUser } from '@clerk/nextjs/server';
+import { currentUser, auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { supabaseServer } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { sanitizeProductTitle } from '@/lib/utils';
 import type { CustomerOrderOption } from '@/types/contact';
@@ -442,6 +443,85 @@ export async function getCustomerOrdersForSelectAction(userEmail?: string): Prom
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error('Failed to load customer orders for contact form:', err);
     return { success: false, orders: [], message: errorMsg };
+  }
+}
+
+/**
+ * Internal helper for fetching lightweight orders after verifying session.
+ */
+async function _fetchOrdersForVerifiedUser(sessionUserId: string) {
+  const { data: customer, error: custErr } = await supabaseServer
+    .from('customers')
+    .select('id')
+    .eq('clerk_user_id', sessionUserId)
+    .maybeSingle();
+
+  if (custErr || !customer) {
+    // Fallback: query directly on orders table if customer row is still being synced
+    const { data: directOrders } = await supabaseServer
+      .from('orders')
+      .select('*')
+      .eq('clerk_user_id', sessionUserId)
+      .order('created_at', { ascending: false });
+    return directOrders || [];
+  }
+
+  const { data, error } = await supabaseServer
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        *,
+        product_variants (
+          name,
+          sku,
+          product_images ( image_url )
+        )
+      )
+    `)
+    .eq('customer_id', customer.id)
+    .order('created_at', { ascending: false });
+
+  if (!error && Array.isArray(data)) {
+    return data;
+  }
+  return [];
+}
+
+/**
+ * IDOR-safe wrapper: callers can pass a userId hint,
+ * but the server always verifies the session identity.
+ */
+export async function getMyOrders(userId: string) {
+  try {
+    const { userId: sessionUserId } = await auth();
+    if (!sessionUserId) return [];
+
+    if (userId && userId !== sessionUserId) {
+      console.warn(
+        `[IDOR BLOCK] getMyOrders called with userId=${userId} but session is ${sessionUserId}`
+      );
+      return [];
+    }
+
+    return await _fetchOrdersForVerifiedUser(sessionUserId);
+  } catch (error) {
+    console.error('Error fetching user orders from Supabase:', error);
+    return [];
+  }
+}
+
+/**
+ * Primary action used by header badge & pages — resolves userId strictly from session.
+ */
+export async function fetchMyOrdersAction() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return [];
+    return await _fetchOrdersForVerifiedUser(userId);
+  } catch (err) {
+    console.error('Error fetching orders action:', err);
+    return [];
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Star, Share2, Truck, RotateCcw, Package } from "lucide-react";
 import { ProductGallery } from "@/components/product/ProductGallery";

@@ -23,7 +23,7 @@ export const POPULAR_CATEGORIES: VisualCategory[] = [
     title: 'Air Conditioners',
     slug: 'ac',
     itemCountLabel: 'Inverter Split & Window ACs',
-    imageUrl: 'https://vsprod.vijaysales.com/media/catalog/product/2/5/254547_1__1.jpg?optimize=medium&fit=bounds',
+    imageUrl: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=600&auto=format&fit=crop&q=80',
     badge: 'Seasonal',
   },
   {

@@ -1,7 +1,7 @@
 import { Container } from "@/components/layout/Container";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Flame, Sparkles, Zap, Tag } from "lucide-react";
+import { Flame, Sparkles, Tag } from "lucide-react";
 import { DealsCountdown } from "@/components/deals/DealsCountdown";
 import { DealsCouponBar } from "@/components/deals/DealsCouponBar";
 import { ClaimDealButton } from "@/components/deals/ClaimDealButton";
