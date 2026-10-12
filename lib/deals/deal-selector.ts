@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface DealRecord {
   productId: number;
@@ -216,12 +216,19 @@ export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDeal
  * - If isBiweeklyFestivalBumperEligible(date) is true: adds a 7th Bumper item (< ₹2 Lakhs)
  *   with +15% anchor markup and 25% promo discount (yielding ~13.75% real markdown).
  */
-export async function selectWeeklyDeals(targetDate: Date = new Date()): Promise<SelectedDealProduct[]> {
+export async function selectWeeklyDeals(
+  targetDate: Date = new Date(),
+  supabaseClient?: SupabaseClient
+): Promise<SelectedDealProduct[]> {
   const seed = getWeeklyDealSeed(targetDate);
   const prng = createMulberry32(seed);
 
   try {
-    const supabase = supabaseAdmin;
+    let supabase = supabaseClient;
+    if (!supabase) {
+      const { supabaseAdmin } = await import("@/lib/supabase/admin");
+      supabase = supabaseAdmin;
+    }
 
     const baseDeals: SelectedDealProduct[] = [];
     const usedProductIds = new Set<number>();
@@ -494,8 +501,11 @@ async function fetchSeventhBumperProduct(
 /**
  * Standalone batch generator returning DealRecord format for external scripts/pipelines
  */
-export async function generateWeeklyDealsBatch(date: Date = new Date()): Promise<DealRecord[]> {
-  const selected = await selectWeeklyDeals(date);
+export async function generateWeeklyDealsBatch(
+  date: Date = new Date(),
+  supabaseClient?: SupabaseClient
+): Promise<DealRecord[]> {
+  const selected = await selectWeeklyDeals(date, supabaseClient);
   return selected.map((d) => ({
     productId: d.id,
     variantId: d.variantId,

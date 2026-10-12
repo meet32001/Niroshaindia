@@ -59,7 +59,7 @@ async function dispatchWeeklyDeals() {
 
   // Step A: Run High-Ticket Deal Selector Algorithm
   console.log("\n🔍 Selecting 6 high-ticket products across 6 distinct categories...");
-  const deals = await selectWeeklyDeals();
+  const deals = await selectWeeklyDeals(now, supabase);
 
   if (deals.length === 0) {
     console.error("❌ [ERROR] No high-ticket products could be selected.");
