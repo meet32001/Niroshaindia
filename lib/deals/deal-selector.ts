@@ -210,9 +210,46 @@ export function getPlaceholderDeals(targetDate: Date = new Date()): SelectedDeal
 }
 
 /**
+ * 6-Month (26 Weeks) Deal Rotation Engine:
+ * Queries past weekly_deals drops from the last 26 weeks (182 days) to exclude
+ * previously featured products from being picked again until 6 months pass.
+ */
+export async function fetchRecentDealProductIds(
+  supabase: any,
+  targetDate: Date = new Date(),
+  weeksBack: number = 26
+): Promise<Set<number>> {
+  const excludedIds = new Set<number>();
+  try {
+    const cutoffDate = new Date(targetDate.getTime() - weeksBack * 7 * 24 * 60 * 60 * 1000);
+
+    const { data: pastDrops, error } = await supabase
+      .from("weekly_deals")
+      .select("products, starts_at")
+      .gte("starts_at", cutoffDate.toISOString());
+
+    if (!error && Array.isArray(pastDrops)) {
+      for (const drop of pastDrops) {
+        if (Array.isArray(drop.products)) {
+          for (const item of drop.products) {
+            if (item && typeof item.id === "number") {
+              excludedIds.add(item.id);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[fetchRecentDealProductIds] Notice:", err);
+  }
+  return excludedIds;
+}
+
+/**
  * Generates the weekly deals batch:
  * - Deterministic: Same 6 products & discount prices across entire calendar week.
  * - Always 6 distinct category high-ticket items.
+ * - 6-Month Cooldown: Products selected in the past 26 weeks are strictly excluded.
  * - If isBiweeklyFestivalBumperEligible(date) is true: adds a 7th Bumper item (< ₹2 Lakhs)
  *   with +15% anchor markup and 25% promo discount (yielding ~13.75% real markdown).
  */
@@ -229,6 +266,10 @@ export async function selectWeeklyDeals(
       const { supabaseAdmin } = await import("@/lib/supabase/admin");
       supabase = supabaseAdmin;
     }
+
+    // Retrieve product IDs featured in the last 26 weeks (6-month exclusion cooldown)
+    const recentProductIds = await fetchRecentDealProductIds(supabase, targetDate, 26);
+    console.log(`[selectWeeklyDeals] Active 6-month cooldown exclusion list: ${recentProductIds.size} products.`);
 
     const baseDeals: SelectedDealProduct[] = [];
     const usedProductIds = new Set<number>();
@@ -256,7 +297,7 @@ export async function selectWeeklyDeals(
         .eq("product.is_active", true)
         .gte("price_cents", 2000000)
         .order("price_cents", { ascending: false })
-        .limit(20);
+        .limit(40);
 
       if (error || !variants || variants.length === 0) {
         // Fallback: If no ₹20k item exists in this specific child bucket, try ₹10k+ floor
@@ -281,22 +322,22 @@ export async function selectWeeklyDeals(
           .eq("product.is_active", true)
           .gte("price_cents", 1000000)
           .order("price_cents", { ascending: false })
-          .limit(10);
+          .limit(30);
 
         if (fallbackVariants && fallbackVariants.length > 0) {
-          await assignStandardDeal(fallbackVariants, bucket, usedProductIds, baseDeals, supabase, prng);
+          await assignStandardDeal(fallbackVariants, bucket, usedProductIds, recentProductIds, baseDeals, supabase, prng);
         }
         continue;
       }
 
-      await assignStandardDeal(variants, bucket, usedProductIds, baseDeals, supabase, prng);
+      await assignStandardDeal(variants, bucket, usedProductIds, recentProductIds, baseDeals, supabase, prng);
     }
 
     // Backfill any missing slots from fallback if catalog is sparse
     if (baseDeals.length < 6) {
       const placeholders = getPlaceholderDeals(targetDate);
       for (const ph of placeholders) {
-        if (!ph.isBumperDeal && !usedProductIds.has(ph.id) && baseDeals.length < 6) {
+        if (!ph.isBumperDeal && !usedProductIds.has(ph.id) && !recentProductIds.has(ph.id) && baseDeals.length < 6) {
           baseDeals.push(ph);
         }
       }
@@ -305,7 +346,7 @@ export async function selectWeeklyDeals(
     // 2. Check Bi-Weekly Festival Bumper Deal (The 7th Product)
     const isBumperActive = isBiweeklyFestivalBumperEligible(targetDate);
     if (isBumperActive) {
-      const bumperDeal = await fetchSeventhBumperProduct(supabase, usedProductIds, prng);
+      const bumperDeal = await fetchSeventhBumperProduct(supabase, usedProductIds, recentProductIds, prng);
       if (bumperDeal) {
         return [bumperDeal, ...baseDeals];
       }
@@ -321,22 +362,32 @@ export async function selectWeeklyDeals(
 
 /**
  * Assigns one standard deal from candidate variants using deterministic PRNG
+ * Enforces strict 6-month cooldown exclusion with safety fallback.
  */
 async function assignStandardDeal(
   variants: any[],
   bucket: (typeof HIGH_TICKET_BUCKETS)[0],
   usedProductIds: Set<number>,
+  recentProductIds: Set<number>,
   selectedDeals: SelectedDealProduct[],
   supabase: any,
   prng: () => number
 ) {
-  const candidateVariants = variants.filter(
-    (v) => v.product && !usedProductIds.has(v.product.id)
+  // First priority: candidates not used in current batch AND not featured in last 26 weeks
+  let candidateVariants = variants.filter(
+    (v) => v.product && !usedProductIds.has(v.product.id) && !recentProductIds.has(v.product.id)
   );
+
+  // Safety fallback: if all products in this category were used within 26 weeks, allow from remaining
+  if (candidateVariants.length === 0) {
+    candidateVariants = variants.filter(
+      (v) => v.product && !usedProductIds.has(v.product.id)
+    );
+  }
 
   if (candidateVariants.length === 0) return;
 
-  const randomIndex = Math.floor(prng() * Math.min(candidateVariants.length, 5));
+  const randomIndex = Math.floor(prng() * Math.min(candidateVariants.length, 10));
   const chosenVariant = candidateVariants[randomIndex];
   const product = chosenVariant.product;
 
@@ -403,6 +454,7 @@ async function assignStandardDeal(
 async function fetchSeventhBumperProduct(
   supabase: any,
   usedProductIds: Set<number>,
+  recentProductIds: Set<number>,
   prng: () => number
 ): Promise<SelectedDealProduct | null> {
   const TWO_LAKHS_CENTS = 20000000;
@@ -429,16 +481,23 @@ async function fetchSeventhBumperProduct(
     .gte("price_cents", TWENTY_THOUSAND_CENTS)
     .lt("price_cents", TWO_LAKHS_CENTS)
     .order("price_cents", { ascending: false })
-    .limit(30);
+    .limit(50);
 
   if (error || !bumperCandidates || bumperCandidates.length === 0) {
     return null;
   }
 
-  // Filter out any products already selected in the 6 base deals
-  const eligibleCandidates = bumperCandidates.filter(
-    (v: any) => v.product && !usedProductIds.has(v.product.id)
+  // Filter out products already selected in current batch AND products featured in last 26 weeks
+  let eligibleCandidates = bumperCandidates.filter(
+    (v: any) => v.product && !usedProductIds.has(v.product.id) && !recentProductIds.has(v.product.id)
   );
+
+  // Safety fallback if all available items are inside the 26-week window
+  if (eligibleCandidates.length === 0) {
+    eligibleCandidates = bumperCandidates.filter(
+      (v: any) => v.product && !usedProductIds.has(v.product.id)
+    );
+  }
 
   if (eligibleCandidates.length === 0) return null;
 
